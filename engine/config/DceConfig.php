@@ -74,12 +74,19 @@ class DceConfig extends Config {
     ];
 
     /** @var array Session配置 */
+    #[ArrayShape([
+        'name' => 'string',
+        'auto_start' => 'bool',
+        'ttl' => 'int',
+        'root' => 'string|int',
+        'class' => 'string',
+    ])]
     public array $session = [
         'name' => 'dcesid', // Sid名
-        'auto_start' => 1, // 是否自动启动
+        'auto_start' => 0, // 是否自动启动
         'ttl' => 3600, // Session存活时间
-//        'save_path' => '',
-//        'save_class' => '',
+        'root' => APP_RUNTIME . 'session/', // 文件型Session处理器根目录或RedisSession处理器库号
+        'class' => '\dce\project\request\SessionFile', // Session处理器类名
     ];
 
     /** @var array|string[] 需内置Http服务忽略的请求路径 */

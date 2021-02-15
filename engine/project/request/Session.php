@@ -16,6 +16,19 @@ abstract class Session {
     private string $sid;
 
     /**
+     * 根据Request开启Session
+     * @param Request $request
+     * @return static
+     */
+    public static function inst(Request $request): static {
+        $instance = new $request->config->session['class']($request);
+        if ($request->config->session['auto_start'] ?: 0) {
+            $instance->open($request);
+        }
+        return $instance;
+    }
+
+    /**
      * 取Session Id键名
      * @return string
      */
@@ -38,19 +51,28 @@ abstract class Session {
 
     /**
      * 取SID
+     * @param bool $withPrefix
      * @return string|null
      */
-    public function getId(): string|null {
-        return $this->sid ?? null;
+    public function getId(bool $withPrefix = true): string|null {
+        if (! isset($this->sid)) {
+            return null;
+        }
+        return ($withPrefix ? Dce::getId() . ':' . self::getSidName() . ':' : '') . $this->sid;
     }
 
     /**
-     * 根据Request开启Session
+     * 开启Session并初始化
      * @param Request $request
      */
-    public function openByRequest(Request $request): void {
-        if ($request->config->session['auto_start'] ?: 0) {
-            $this->open($request);
+    protected function openInit(Request $request): void {
+        if (! $this->getId(false)) {
+            $id = $request->cookie->get(self::getSidName());
+            if (! $id) {
+                $id = sha1(uniqid('', true));
+                $request->cookie->set(self::getSidName(), $id);
+            }
+            $this->setId($id);
         }
     }
 

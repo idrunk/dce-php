@@ -32,6 +32,13 @@ final class VarCache extends CacheClearable {
     }
 
     /** @inheritDoc */
+    public function touch(array|string $key, int $expiry = 0): bool {
+        $key = self::genKey($key);
+        self::$cacheMapping[$key]['update_time'] = time();
+        return true;
+    }
+
+    /** @inheritDoc */
     public function inc(string|array $key, float $value = 1): int|float|false {
         $key = self::genKey($key);
         return self::$cacheMapping[$key]['data'] += $value;

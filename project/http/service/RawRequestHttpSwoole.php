@@ -8,7 +8,7 @@ namespace http\service;
 
 use dce\project\request\RawRequestHttp;
 use dce\project\request\Request;
-use dce\project\request\SessionRedis;
+use dce\project\request\Session;
 use dce\project\request\Url;
 use Swoole\Http\Request as RequestSwoole;
 use Swoole\Http\Response as ResponseSwoole;
@@ -82,8 +82,7 @@ class RawRequestHttpSwoole extends RawRequestHttp {
     /** @inheritDoc */
     protected function supplementHttpRequest(Request $request): array {
         $request->cookie = new CookieSwoole($this);
-        $request->session = new SessionRedis();
-        $request->session->openByRequest($request);
+        $request->session = Session::inst($request);
         $request->url = new Url($this);// 补充相关请求参数
 
         // 补充相关请求参数

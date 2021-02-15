@@ -88,6 +88,10 @@ final class CacheManager {
         return $this->default->set($key, $value, $expiry);
     }
 
+    public function touch(string|array $key, int $expiry = 0): bool {
+        return $this->default->touch($key, $expiry);
+    }
+
     public function inc(string|array $key, float $value = 1): int|float|false {
         return $this->default->inc($key, $value);
     }

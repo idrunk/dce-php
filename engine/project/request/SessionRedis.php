@@ -6,60 +6,52 @@
 
 namespace dce\project\request;
 
-use dce\Dce;
-use dce\storage\redis\RedisPool;
+use dce\storage\redis\DceRedis;
 
 class SessionRedis extends Session {
     /** @inheritDoc */
     public function open(Request $request): void {
-        if (! $this->getId()) {
-            $id = $request->cookie->get(self::getSidName());
-            if (! $id) {
-                $id = self::getSidName() . '-' . Dce::getId() . ':' . sha1(uniqid('', true));
-                $request->cookie->set(self::getSidName(), $id);
-            }
-            $this->setId($id);
-        }
-        $redis = RedisPool::inst()->setConfigs(Dce::$config->redis)->fetch();
+        $this->openInit($request);
+        $redis = DceRedis::get();
         // 更新session过期时间
         $redis->expire($this->getId(), $request->config->session['ttl'] ?? 3600);
-        RedisPool::inst()->put($redis);
+        DceRedis::put($redis);
     }
 
     /** @inheritDoc */
-    public function set(string $key, $value): void {
-        $redis = RedisPool::inst()->fetch();
+    public function set(string $key, mixed $value): void {
+        $redis = DceRedis::get();
         $redis->hSet($this->getId(), $key, $value);
-        RedisPool::inst()->put($redis);
+        DceRedis::put($redis);
     }
 
     /** @inheritDoc */
     public function get(string $key): mixed {
-        $redis = RedisPool::inst()->fetch();
+        $redis = DceRedis::get();
         $value = $redis->hGet($this->getId(), $key);
-        RedisPool::inst()->put($redis);
+        DceRedis::put($redis);
         return $value;
     }
 
     /** @inheritDoc */
     public function getAll(): array {
-        $redis = RedisPool::inst()->fetch();
+        $redis = DceRedis::get();
         $value = $redis->hGetAll($this->getId());
-        RedisPool::inst()->put($redis);
+        DceRedis::put($redis);
         return $value;
     }
 
     /** @inheritDoc */
     public function delete(string $key): void {
-        $redis = RedisPool::inst()->fetch();
+        $redis = DceRedis::get();
         $redis->hDel($this->getId(), $key);
-        RedisPool::inst()->put($redis);
+        DceRedis::put($redis);
     }
 
     /** @inheritDoc */
     public function destroy(): void {
-        $redis = RedisPool::inst()->fetch();
+        $redis = DceRedis::get();
         $redis->del($this->getId());
-        RedisPool::inst()->put($redis);
+        DceRedis::put($redis);
     }
 }

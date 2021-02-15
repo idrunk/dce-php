@@ -85,6 +85,14 @@ abstract class Cache {
     abstract public function set(string|array $key, mixed $value, int $expiry = 0): bool;
 
     /**
+     * 重置有效时长
+     * @param string|array $key
+     * @param int $expiry
+     * @return bool
+     */
+    abstract public function touch(string|array $key, int $expiry = 0): bool;
+
+    /**
      * @param string|array $key
      * @param float $value
      * @return int|float|false

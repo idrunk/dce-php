@@ -45,6 +45,11 @@ final class MemcachedCache extends Cache {
         return $this->getInst()->set($key, $value, $expiry);
     }
 
+    public function touch(array|string $key, int $expiry = 0): bool {
+        $key = self::genKey($key);
+        return $this->getInst()->touch($key, $expiry);
+    }
+
     public function inc(string|array $key, float $value = 1): int|float|false {
         $key = self::genKey($key);
         return $this->getInst()->increment($key, $value);

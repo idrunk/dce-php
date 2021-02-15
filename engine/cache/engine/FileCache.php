@@ -29,8 +29,15 @@ class FileCache extends CacheClearable {
         $filename = $this->key2path($key);
         $content = serialize($value);
         $fd = fopen($filename, 'wb');
+        flock($fd, LOCK_EX);
         fwrite($fd, $expiry . self::EXPIRY_SEPARATOR . $content);
+        flock($fd, LOCK_UN);
         return fclose($fd);
+    }
+
+    public function touch(array|string $key, int $expiry = 0): bool {
+        $filename = $this->key2path($key);
+        return touch($filename);
     }
 
     // 不安全, 需加锁, 先不管
