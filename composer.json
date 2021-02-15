@@ -1,0 +1,28 @@
+{
+    "name": "idrunk/dce",
+    "description": "DCE, A network programming framework with sharding middleware",
+    "keywords": ["dce", "swoole", "websocket", "sharding", "rcr"],
+    "homepage": "https://drunkce.com",
+    "type": "library",
+    "license": "MulanPSL-2.0",
+    "authors": [
+        {
+            "name": "Drunk",
+            "homepage": "http://idrunk.net"
+        }
+    ],
+    "require": {
+        "php": ">=8.0",
+        "ext-json": "*",
+        "ext-pdo": "*",
+        "ext-redis": "*",
+        "ext-sockets": "*",
+        "swoole/ide-helper": "@dev"
+    },
+    "require-dev": {
+        "fakerphp/faker": "^1.13"
+    },
+    "autoload": {
+        "files": ["dce.php"]
+    }
+}
