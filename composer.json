@@ -13,10 +13,6 @@
     ],
     "require": {
         "php": ">=8.0",
-        "ext-json": "*",
-        "ext-pdo": "*",
-        "ext-redis": "*",
-        "ext-sockets": "*",
         "swoole/ide-helper": "@dev"
     },
     "require-dev": {
