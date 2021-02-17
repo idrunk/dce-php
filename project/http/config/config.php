@@ -12,7 +12,7 @@ return [
     ],
     'swoole_http' => [
         'enable_static_handler' => true,
-        'document_root' => dce\Dce::$config->wwwPath,
+        'document_root' => APP_WWW,
     ],
     '#extends' => [
         APP_COMMON . 'config/http.php',

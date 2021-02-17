@@ -12,7 +12,7 @@ return [
     ],
     'swoole_websocket' => [
         'enable_static_handler' => true,
-        'document_root' => dce\Dce::$config->wwwPath,
+        'document_root' => APP_WWW,
     ],
     '#extends' => [ // 扩展用户自定义的配置
         APP_COMMON . 'config/websocket.php',

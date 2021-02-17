@@ -34,9 +34,6 @@ class DceConfig extends Config {
      */
     public array|null $projectPaths = null;
 
-    /** @var string 静态资源目录/Cgi入口目录 */
-    public string $wwwPath = APP_ROOT . 'www/';
-
     /** @var bool 是否重写模式, 用于生成伪静态Url */
     public bool $rewriteMode = false;
 

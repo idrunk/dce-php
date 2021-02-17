@@ -1,7 +1,7 @@
 {
     "name": "idrunk/dce",
     "description": "DCE, A network programming framework with sharding middleware",
-    "keywords": ["dce", "swoole", "websocket", "sharding", "rcr"],
+    "keywords": ["dce", "swoole", "websocket", "sharding", "rcr", "rpc", "pool"],
     "homepage": "https://drunkce.com",
     "type": "library",
     "license": "MulanPSL-2.0",

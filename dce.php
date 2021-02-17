@@ -20,6 +20,8 @@ defined('APP_COMMON') or define('APP_COMMON', APP_ROOT . 'common/');
 defined('APP_PROJECT_ROOT') or define('APP_PROJECT_ROOT', APP_ROOT . 'project/');
 // 应用运行时目录
 defined('APP_RUNTIME') or define('APP_RUNTIME', APP_ROOT .'runtime/');
+// Cgi入口/静态文件目录
+defined('APP_WWW') or define('APP_WWW', APP_ROOT .'www/');
 
 require_once DCE_ROOT . 'engine/Loader.php';
 dce\Loader::init();
