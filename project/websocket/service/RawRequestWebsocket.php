@@ -6,6 +6,7 @@
 
 namespace websocket\service;
 
+use dce\Dce;
 use dce\project\request\Request;
 use dce\service\server\RawRequestConnection;
 use Swoole\WebSocket\Frame;
@@ -49,6 +50,7 @@ class RawRequestWebsocket extends RawRequestConnection {
         if (is_array($this->dataParsed)) {
             $request->request = $this->dataParsed;
         }
+        $request->session = Dce::$cache->var->get(['session', $request->fd]);
     }
 
     /** @inheritDoc */

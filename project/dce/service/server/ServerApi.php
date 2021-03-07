@@ -47,10 +47,10 @@ class ServerApi extends RpcMatrix {
      * 向Tcp客户端推送消息
      * @param int $fd
      * @param mixed $value
-     * @param string $path
+     * @param string|false $path
      * @return bool
      */
-    public static function send(int $fd, mixed $value, string $path): bool {
+    public static function send(int $fd, mixed $value, string|false $path): bool {
         return static::$server->send($fd, $value, $path);
     }
 
@@ -59,10 +59,21 @@ class ServerApi extends RpcMatrix {
      * @param string $host
      * @param int $port
      * @param mixed $value
-     * @param string $path
+     * @param string|false $path
      * @return bool
      */
-    public static function sendTo(string $host, int $port, mixed $value, string $path): bool {
+    public static function sendTo(string $host, int $port, mixed $value, string|false $path): bool {
         return static::$server->sendTo($host, $port, $value, $path);
+    }
+
+    /**
+     * 向Websocket客户端推送消息
+     * @param int $fd
+     * @param mixed $value
+     * @param string|false $path
+     * @return bool
+     */
+    public static function push(int $fd, mixed $value, string|false $path): bool {
+        return self::$server->push($fd, $value, $path);
     }
 }

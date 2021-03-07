@@ -62,12 +62,12 @@ class RpcServer {
 
     /**
      * 预加载Rpc命名空间
-     * @param string $root
      * @param string $wildcard
+     * @param string $root
      * @return $this
      * @throws null
      */
-    public function prepare(string $root, string $wildcard = RpcUtility::DEFAULT_NAMESPACE_WILDCARD): self {
+    public function prepare(string $wildcard, string $root): self {
         if (! is_dir($root)) {
             throw new RpcException('预载命名空间根目录不存在');
         }
@@ -107,7 +107,7 @@ class RpcServer {
             usleep(200000);
         } else {
             $this->prepareService();
-            $this->run();
+            $this->run($useAsyncServer);
         }
     }
 
@@ -151,6 +151,9 @@ class RpcServer {
         }
         $server->on('receive', function (aServer $aServer, int $fd, int $reactorId, string $requestData) use ($rpcHost) {
             try {
+                if (! $requestData) {
+                    return; // "0"视为ping, 无需处理
+                }
                 // 鉴权并提取信息
                 $clientInfo = $aServer->getClientInfo($fd);
                 [$className, $methodName, $arguments] = self::accept([
@@ -194,21 +197,23 @@ class RpcServer {
         foreach ($this->rpcHosts as $rpcHost) {
             go(function () use($rpcHost) {
                 $server = new Server(($rpcHost->isUnixSock ? 'unix:' : '') . $rpcHost->host, $rpcHost->port);
-                //收到15信号关闭服务
-                Process::signal(SIGTERM, function () use ($server) {
-                    $server->shutdown();
-                });
                 $server->handle(function (Server\Connection $connection) use ($rpcHost) {
                     while (1) {
                         try {
                             $requestData = $connection->recv();
-                            if (empty($requestData)) {
-                                $connection->close();
-                                break;
+                            $socket = $connection->exportSocket();
+                            if (! $requestData) {
+                                if ($socket->errCode > 0) {
+                                    $connection->close();
+                                    echo "{$socket->errMsg}, code: {$socket->errCode}, fd: {$socket->fd}\n";
+                                    break;
+                                }
+                                // 如果是"0", 则为ping
+                                continue;
                             }
                             // 鉴权并提取信息
                             [$className, $methodName, $arguments] = self::accept([
-                                'client_ip' => $connection->exportSocket()->getsockname()['address'],
+                                'client_ip' => $socket->getsockname()['address'],
                             ], $requestData, $rpcHost);
                             // 执行被请求的Rpc方法
                             $result = self::execute($className, $methodName, $arguments);

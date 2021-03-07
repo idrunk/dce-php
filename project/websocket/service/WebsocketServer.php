@@ -6,9 +6,11 @@
 
 namespace websocket\service;
 
+use dce\Dce;
 use dce\project\ProjectManager;
 use dce\project\request\Request as DceRequest;
 use dce\project\request\Session;
+use dce\project\request\SessionManager;
 use dce\service\server\RawRequestConnection;
 use dce\service\server\ServerMatrix;
 use Swoole\Http\Request;
@@ -19,10 +21,6 @@ use Throwable;
 
 class WebsocketServer extends ServerMatrix {
     protected static string $localRpcHost = '/var/run/dce_websocket_api.sock';
-
-    protected static string $serverApiPath = __DIR__ . '/WebsocketServerApi.php';
-
-    protected static string $serverApiClass = 'rpc\websocket\service\WebsocketServerApi';
 
     /** @var string 定义RawRequest类名, (可在子类覆盖此属性使用自定义RawRequest类) */
     protected static string $rawRequestWebsocketClass = RawRequestWebsocket::class;
@@ -51,9 +49,9 @@ class WebsocketServer extends ServerMatrix {
         $host = $param['host'] ?? $websocketConfig['host'];
         $port = $param['port'] ?? $websocketConfig['port'];
         $extraPorts = $websocketConfig['extra_ports'] ?? [];
-        $this->apiHost = $websocketConfig['api_host'] ?? '';
-        $this->apiPort = $websocketConfig['api_port'] ?? 0;
-        $this->apiPassword = $websocketConfig['api_password'] ?? '';
+        $this->apiHost = $param['api_host'] ?? $websocketConfig['api_host'] ?? '';
+        $this->apiPort = $param['api_port'] ?? $websocketConfig['api_port'] ?? 0;
+        $this->apiPassword = $param['api_password'] ?? $websocketConfig['api_password'] ?? '';
 
         $swooleWebsocketConfig = $this->projectConfig->swooleWebsocket ?: [];
         $swooleWebsocketEvents = $this->eventsToBeBound();
@@ -67,7 +65,6 @@ class WebsocketServer extends ServerMatrix {
             $this->server->listen($extraHost, $extraPort, SWOOLE_SOCK_TCP);
         }
         $this->eventBeforeStart($this->server);
-        $this->sessionManager = $this->genSessionManager();
 
         $this->server->on('open', function (Server $server, Request $request) {
             try {
@@ -86,6 +83,7 @@ class WebsocketServer extends ServerMatrix {
         });
 
         $this->server->on('close', function (Server $server, int $fd, int $reactorId) {
+            // 不仅websocket的close会进到这里, http以及一个疑似ws握手的连接close也会进来.
             try {
                 $this->takeoverClose($server, $fd, $reactorId);
             } catch (Throwable $throwable) {
@@ -124,8 +122,9 @@ class WebsocketServer extends ServerMatrix {
      * @param Request $request
      */
     protected function takeoverOpen(Server $server, Request $request): void {
-        // Session Manager记录fd与sid
-        $this->sessionManager->logFdBySid($request->cookie[Session::getSidName()] ?? '', $request->fd, $this->apiHost, $this->apiPort, 'websocket');
+        $session = Session::newBySid($request->cookie[Session::getSidName()] ?? true);
+        Dce::$cache->var->set(['session', $request->fd], $session);
+        SessionManager::inst()->connect($session->getId(), $request->fd, $this->apiHost, $this->apiPort, self::SM_EXTRA_WS);
         $this->eventOnOpen($server, $request);
     }
 
@@ -139,7 +138,6 @@ class WebsocketServer extends ServerMatrix {
         $rawRequest = new static::$rawRequestWebsocketClass($this, $frame);
         $rawRequest->init();
         $request = new DceRequest($rawRequest);
-        $request->setSessionManager($this->sessionManager);
         $request->route();
     }
 

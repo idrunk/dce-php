@@ -14,6 +14,12 @@ final class VarCache extends CacheClearable {
     public function __construct(array $config) {}
 
     /** @inheritDoc */
+    public function exists(string|array $key): bool {
+        $key = self::genKey($key);
+        return key_exists($key, self::$cacheMapping);
+    }
+
+    /** @inheritDoc */
     public function get(string|array $key): mixed {
         return $this->getClearExpired($key);
     }

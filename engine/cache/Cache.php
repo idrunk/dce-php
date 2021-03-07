@@ -72,6 +72,12 @@ abstract class Cache {
 
     /**
      * @param string|array $key
+     * @return bool
+     */
+    abstract public function exists(string|array $key): bool;
+
+    /**
+     * @param string|array $key
      * @return mixed
      */
     abstract public function get(string|array $key): mixed;

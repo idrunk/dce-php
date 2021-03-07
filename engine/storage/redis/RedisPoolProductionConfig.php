@@ -18,7 +18,7 @@ class RedisPoolProductionConfig extends PoolProductionConfig {
 
     public int $port;
 
-    public string $token;
+    public string $password;
 
     private const CAPACITY_DEFAULT = 16;
 

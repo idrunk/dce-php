@@ -251,7 +251,7 @@ class Url {
      * @return string
      */
     public function getCurrent (): string {
-        $host = 'http' . ($this->request->isHttps === "on" ? 's' : '') . '://' . $this->request->host; // 自带port
+        $host = 'http' . ($this->request->isHttps ? 's' : '') . '://' . $this->request->host; // 自带port
         return self::fill($this->request->requestUri, $host);
     }
 }

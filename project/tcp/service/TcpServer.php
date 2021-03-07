@@ -15,10 +15,6 @@ use Throwable;
 class TcpServer extends ServerMatrix {
     protected static string $localRpcHost = '/var/run/dce_tcp_api.sock';
 
-    protected static string $serverApiPath = __DIR__ . '/TcpServerApi.php';
-
-    protected static string $serverApiClass = 'rpc\tcp\service\TcpServerApi';
-
     private Server $server;
 
     /**
@@ -38,9 +34,9 @@ class TcpServer extends ServerMatrix {
         $mode = $param['mode'] ?? $tcpConfig['mode'];
         $sockType = $param['sock_type'] ?? $tcpConfig['sock_type'];
         $extraPorts = $tcpConfig['extra_ports'] ?? [];
-        $this->apiHost = $tcpConfig['api_host'] ?? '';
-        $this->apiPort = $tcpConfig['api_port'] ?? 0;
-        $this->apiPassword = $tcpConfig['api_password'] ?? '';
+        $this->apiHost = $param['api_host'] ?? $tcpConfig['api_host'] ?? '';
+        $this->apiPort = $param['api_port'] ?? $tcpConfig['api_port'] ?? 0;
+        $this->apiPassword = $param['api_password'] ?? $tcpConfig['api_password'] ?? '';
 
         $swooleTcpConfig = $this->projectConfig->swooleTcp ?: [];
         $swooleTcpEvents = $this->eventsToBeBound();
@@ -54,7 +50,6 @@ class TcpServer extends ServerMatrix {
             $this->server->listen($extraHost, $extraPort, $extraSockType);
         }
         $this->eventBeforeStart($this->server);
-        $this->sessionManager = $this->genSessionManager();
 
         $this->server->on('connect', function (Server $server, int $fd, int $reactorId) {
             try {

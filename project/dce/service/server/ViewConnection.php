@@ -19,12 +19,13 @@ abstract class ViewConnection extends ViewCli {
 
     /**
      * 响应客户端, 回发数据
+     * @param mixed $content
      * @param string|false|null $path
      * @return mixed
      */
-    protected function response(string|false|null $path = null): mixed {
+    protected function response(mixed $content = false, string|false|null $path = null): mixed {
         // 如果未指定路径, 则返回请求路径
         $path ??= $this->request->rawRequest->path;
-        return $this->request->rawRequest->response($this->getAllAssignedStatus(), $path);
+        return $this->request->rawRequest->response(false === $content ? $this->getAllAssignedStatus() : $content, $path);
     }
 }

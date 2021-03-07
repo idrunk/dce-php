@@ -21,6 +21,11 @@ class FileCache extends CacheClearable {
         }
     }
 
+    public function exists(string|array $key): bool {
+        $filename = $this->key2path($key);
+        return file_exists($filename);
+    }
+
     public function get(string|array $key): mixed {
         return $this->getClearExpired($key);
     }

@@ -31,7 +31,7 @@ abstract class Cookie {
      * @param bool $secure
      * @param bool $httpOnly
      */
-    abstract public function set(string $key, $value = "", $expire = 0, $path = "", $domain = "", $secure = false, $httpOnly = false): void;
+    abstract public function set(string $key, string $value = "", int $expire = 0, string $path = "", string $domain = "", bool $secure = false, bool $httpOnly = false): void;
 
     /**
      * 删除某个Cookie值

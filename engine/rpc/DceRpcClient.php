@@ -50,7 +50,7 @@ final class DceRpcClient {
                     throw new RpcException('rpc_servers[][]配置异常');
                 }
             }
-            RpcClient::prepare($hosts, $wildcards);
+            RpcClient::prepare($wildcards, $hosts);
         }
     }
 }

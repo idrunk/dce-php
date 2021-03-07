@@ -88,7 +88,7 @@ abstract class Pool {
             }
             if ($matchedInstanceConfig) {
                 // 若新配置匹配到配置实例, 则扩展该实例
-                $matchedInstanceConfig->setProperties($config);
+                $matchedInstanceConfig->extend($config);
             } else {
                 $matchedInstanceConfig = new $this->configClass($config);
                 $channel = new self::$channelClass;

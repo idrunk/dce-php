@@ -10,7 +10,7 @@ use dce\config\ConfigException;
 use dce\project\request\Request;
 use dce\project\view\ViewCli;
 use http\service\HttpServer;
-use rpc\http\service\HttpServerApi;
+use rpc\dce\service\RpcServerApi;
 
 class HttpServerController extends ViewCli {
     private HttpServer $server;
@@ -30,17 +30,17 @@ class HttpServerController extends ViewCli {
     }
 
     public function stop() {
-        HttpServerApi::stop();
+        RpcServerApi::stop();
         $this->print('Http server was stopped.');
     }
 
     public function reload() {
-        HttpServerApi::reload();
+        RpcServerApi::reload();
         $this->print('Http server was reloaded.');
     }
 
     public function status() {
-        $status = HttpServerApi::status();
+        $status = RpcServerApi::status();
         $status = json_encode($status, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         $this->print($status);
     }

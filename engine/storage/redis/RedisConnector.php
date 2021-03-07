@@ -20,14 +20,15 @@ class RedisConnector {
         }
         if (
             $persistent
-            ? ! $this->redis->pconnect($config['host'], $config['port'], 1)
-            : ! $this->redis->connect($config['host'], $config['port'], 1)
+            ? ! $this->redis->pconnect($config['host'], $config['port'], 3)
+            : ! $this->redis->connect($config['host'], $config['port'], 3)
         ) {
             throw new PoolException('生成连接实例失败, 无法连接到Redis服务');
         }
-        if (isset($config['index'])) {
-            $this->redis->select((int) $config['index']);
+        if ($config['index'] > 0) {
+            $this->redis->select($config['index']);
         }
+        $this->redis->setOption(Redis::OPT_SCAN, Redis::SCAN_RETRY);
         $this->redis->setOption(Redis::OPT_SERIALIZER, Redis::SERIALIZER_PHP);
     }
 

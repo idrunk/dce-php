@@ -66,7 +66,7 @@ class RawRequestHttpCgi extends RawRequestHttp {
     public function supplementHttpRequest(Request $request): array {
         // 实例化Session
         $request->cookie = new CookieCgi();
-        $request->session = Session::inst($request);
+        $request->session = Session::newByRequest($request);
         $request->url = new Url($this);
 
         // 补充相关请求参数

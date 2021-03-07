@@ -61,15 +61,15 @@ final class CacheManager {
     }
 
     private function initRedisCache(): void {
-        $this->redis = new RedisCache(Dce::$config->redis ?? []);
+        $this->redis = new RedisCache(Dce::$config->cache['redis']);
     }
 
     private function initMemcacheCache(): void {
-        $this->memcache = new MemcacheCache(Dce::$config->cache['memcache'] ?? []);
+        $this->memcache = new MemcacheCache(Dce::$config->cache['memcache']);
     }
 
     private function initMemcachedCache(): void {
-        $this->memcached = new MemcachedCache(Dce::$config->cache['memcached'] ?? []);
+        $this->memcached = new MemcachedCache(Dce::$config->cache['memcached']);
     }
 
     private function initVarCache(): void {

@@ -51,6 +51,7 @@ class DceConfig extends Config {
         'file' => [ 'dir' => 'string', 'template_dir' => 'string', ],
         'memcache' => [ 'host' => 'string', 'backup_on' => 'bool', ],
         'memcached' => [ 'host' => 'string', 'backup_on' => 'bool', ],
+        'redis' => ['index' => 'int'],
     ])]
     public array $cache = [
         'default' => 'file',
@@ -58,32 +59,41 @@ class DceConfig extends Config {
             'dir' => APP_RUNTIME .'cache/', // 文件缓存目录
             'template_dir' => APP_RUNTIME . 'tpl/', // PHP模板文件缓存目录
         ],
-//        'memcache' => [
+        'memcache' => [
 //            'host' => '', // 缓存服务器
 //            'port' => 0,
-//            'backup_on' => false, // 是否备份
-//        ],
-//        'memcached' => [
+            'backup_on' => false, // 是否备份
+        ],
+        'memcached' => [
 //            'host' => '', // 缓存服务器
 //            'port' => 0,
-//            'backup_on' => false, // 是否备份
-//        ],
+            'backup_on' => false, // 是否备份
+        ],
+        'redis' => [
+            'index' => 0,
+        ],
     ];
 
     /** @var array Session配置 */
     #[ArrayShape([
         'name' => 'string',
-        'auto_start' => 'bool',
+        'auto_open' => 'bool',
         'ttl' => 'int',
-        'root' => 'string|int',
         'class' => 'string',
+        'root' => 'string',
+        'index' => 'int',
+        'manager_class' => 'string',
+        'manager_index' => 'int',
     ])]
     public array $session = [
         'name' => 'dcesid', // Sid名
-        'auto_start' => 0, // 是否自动启动
+        'auto_open' => 0, // 是否自动启动
         'ttl' => 3600, // Session存活时间
-        'root' => APP_RUNTIME . 'session/', // 文件型Session处理器根目录或RedisSession处理器库号
-        'class' => '\dce\project\request\SessionFile', // Session处理器类名
+        'class' => '', // 未指定Session类则Dce自行选择
+        'root' => APP_RUNTIME . 'session/', // 文件型Session处理器根目录
+        'index' => 0, // RedisSession处理器库号
+        'manager_class' => '', // 留空表示Dce执行选择SessionManager类
+        'manager_index' => 0,
     ];
 
     /** @var array|string[] 需内置Http服务忽略的请求路径 */
@@ -91,18 +101,14 @@ class DceConfig extends Config {
         '/favicon.ico',
     ];
 
-    /**
-     * @var array Redis配置
-     * <pre>
-     * [
-     *    'host' => '127.0.0.1',
-     *    'port' => 6379,
-     *    'password' => 'password',
-     *    'index' => 0, // 默认库号
-     * ]
-     * </pre>
-     */
-    public array $redis;
+    /** @var array Redis配置 */
+    #[ArrayShape([
+        'host' => 'string', // 127.0.0.1
+        'port' => 'int', // 6379
+        'password' => 'string', // password
+        'index' => 'int',
+    ])]
+    public array $redis = ['index' => 0];
 
     /**
      * @var DbConfig Mysql配置 (用户配置为数组, DCE会自动将其实例化为对象)
@@ -230,45 +236,47 @@ class DceConfig extends Config {
      */
     public array $rpcServers = [];
 
-    /**
-     * @var array 内置Websocket服务配置
-     * <pre>
-     * [
-     *    'host' => '0.0.0.0',
-     *    'port' => 20461,
-     *    'service' => '\\websocket\\service\\WebsocketServer',
-     * ]
-     * </pre>
-     */
+    /** @var array 内置Websocket服务配置 **/
+    #[ArrayShape([
+        'host' => 'string', // 0.0.0.0
+        'port' => 'int', // 20461
+        'service' => 'string', // \\websocket\\service\\WebsocketServer
+        'enable_http' => 'bool', // false, 是否同时开启HTTP协议支持
+        'extra_ports' => [['host' => '', 'port' => '']], // 需要额外监听的端口(Websocket,HTTP)
+        'api_host' => 'string', // 服务器Api主机，如果需要远程管理你的Websocket服务器，可以通过此Rpc接口实现
+        'api_port' => 'int', // 服务器Api端口
+        'api_password' => 'string', // 服务器Api Rpc密匙
+        'enable_tcp_ports' => [['host' => '', 'port' => '', 'sock_type' => 0]], // 需要额外监听的TCP端口集，配置后将同时开启TCP支持
+    ])]
     public array $websocket = [];
 
-    /**
-     * @var array 内置Http服务配置
-     * <pre>
-     * [
-     *    'host' => '0.0.0.0',
-     *    'port' => 20460,
-     *    'service' => '\\http\\service\\HttpServer',
-     * ]
-     * </pre>
-     */
+    /** @var array 内置Http服务配置 **/
+    #[ArrayShape([
+        'host' => 'string', // 0.0.0.0
+        'port' => 'int', // 20460
+        'service' => 'string', // \\http\\service\\HttpServer
+        'extra_ports' => [['host' => '', 'port' => '']], // 需要额外监听的端口(Websocket,HTTP)
+        'api_host' => 'string', // 服务器Api主机，如果需要远程管理你的Websocket服务器，可以通过此Rpc接口实现
+        'api_port' => 'int', // 服务器Api端口
+        'api_password' => 'string', // 服务器Api Rpc密匙
+        'enable_tcp_ports' => [['host' => '', 'port' => '', 'sock_type' => 0]], // 需要额外监听的TCP端口集，配置后将同时开启TCP支持
+    ])]
     public array $http = [];
 
-    /**
-     * @var array 内置Tcp服务配置
-     * <pre>
-     * [
-     *    'host' => '0.0.0.0',
-     *    'port' => 20462,
-     *    'mode' => SWOOLE_PROCESS,
-     *    'sock_type' => SWOOLE_SOCK_TCP,
-     *    'service' => '\\tcp\\service\\TcpServer',
-     *    'extra_ports' => [
-     *        ['host' => '0.0.0.0', 'port' => 20463, 'sock_type' => SWOOLE_SOCK_UDP], // 同时监听20463端口的Udp服务
-     *    ],
-     * ]
-     * </pre>
-     */
+    /** @var array 内置Tcp服务配置 **/
+    #[ArrayShape([
+        'host' => 'string', // 0.0.0.0
+        'port' => 'int', // 20462
+        'mode' => 'int', // SWOOLE_PROCESS
+        'sock_type' => 'int', // SWOOLE_SOCK_TCP
+        'service' => 'string', // \\tcp\\service\\TcpServer
+        'extra_ports' => [
+            ['host' => '0.0.0.0', 'port' => 20463, 'sock_type' => SWOOLE_SOCK_UDP], // 同时监听20463端口的Udp服务
+        ],
+        'api_host' => 'string', // 服务器Api主机，如果需要远程管理你的Websocket服务器，可以通过此Rpc接口实现
+        'api_port' => 'int', // 服务器Api端口
+        'api_password' => 'string', // 服务器Api Rpc密匙
+    ])]
     public array $tcp = [];
 
     /** @var array Swoole\Websocket\Server原生配置 */
@@ -279,6 +287,9 @@ class DceConfig extends Config {
 
     /** @var array Swoole\Tcp\Server原生配置 */
     public array $swooleTcp = [];
+
+    /** @var array 服务器接口授权密匙表, 格式为[host:port => password] */
+    public array $serverApiAuthMapping = [];
 
     /** @var array 该配置将在引导时自动遍历作为参数给ini_set()调用 */
     public array $iniSet = [

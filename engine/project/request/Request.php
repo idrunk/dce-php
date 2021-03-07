@@ -40,9 +40,6 @@ class Request {
     /** @var Session 当前项目Session对象, (用于全部类型请求) */
     public Session $session;
 
-    /** @var SessionManager Session管理器, (用于全部类型请求) */
-    public SessionManager $sessionManager;
-
     /**
      * @var mixed 原始请求数据, (用于全部类型请求)
      * <pre>
@@ -99,14 +96,6 @@ class Request {
 
     public function __construct(RawRequest $rawRequest) {
         $this->rawRequest = $rawRequest;
-    }
-
-    /**
-     * 设置Session管理器
-     * @param SessionManager $sessionManager
-     */
-    public function setSessionManager(SessionManager $sessionManager): void {
-        $this->sessionManager = $sessionManager;
     }
 
     /**

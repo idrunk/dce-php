@@ -6,6 +6,7 @@
 
 namespace dce\cache\engine;
 
+use dce\base\Exception;
 use memcached;
 use dce\cache\Cache;
 
@@ -25,6 +26,10 @@ final class MemcachedCache extends Cache {
             $instance->addServer($this->config['host'], $this->config['port']);
         }
         return $instance;
+    }
+
+    public function exists(string|array $key): bool {
+        throw new Exception('Memcached不支持exists');
     }
 
     public function get(string|array $key): mixed {

@@ -27,6 +27,12 @@ final class ShmCache extends CacheClearable {
     }
 
     /** @inheritDoc */
+    public function exists(string|array $key): bool {
+        $key = self::genKey($key);
+        return $this->table->exists($key);
+    }
+
+    /** @inheritDoc */
     public function get(string|array $key): mixed {
         return $this->getClearExpired($key);
     }

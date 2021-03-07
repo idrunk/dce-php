@@ -17,11 +17,14 @@ class RpcClient {
     /** @var float 接收超时时间 */
     private static float $receiveTimeout = 8;
 
-    /** @var array 命名空间通配符与主机集的映射 */
-    private static array $wildcardHostsMapping = [];
+    /** @var array 名字空间/类名包特征映射表 {md5(names / classes): {loaded, hosts : [{host, port, token, max_connection}]}} */
+    private static array $namingMapping = [];
 
-    /** @var array 类名与对应服务主机集的映射 */
-    private static array $classHostsMapping = [];
+    /** @var array 命名空间通配符包与其特征映射表 {name: md5(names)} */
+    private static array $wildcardMapping = [];
+
+    /** @var array 类名包与其特征映射表 {class: md5(classes)} */
+    private static array $classMapping = [];
 
     /** @var string 特定主机缓存 */
     private static string $specifiedHost = '';
@@ -34,37 +37,55 @@ class RpcClient {
 
     /**
      * 拦截rpc命名空间的类, 将其转到当前RPC客户端下的魔术方法处理
+     * @param array|string $wildcards 监听命名空间集, 如['rpc\*'], 表示用户调用rpc命名空间下的类方法, 如rpc\service\MidService::generation时, 会拦截并转发到Rpc服务器执行
      * @param array $hosts 服务主机列表
      * <pre>
      * {host, port, token}, token不填则表示非加密API, 将不传递token, 此map形式会自动转为下方的数组形式
      * [{host, port, token, max_connection}], 主机集形式, 标准形式
      * </pre>
-     * @param array $wildcards 监听命名空间集, 如['rpc\*'], 表示用户调用rpc命名空间下的类方法, 如rpc\service\MidService::generation时, 会拦截并转发到Rpc服务器执行
      * @throws null
      */
-    final public static function prepare(array $hosts, array $wildcards = [RpcUtility::DEFAULT_NAMESPACE_WILDCARD]): void {
-        $hosts = RpcUtility::hostsFormat($hosts);
+    final public static function prepare(array|string $wildcards, array $hosts): void {
+        $wildcards = array_map(fn($wildcard) => ltrim($wildcard, '\\'), is_array($wildcards) ? $wildcards : [$wildcards]);
+        // 按通配符数组键长度逆序排序, 使得较长的名字空间排在前面, 解决想匹配子级名字空间却因先匹配到父级空间就返回了的问题
+        usort($wildcards, fn ($k1, $k2) => strlen($k2) <=> strlen($k1));
+        $identity = md5(json_encode($wildcards));
         foreach ($wildcards as $wildcard) {
-            $backSlashWildcard = str_replace('\\', '\\\\', $wildcard);
-            if (key_exists($backSlashWildcard, self::$wildcardHostsMapping)) {
-                // 先这样, 后续考虑允许重复注册并自动合并主机
-                throw new RpcException("{$wildcard} 已注册为RPC名字空间, 请勿重复注册");
+            if (! key_exists($wildcard, self::$wildcardMapping)) {
+                self::$wildcardMapping[$wildcard] = $identity;
+                Loader::prepare($wildcard, self::getAutoload());
+            } else if (self::$wildcardMapping[$wildcard] !== $identity) {
+                throw new RpcException("命名空间 {$wildcard} 当前集与前次命名空间集不一致");
             }
-            self::$wildcardHostsMapping[$backSlashWildcard] = $hosts;
-            Loader::prepare($wildcard, self::getAutoload());
         }
+        self::$namingMapping[$identity] = [
+            'loaded' => false,
+            'hosts' => RpcUtility::hostsMerge(self::$namingMapping[$identity]['hosts'] ?? [], $hosts),
+        ];
     }
 
     /**
      * 拦截rpc类, 将其转到当前RPC客户端下的魔术方法处理
-     * @param array $hosts
-     * @param string $className
+     * @param array|string $classNames
+     * @param array $hosts {host, port, token, max_connection} / [{}]
      * @throws RpcException
      */
-    final public static function preload(array $hosts, string $className): void {
-        $className = ltrim($className, '\\');
-        self::$classHostsMapping[$className] = RpcUtility::hostsFormat($hosts);
-        Loader::preload($className, self::getAutoload());
+    final public static function preload(array|string $classNames, array $hosts): void {
+        $classNames = array_map(fn($className) => ltrim($className, '\\'), is_array($classNames) ? $classNames : [$classNames]);
+        asort($classNames);
+        $identity = md5(json_encode($classNames));
+        foreach ($classNames as $className) {
+            if (! key_exists($className, self::$classMapping)) {
+                self::$classMapping[$className] = $identity;
+                Loader::preload($className, self::getAutoload());
+            } else if (self::$classMapping[$className] !== $identity) {
+                throw new RpcException("类名 {$className} 当前集与前次类名集不一致, 或者已通过名字空间设置");
+            }
+        }
+        self::$namingMapping[$identity] = [
+            'loaded' => false,
+            'hosts' => RpcUtility::hostsMerge(self::$namingMapping[$identity]['hosts'] ?? [], $hosts),
+        ];
     }
 
     /**
@@ -73,6 +94,7 @@ class RpcClient {
     private static function getAutoload(): Closure {
         if (! isset(self::$autoload)) {
             self::$autoload = function (string $className) {
+                self::addClassMapping($className);
                 $classNameSplit = explode('\\', $className);
                 $baseClassName = array_pop($classNameSplit);
                 $namespace = implode('\\', $classNameSplit);
@@ -84,12 +106,30 @@ class RpcClient {
                 try {
                     // 因为callStatic时才会进到这里, 所以classname是绝对合法的, 所以此处不会有安全漏洞
                     eval($scripts);
-                } catch (Throwable $throwable) {
+                } catch (Throwable) {
                     throw new RpcException("{$className} 不是合法类");
                 }
             };
         }
         return self::$autoload;
+    }
+
+    /**
+     * 将以名字空间注册的类补充进类名映射
+     * @param string $className
+     * @throws RpcException
+     */
+    private static function addClassMapping(string $className): void {
+        if (key_exists($className, self::$classMapping)) {
+            return;
+        }
+        foreach (self::$wildcardMapping as $wildcard => $identity) {
+            if (fnmatch(str_ireplace('\\', '\\\\', $wildcard), $className)) {
+                self::$classMapping[$className] = $identity;
+                return;
+            }
+        }
+        throw new RpcException("类 {$className} 未注册远程过程服务");
     }
 
     /**
@@ -141,7 +181,7 @@ class RpcClient {
         $client = $pool->fetch($specifiedConfig);
         $data = self::authPack($pool->getProductMap($client)['config']->token ?? '', $className, $methodName, $arguments);
         $response = self::request($client, $data);
-        $result = self::responseHandler($response);
+        $result = self::responseHandling($response);
         $pool->put($client);
         return $result;
     }
@@ -150,30 +190,12 @@ class RpcClient {
      * 取连接池
      * @param string $className
      * @return TcpPool
-     * @throws RpcException
      */
     private static function getPool(string $className): TcpPool {
-        if (! key_exists($className, self::$classHostsMapping)) {
-            // 按通配符数组键长度逆序排序, 使得较长的名字空间排在前面, 解决想匹配子级名字空间却因先匹配到父级空间就返回了的问题
-            uksort(self::$wildcardHostsMapping, fn ($k1, $k2) => strlen($k2) <=> strlen($k1));
-            foreach (self::$wildcardHostsMapping as $wildcard => $hosts) {
-                if (fnmatch($wildcard, $className)) {
-                    // 如果名字空间通配符匹配, 则表示该类位于当前主机组, 记录映射
-                    self::$classHostsMapping[$className] = $hosts;
-                    break;
-                }
-            }
-        }
-        if (! (self::$classHostsMapping[$className] ?? [])) {
-            throw new RpcException("{$className}未能与远程服务匹配");
-        }
-        $poolConfigs = self::$classHostsMapping[$className];
-        $identities = [];
-        foreach ($poolConfigs as $config) {
-            // 拼组识别标识
-            $identities[] = "{$config['host']}{$config['port']}";
-        }
-        return TcpPool::inst(... $identities)->setConfigs($poolConfigs, false);
+        $identity = self::$classMapping[$className];
+        ['loaded' => $loaded, 'hosts' => $hosts] = self::$namingMapping[$identity];
+        self::$namingMapping[$identity]['loaded'] = true;
+        return TcpPool::inst($identity)->setConfigs($hosts, ! $loaded);
     }
 
     /**
@@ -192,7 +214,7 @@ class RpcClient {
             throw new RpcException($client->errMsg ?: '响应超时', $client->errCode);
         }
         if (! $response) {
-            throw new RpcException('空响应, 可能服务异常导致');
+            throw new RpcException('空响应, 可能远程服务异常导致');
         }
         return $response;
     }
@@ -218,7 +240,7 @@ class RpcClient {
      * @throws RpcException
      * @throws Throwable
      */
-    private static function responseHandler(string $response): mixed {
+    private static function responseHandling(string $response): mixed {
         [$resultType, $result] = RpcUtility::decode(RpcUtility::RESPONSE_FORMATTER, $response);
         if ($resultType === RpcUtility::RESULT_TYPE_OBJECT) {
             $result = unserialize($result); // 如果结果类型为对象, 则反序列化

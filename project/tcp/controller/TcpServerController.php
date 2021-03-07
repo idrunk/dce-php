@@ -9,7 +9,7 @@ namespace tcp\controller;
 use dce\config\ConfigException;
 use dce\project\request\Request;
 use dce\project\view\ViewCli;
-use rpc\tcp\service\TcpServerApi;
+use rpc\dce\service\RpcServerApi;
 use tcp\service\TcpServer;
 
 class TcpServerController extends ViewCli {
@@ -30,17 +30,17 @@ class TcpServerController extends ViewCli {
     }
 
     public function stop() {
-        TcpServerApi::stop();
+        RpcServerApi::stop();
         $this->print('Tcp server was stopped.');
     }
 
     public function reload() {
-        TcpServerApi::reload();
+        RpcServerApi::reload();
         $this->print('Tcp server was reloaded.');
     }
 
     public function status() {
-        $status = TcpServerApi::status();
+        $status = RpcServerApi::status();
         $status = json_encode($status, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         $this->print($status);
     }

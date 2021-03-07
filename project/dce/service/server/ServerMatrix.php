@@ -7,8 +7,9 @@
 namespace dce\service\server;
 
 use dce\config\DceConfig;
+use dce\Dce;
 use dce\project\request\Request as DceRequest;
-use dce\project\request\SessionForm;
+use dce\project\request\Session;
 use dce\project\request\SessionManager;
 use dce\rpc\RpcClient;
 use dce\rpc\RpcServer;
@@ -22,6 +23,12 @@ use tcp\service\RawRequestUdp;
 use Throwable;
 
 abstract class ServerMatrix {
+    /** @var string SessionManager FdForm Tcp fd标记 */
+    public const SM_EXTRA_TCP = 'tcp';
+
+    /** @var string SessionManager FdForm Websocket fd标记 */
+    public const SM_EXTRA_WS = 'ws';
+
     /** @var string 定义RawRequestHttp类名, (可在子类覆盖此属性使用自定义RawRequest类) */
     protected static string $rawRequestHttpClass = RawRequestHttpSwoole::class;
 
@@ -31,23 +38,17 @@ abstract class ServerMatrix {
     /** @var string 定义RawRequestUdp类名 */
     protected static string $rawRequestUdpClass = RawRequestUdp::class;
 
-    /** @var array 连接符与客户端信息映射表 */
-    private static array $fdClientMapping = [];
-
     /** @var string 服务接口Rpc监听主机地址 */
     protected static string $localRpcHost;
 
     /** @var string 服务接口文件路径 */
-    protected static string $serverApiPath;
+    protected static string $serverApiPath = __DIR__ . '/RpcServerApi.php';
 
     /** @var string 服务接口类名 */
-    protected static string $serverApiClass;
+    protected static string $serverApiClass = '\rpc\dce\service\RpcServerApi';
 
     /** @var DceConfig 当前Server项目配置 */
     protected DceConfig $projectConfig;
-
-    /** @var SessionManager Session管理器 */
-    protected SessionManager $sessionManager;
 
     /** @var string 对外Api服务地址 */
     public string $apiHost;
@@ -60,14 +61,6 @@ abstract class ServerMatrix {
 
     public function __construct() {
         self::prepareApiRpc();
-    }
-
-    /**
-     * 生成SessionManager实例, (可在子类覆盖此方法使用自定义SessionManager类)
-     * @return SessionManager
-     */
-    protected function genSessionManager(): SessionManager {
-        return new SessionManagerNoop();
     }
 
     /**
@@ -89,9 +82,8 @@ abstract class ServerMatrix {
      * @param Server $server
      * @param int $fd
      * @param int $reactorId
-     * @param SessionForm|null $sessionForm
      */
-    protected function eventOnClose(Server $server, int $fd, int $reactorId, SessionForm|null $sessionForm): void {}
+    protected function eventOnClose(Server $server, int $fd, int $reactorId): void {}
 
     /**
      * 取用户自定义的需要监听的其他事件, (可在子类覆盖自定义)
@@ -118,9 +110,9 @@ abstract class ServerMatrix {
                         $this->handleException($throwable);
                     }
                 });
-                $portInstance->on('receive', function (Server $server, int $fd, int $reactor_id, string $data) {
+                $portInstance->on('receive', function (Server $server, int $fd, int $reactorId, string $data) {
                     try {
-                        $this->takeoverReceive($server, $fd, $reactor_id, $data);
+                        $this->takeoverReceive($server, $fd, $reactorId, $data);
                     } catch (Throwable $throwable) {
                         $this->handleException($throwable);
                     }
@@ -151,8 +143,9 @@ abstract class ServerMatrix {
      * @param int $reactorId
      */
     protected function takeoverConnect(Server $server, int $fd, int $reactorId): void {
-        // Session Manager记录fd与sid
-        $this->sessionManager->logFdBySid('', $fd, $this->apiHost, $this->apiPort, 'tcp');
+        $session = Session::newBySid(true); // 生成一个Session对象并var缓存
+        Dce::$cache->var->set(['session', $fd], $session);
+        SessionManager::inst()->connect($session->getId(), $fd, $this->apiHost, $this->apiPort, self::SM_EXTRA_TCP);
         $this->eventOnConnect($server, $fd, $reactorId);
     }
 
@@ -163,10 +156,9 @@ abstract class ServerMatrix {
      * @throws Throwable
      */
     protected function takeoverRequest(Request $request, Response $response): void {
-        $rawRequest = new static::$rawRequestHttpClass($request, $response);
+        $rawRequest = new static::$rawRequestHttpClass($this, $request, $response);
         $rawRequest->init();
         $dceRequest = new DceRequest($rawRequest);
-        $dceRequest->setSessionManager($this->sessionManager);
         $dceRequest->route();
     }
 
@@ -182,7 +174,6 @@ abstract class ServerMatrix {
         $rawRequest = new static::$rawRequestTcpClass($this, $data, $fd, $reactorId);
         $rawRequest->init();
         $request = new DceRequest($rawRequest);
-        $request->setSessionManager($this->sessionManager);
         $request->route();
     }
 
@@ -197,21 +188,19 @@ abstract class ServerMatrix {
         $rawRequest = new static::$rawRequestUdpClass($this, $data, $clientInfo);
         $rawRequest->init();
         $request = new DceRequest($rawRequest);
-        $request->setSessionManager($this->sessionManager);
         $request->route();
     }
 
     /**
-     * 接管连接关闭事件
+     * 接管连接关闭事件 (用于Tcp/Websocket)
      * @param Server $server
      * @param int $fd
      * @param int $reactorId
      */
     protected function takeoverClose(Server $server, int $fd, int $reactorId): void {
-        $sessionForm = $this->sessionManager->filterByFd($fd, $this->apiHost, $this->apiPort)[0] ?? null;
-        $this->eventOnClose($server, $fd, $reactorId, $sessionForm);
-        // Session Manager注销记录
-        $this->sessionManager->tryUnLog($sessionForm->id ?? 0);
+        $this->eventOnClose($server, $fd, $reactorId);
+        SessionManager::inst()->disconnect($fd, $this->apiHost, $this->apiPort);
+        Dce::$cache->var->del(['session', $fd]);
     }
 
     /**
@@ -248,31 +237,25 @@ abstract class ServerMatrix {
     }
 
     /**
-     * 取绑定的SessionManager
-     * @return SessionManager
-     */
-    public function getSessionManager(): SessionManager {
-        return $this->sessionManager;
-    }
-
-    /**
      * 执行服务器Api服务
      */
     protected function runApiService(): void {
         $this->getServer()->addProcess(new Process(function () {
             $rpcServer = RpcServer::new(RpcServer::host(static::$localRpcHost))->preload(static::$serverApiPath);
             if ($this->apiHost && $this->apiPort) {
+                // 这里不做过多的安全限制, 服务器接口安全可以通过物理服务器防火墙管理
                 $rpcServer->addHost(RpcServer::host($this->apiHost, $this->apiPort)->setAuth($this->apiPassword));
             }
             $rpcServer->start(false);
             static::$serverApiClass::logServer($this);
+            SessionManager::inst()->clear($this->apiHost, $this->apiPort);
         }, false, SOCK_STREAM, true));
     }
 
     /** 预挂载服务接口本地Rpc客户端 */
     private static function prepareApiRpc(): void {
         // 预挂载服务接口本地Rpc客户端
-        RpcClient::preload(['host' => static::$localRpcHost, 'port' => 0], static::$serverApiClass);
+        RpcClient::preload(static::$serverApiClass, ['host' => static::$localRpcHost, 'port' => 0]);
     }
 
     /** 停止服务 */

@@ -14,6 +14,8 @@ use dce\rpc\RpcClient;
 use dce\rpc\RpcServer;
 use dce\rpc\RpcUtility;
 use dce\sharding\id_generator\bridge\IdgRequestLocal;
+use dce\sharding\id_generator\bridge\IdgStorage;
+use dce\sharding\id_generator\bridge\IdgStorageRedis;
 use dce\sharding\id_generator\server\IdgServer;
 use rpc\didg\IdgClientRpc;
 
@@ -23,6 +25,8 @@ final class DceIdGenerator extends Config {
     public string $clientStorage = '\dce\sharding\id_generator\bridge\IdgStorageFile';
 
     public string $clientStorageArg = APP_RUNTIME . 'didg/';
+
+    public int $redisIndex;
 
     public string $requester;
 
@@ -40,6 +44,7 @@ final class DceIdGenerator extends Config {
     }
 
     private function prepare() {
+        $this->redisIndex ??= Dce::$config->redis['index'];
         if ($this->serverRpcHosts) {
             // 如果配了服务端RPC主机, 则表示IdgServer未部署在当前进程, 需要通过RPC调用
             $serverHosts = RpcUtility::hostsFormat($this->serverRpcHosts);
@@ -48,7 +53,7 @@ final class DceIdGenerator extends Config {
                 RpcServer::new(RpcServer::host($serverHosts[0]['host'], $serverHosts[0]['port'] ?? 0))
                     ->preload(__DIR__ . '/server/IdgServerRpc.php')->start();
             }
-            RpcClient::preload($serverHosts, '\rpc\didg\IdgServerRpc');
+            RpcClient::preload('\rpc\didg\IdgServerRpc', $serverHosts);
             // 如果未配置请求器, 则设为系统默认的RPC请求器
             $this->requester ??= '\dce\sharding\id_generator\bridge\IdgRequestRpc';
         } else {
@@ -63,7 +68,7 @@ final class DceIdGenerator extends Config {
                 RpcServer::new(RpcServer::host($clientHosts[0]['host'], $clientHosts[0]['port'] ?? 0))
                     ->preload(__DIR__ . '/client/IdgClientRpc.php')->start();
             }
-            RpcClient::preload($clientHosts, '\rpc\didg\IdgClientRpc');
+            RpcClient::preload('\rpc\didg\IdgClientRpc', $clientHosts);
         }
     }
 
@@ -120,13 +125,12 @@ final class DceIdGenerator extends Config {
     public function newClient(string $tag): IdGenerator {
         static $client;
         if (null === $client) {
-            $storage = new $this->clientStorage($this->clientStorageArg);
-            if (ltrim($this->requester, '\\') === IdgRequestLocal::class) {
+            if (is_a($this->requester, IdgRequestLocal::class, true)) {
                 $request = new IdgRequestLocal($this->newServer());
             } else {
                 $request = new $this->requester();
             }
-            $client = IdGenerator::new($storage, $request);
+            $client = IdGenerator::new($this->genStorage($this->clientStorage, $this->clientStorageArg), $request);
         }
         if (! $client->wasLoaded($tag)) {
             $client->getBatch($tag);
@@ -137,10 +141,13 @@ final class DceIdGenerator extends Config {
     public function newServer(): IdgServer {
         static $server;
         if (null === $server) {
-            $storage = new $this->serverStorage($this->serverStorageArg);
             $configDir = $this->serverConfigDir;
-            $server = IdgServer::new($storage, $configDir);
+            $server = IdgServer::new($this->genStorage($this->serverStorage, $this->serverStorageArg), $configDir);
         }
         return $server;
+    }
+
+    private function genStorage(string $class, string $arg): IdgStorage {
+        return is_a($class, IdgStorageRedis::class, true) ? new $class($arg, $this->redisIndex) : new $class($arg);
     }
 }

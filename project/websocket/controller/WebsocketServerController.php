@@ -9,7 +9,7 @@ namespace websocket\controller;
 use dce\config\ConfigException;
 use dce\project\request\Request;
 use dce\project\view\ViewCli;
-use rpc\websocket\service\WebsocketServerApi;
+use rpc\dce\service\RpcServerApi;
 use websocket\service\WebsocketServer;
 
 class WebsocketServerController extends ViewCli {
@@ -30,17 +30,17 @@ class WebsocketServerController extends ViewCli {
     }
 
     public function stop() {
-        WebsocketServerApi::stop();
+        RpcServerApi::stop();
         $this->print('Websocket server was stopped.');
     }
 
     public function reload() {
-        WebsocketServerApi::reload();
+        RpcServerApi::reload();
         $this->print('Websocket server was reloaded.');
     }
 
     public function status() {
-        $status = WebsocketServerApi::status();
+        $status = RpcServerApi::status();
         $status = json_encode($status, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         $this->print($status);
     }

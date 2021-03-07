@@ -6,6 +6,7 @@
 
 namespace dce\cache\engine;
 
+use dce\base\Exception;
 use memcache;
 use dce\cache\Cache;
 
@@ -25,6 +26,10 @@ final class MemcacheCache extends Cache {
             $instance->connect($this->config['host'], $this->config['port']);
         }
         return $instance;
+    }
+
+    public function exists(string|array $key): bool {
+        throw new Exception('Memcache不支持exists');
     }
 
     public function get(string|array $key): mixed {

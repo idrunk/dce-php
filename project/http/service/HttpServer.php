@@ -17,10 +17,6 @@ use Throwable;
 class HttpServer extends ServerMatrix {
     protected static string $localRpcHost = '/var/run/dce_http_api.sock';
 
-    protected static string $serverApiPath = __DIR__ . '/HttpServerApi.php';
-
-    protected static string $serverApiClass = 'rpc\http\service\HttpServerApi';
-
     private Server $server;
 
     /**
@@ -54,7 +50,6 @@ class HttpServer extends ServerMatrix {
             $this->server->listen($extraHost, $extraPort, SWOOLE_SOCK_TCP);
         }
         $this->eventBeforeStart($this->server);
-        $this->sessionManager = $this->genSessionManager();
 
         $this->server->on('request', function (Request $request, Response $response) {
             try {

@@ -10,48 +10,57 @@ use dce\storage\redis\DceRedis;
 
 class SessionRedis extends Session {
     /** @inheritDoc */
-    public function open(Request $request): void {
-        $this->openInit($request);
-        $redis = DceRedis::get();
+    protected function touch(mixed $param1 = null): void {
         // 更新session过期时间
-        $redis->expire($this->getId(), $request->config->session['ttl'] ?? 3600);
+        $param1->expire($this->getId(true), self::$config['ttl']);
+    }
+
+    /** @inheritDoc */
+    public function isAlive(): bool {
+        $redis = DceRedis::get(self::$config['index']);
+        $result = $redis->exists($this->getId(true));
         DceRedis::put($redis);
+        return $result;
     }
 
     /** @inheritDoc */
     public function set(string $key, mixed $value): void {
-        $redis = DceRedis::get();
-        $redis->hSet($this->getId(), $key, $value);
+        $redis = DceRedis::get(self::$config['index']);
+        $this->tryTouch($redis);
+        $redis->hSet($this->getId(true), $key, $value);
         DceRedis::put($redis);
     }
 
     /** @inheritDoc */
     public function get(string $key): mixed {
-        $redis = DceRedis::get();
-        $value = $redis->hGet($this->getId(), $key);
+        $redis = DceRedis::get(self::$config['index']);
+        $this->tryTouch($redis);
+        $value = $redis->hGet($this->getId(true), $key);
         DceRedis::put($redis);
         return $value;
     }
 
     /** @inheritDoc */
     public function getAll(): array {
-        $redis = DceRedis::get();
-        $value = $redis->hGetAll($this->getId());
+        $redis = DceRedis::get(self::$config['index']);
+        $this->tryTouch($redis);
+        $value = $redis->hGetAll($this->getId(true));
         DceRedis::put($redis);
         return $value;
     }
 
     /** @inheritDoc */
     public function delete(string $key): void {
-        $redis = DceRedis::get();
-        $redis->hDel($this->getId(), $key);
+        $redis = DceRedis::get(self::$config['index']);
+        $this->tryTouch($redis);
+        $redis->hDel($this->getId(true), $key);
         DceRedis::put($redis);
     }
 
     /** @inheritDoc */
     public function destroy(): void {
-        $redis = DceRedis::get();
-        $redis->del($this->getId());
+        $redis = DceRedis::get(self::$config['index']);
+        $redis->del($this->getId(true));
         DceRedis::put($redis);
     }
 }

@@ -6,17 +6,16 @@
 
 namespace dce\sharding\id_generator\bridge;
 
-use dce\Dce;
-use dce\storage\redis\RedisPool;
+use dce\storage\redis\DceRedis;
 
 class IdgStorageRedis extends IdgStorage {
-    private array $configs;
-
     private string $prefix;
 
-    public function __construct(string $prefix) {
-        $this->configs = Dce::$config->redis;
+    private int $index;
+
+    public function __construct(string $prefix, int $index) {
         $this->prefix = $prefix;
+        $this->index = $index;
     }
 
     /** @inheritDoc */
@@ -26,16 +25,16 @@ class IdgStorageRedis extends IdgStorage {
 
     /** @inheritDoc */
     public function load(string $tag): IdgBatch|null {
-        $redis = RedisPool::inst()->setConfigs($this->configs, false)->fetch();
+        $redis = DceRedis::get($this->index);
         $batch = $redis->get($this->genKey($tag));
-        RedisPool::inst()->put($redis);
+        DceRedis::put($redis);
         return $batch ?: null;
     }
 
     /** @inheritDoc */
     public function save(string $tag, IdgBatch $batch): void {
-        $redis = RedisPool::inst()->fetch();
+        $redis = DceRedis::get($this->index);
         $redis->set($this->genKey($tag), $batch);
-        RedisPool::inst()->put($redis);
+        DceRedis::put($redis);
     }
 }

@@ -7,6 +7,7 @@
 namespace dce\rpc;
 
 use drunk\Network;
+use drunk\Structure;
 
 final class RpcUtility {
     public const DEFAULT_NAMESPACE_WILDCARD = 'rpc\*';
@@ -314,8 +315,27 @@ final class RpcUtility {
         if (0 !== $firstKey) {
             $hosts = [$hosts];
         }
-        if (! isset($hosts[0]['host'])) {
+        if (! isset($hosts[0]['host']) || ! isset($hosts[0]['port'])) {
             throw new RpcException('无效RpcHosts配置');
+        }
+        return $hosts;
+    }
+
+    /**
+     * 合并多组主机
+     * @param array $hosts
+     * @param array $hostsToMerge
+     * @return array
+     * @throws RpcException
+     */
+    public static function hostsMerge(array $hosts, array $hostsToMerge): array {
+        $hostsToMerge = self::hostsFormat($hostsToMerge);
+        foreach ($hostsToMerge as $hostToMerge) {
+            if (false !== $index = Structure::arraySearch(['host' => $hostToMerge['host'], 'port' => $hostToMerge['port']], $hosts)) {
+                $hosts[$index] = $hostToMerge;
+            } else {
+                $hosts[] = $hostToMerge;
+            }
         }
         return $hosts;
     }

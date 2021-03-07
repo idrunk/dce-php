@@ -113,7 +113,7 @@ class Loader {
         if (! $dirBase instanceof Closure) {
             $dirBase = rtrim($dirBase, '\\/') . '/';
         }
-        if (empty(self::$mapping[$namespaceWildcard])) {
+        if (! key_exists($namespaceWildcard, self::$mapping)) {
             self::$mapping[$namespaceWildcard] = [];
         }
         if (! in_array($dirBase, self::$mapping[$namespaceWildcard])) {
