@@ -23,10 +23,16 @@ class Event {
     public const BEFORE_CONTROLLER = 'BEFORE_CONTROLLER';
 
     /**
-     * 响应结束回调
-     * @callable(Request, View)
+     * 进入控制器时回调 (控制器实例化后触发)
+     * @callable(View)
      */
-    public const AFTER_RESPONSE = 'AFTER_RESPONSE';
+    public const ENTERING_CONTROLLER = 'ENTERING_CONTROLLER';
+
+    /**
+     * 控制器执行完毕回调
+     * @callable(View)
+     */
+    public const AFTER_CONTROLLER = 'AFTER_RESPONSE';
 
     /** @var EventCallbacks[] $events */
     private static array $events = [];

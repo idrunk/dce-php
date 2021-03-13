@@ -9,7 +9,7 @@ return [
     [
         'methods' => 'cli',
         'path' => 'dce',
-        'url_path_hidden' => true,
+        'omissible_path' => true,
         'controller' => 'CliController->index',
     ],
 
@@ -36,5 +36,11 @@ return [
         'path' => 'sharding/extend',
         'controller' => 'ShardingController->extend',
         'enable_coroutine' => true,
+    ],
+
+    // 综合工具
+    [
+        'path' => 'cache/clear',
+        'controller' => 'UtilityController->cacheClear',
     ],
 ];

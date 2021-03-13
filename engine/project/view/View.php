@@ -6,15 +6,19 @@
 
 namespace dce\project\view;
 
+use dce\project\request\RawRequest;
 use dce\project\request\Request;
 
 abstract class View {
     public Request $request;
 
+    public RawRequest $rawRequest;
+
     private array $data = [];
 
     public function __construct(Request $request) {
         $this->request = $request;
+        $this->rawRequest = $request->rawRequest;
     }
 
     /**

@@ -60,7 +60,7 @@ abstract class ViewHttp extends View {
      * 响应Http请求
      * @param string $content
      */
-    protected function response(string $content): void {
+    public function response(string $content): void {
         $this->rendered = true;
         $this->httpRequest->response($content);
     }

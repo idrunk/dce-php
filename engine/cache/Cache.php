@@ -117,4 +117,7 @@ abstract class Cache {
      * @return bool
      */
     abstract public function del(string|array $key): bool;
+
+    /** 清空缓存 */
+    abstract public function clear(): void;
 }

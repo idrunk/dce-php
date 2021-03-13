@@ -50,8 +50,8 @@ class ProjectManager {
         }
         // 校验项目有效性并初始化
         foreach ($projectsPaths as $v) {
-            if (! file_exists($v . '/config/nodes.php')) {
-                continue; // 必须有节点配置
+            if (! is_dir($v . '/controller')) {
+                continue; // 有控制器目录的视为有效项目
             }
             $projectName = pathinfo($v, PATHINFO_FILENAME);
             $projects[$projectName] = new Project($projectName, realpath($v) . '/');

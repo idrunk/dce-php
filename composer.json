@@ -19,6 +19,6 @@
         "fakerphp/faker": "^1.13"
     },
     "autoload": {
-        "files": ["dce.php"]
+        "files": ["engine/run.php"]
     }
 }

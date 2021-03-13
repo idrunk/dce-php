@@ -133,7 +133,7 @@ class Url {
      * @return string
      */
     private static function makePart (Node $node, array $matchedArguments): string {
-        $nodeName = $node->urlPathHidden ? null : $node->pathName;
+        $nodeName = $node->omissiblePath ? null : $node->pathName;
         $urlArgs = '';
         foreach ($node->urlArguments as $i => $argument) {
             $argumentValue = $matchedArguments[$argument->name] ?? null;
@@ -147,7 +147,7 @@ class Url {
         }
         // 移除空参数留下的尾部分割符
         $urlArgs = rtrim($urlArgs, '-/');
-        // 如果即为隐藏路径, 又没有必传参数, 则置为空
+        // 如果即为可省略路径, 又没有必传参数, 则置为空
         $urlPart = ! $nodeName && ! $urlArgs ? '' : '/';
         if (null !== $nodeName) {
             $urlPart .= $nodeName;

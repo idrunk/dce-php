@@ -90,7 +90,7 @@ abstract class Session {
         if (! isset($this->sid)) {
             return null;
         }
-        return ($withPrefix ? Dce::getId() . ':' . self::getSidName() . ':' : '') . $this->sid;
+        return ($withPrefix ? self::getSidName() . ':' : '') . $this->sid;
     }
 
     /**

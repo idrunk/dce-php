@@ -98,7 +98,7 @@ abstract class RawRequestHttp extends RawRequest {
      * @return string
      */
     protected function getPath(): string {
-        $path = $this->queryString;
+        $path = str_starts_with($this->queryString, '/') ? $this->queryString : $this->requestUri;
         $nodeTree = NodeManager::getTreeByHost($this->host);
         if ($nodeTree) {
             $slash = str_starts_with($path, '/') ? '/' : '';
@@ -116,6 +116,7 @@ abstract class RawRequestHttp extends RawRequest {
             $nodeIdFamily = $router->getLocatedNodeIdFamily();
             // 取从请求地址中解析出来的参数
             $this->locatedArguments = $router->getLocatedArguments();
+            $this->remainingPaths = $router->getComponentsRemaining();
             // 当前节点赋值
             $node = NodeManager::getNode(end($nodeIdFamily));
         } catch (Throwable $throwable) {

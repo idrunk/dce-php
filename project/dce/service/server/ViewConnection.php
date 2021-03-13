@@ -10,11 +10,11 @@ use dce\project\request\Request;
 use dce\project\view\ViewCli;
 
 abstract class ViewConnection extends ViewCli {
-    protected RawRequestConnection $rawRequest;
+    protected RawRequestConnection $connectionRequest;
 
     public function __construct(Request $request) {
         parent::__construct($request);
-        $this->rawRequest = $this->request->rawRequest;
+        $this->connectionRequest = $this->request->rawRequest;
     }
 
     /**
@@ -23,7 +23,7 @@ abstract class ViewConnection extends ViewCli {
      * @param string|false|null $path
      * @return mixed
      */
-    protected function response(mixed $content = false, string|false|null $path = null): mixed {
+    public function response(mixed $content = false, string|false|null $path = null): mixed {
         // 如果未指定路径, 则返回请求路径
         $path ??= $this->request->rawRequest->path;
         return $this->request->rawRequest->response(false === $content ? $this->getAllAssignedStatus() : $content, $path);

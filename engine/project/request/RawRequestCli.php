@@ -91,6 +91,7 @@ class RawRequestCli extends RawRequest {
     /** @inheritDoc */
     public function routeGetNode(): Node {
         $router = new Router($this);
+        $this->remainingPaths = $router->getComponentsRemaining();
         // 取路由定位到的当前节点及其上级节点ID集
         $nodeIdFamily = $router->getLocatedNodeIdFamily();
         return NodeManager::getNode(end($nodeIdFamily));

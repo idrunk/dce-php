@@ -34,6 +34,16 @@ class DceConfig extends Config {
      */
     public array|null $projectPaths = null;
 
+    /** @var array 节点配置 */
+    #[ArrayShape([
+        'cache' => 'bool',
+        'deep' => 'int',
+    ])]
+    public array $node = [
+        'cache' => false, // 是否开启节点缓存
+        'deep' => 4, // 默认最深扫描4层控制器注解式节点
+    ];
+
     /** @var bool 是否重写模式, 用于生成伪静态Url */
     public bool $rewriteMode = false;
 
@@ -48,13 +58,14 @@ class DceConfig extends Config {
 
     /** @var array 缓存配置 (无法对项目单独设置, 但开发者模式全局配置覆盖有效) */
     #[ArrayShape([
+        'default' => 'string',
         'file' => [ 'dir' => 'string', 'template_dir' => 'string', ],
-        'memcache' => [ 'host' => 'string', 'backup_on' => 'bool', ],
-        'memcached' => [ 'host' => 'string', 'backup_on' => 'bool', ],
+        'memcache' => [ 'host' => 'string', 'port' => 'int', 'backup_on' => 'bool', ],
+        'memcached' => [ 'host' => 'string', 'port' => 'int', 'backup_on' => 'bool', ],
         'redis' => ['index' => 'int'],
     ])]
     public array $cache = [
-        'default' => 'file',
+        'default' => 'file', // 默认缓存器
         'file' => [
             'dir' => APP_RUNTIME .'cache/', // 文件缓存目录
             'template_dir' => APP_RUNTIME . 'tpl/', // PHP模板文件缓存目录

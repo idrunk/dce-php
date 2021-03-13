@@ -73,4 +73,9 @@ final class VarCache extends CacheClearable {
         $key = self::genKey($key);
         return self::$cacheMapping[$key] ?? false;
     }
+
+    /** @inheritDoc */
+    public function clear(): void {
+        self::$cacheMapping = [];
+    }
 }

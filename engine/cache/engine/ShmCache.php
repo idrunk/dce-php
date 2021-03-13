@@ -98,4 +98,11 @@ final class ShmCache extends CacheClearable {
         $meta['data'] = $loadData ? unserialize($meta['data']) : null;
         return $meta;
     }
+
+    /** @inheritDoc */
+    public function clear(): void {
+        foreach ($this->table as $k => $v) {
+            $this->table->del($k);
+        }
+    }
 }

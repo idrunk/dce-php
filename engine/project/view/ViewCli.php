@@ -6,8 +6,6 @@
 
 namespace dce\project\view;
 
-use Stringable;
-
 abstract class ViewCli extends View {
     public function input(string $label = '', int $size = 1024): string {
         echo $label;

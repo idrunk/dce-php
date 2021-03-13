@@ -6,8 +6,15 @@
 
 namespace dce\project\node;
 
+use Attribute;
 use dce\base\TraitModel;
+use dce\project\view\ViewCli;
+use dce\service\server\ViewConnection;
+use ReflectionAttribute;
+use ReflectionClass;
+use ReflectionMethod;
 
+#[Attribute(Attribute::TARGET_METHOD)]
 class Node {
     use TraitModel {
         TraitModel::arrayify as baseArrayify;
@@ -52,14 +59,14 @@ class Node {
     /** @var int 接口缓存 {0: 不缓存, 1: 缓存Api数据, 2: 缓存模板, 4: 缓存页面} */
     public int $apiCache = 0;
 
+    /** @var bool 可省略的节点路径, 如home节点配置为真, 则home/news节点的url可简化为news */
+    public bool $omissiblePath = false;
+
     /** @var NodeArgument[] 参数配置集 */
     public array $urlArguments = [];
 
     /** @var bool 参数位未传时是否保留分隔符, 如保留时为news/1---, 不保留时则为news/1 */
     public bool $urlPlaceholder = true;
-
-    /** @var bool 是否隐藏节点url路径, 如home节点配置为真, 则home/news节点的url可简化为news */
-    public bool $urlPathHidden = false;
 
     /** @var array 允许的后缀, 下述配置情况下news或news/都能匹配到对应节点 */
     public array $urlSuffix = ['', '/'];
@@ -88,11 +95,57 @@ class Node {
     /** @var array 用户自定义参数 */
     public array $extra;
 
-    public function __construct(array $properties, string $projectName) {
-        $properties = $this->init($properties, $projectName);
-        $this->setProperties($properties);
-        $this->projectName = $projectName;
-        ['path_name' => $this->pathName] = $this->genPathInfo();
+    /**
+     * 节点类. 本类同时作为节点实体类与注解类, 仅作为实体类时才会被实例化, 作为注解类时仅用来提供IDE智能提示
+     * @param array|string $path 作为实体类时为节点属性表的数组
+     * @param string|array|null $methods 作为实体类时为项目名的字符串
+     * @param string|null $id
+     * @param string|null $name
+     * @param bool|null $enableCoroutine
+     * @param bool|null $hookCoroutine
+     * @param string|null $phpTemplate
+     * @param string|null $templateLayout
+     * @param array|null $corsOrigins
+     * @param array|null $projectHosts
+     * @param int|null $apiCache
+     * @param bool|null $omissiblePath
+     * @param array|null $urlArguments
+     * @param bool|null $urlPlaceholder
+     * @param array|null $urlSuffix
+     * @param bool|null $lazyMatch
+     * @param string|null $http301
+     * @param string|null $http302
+     * @param string|null $jsonpCallback
+     * @param array|null $extra
+     * @throws NodeException
+     */
+    public function __construct(
+        array|string $path,
+        string|array|null $methods = null,
+        string|null $id = null,
+        string|null $name = null,
+        bool|null $enableCoroutine = null,
+        bool|null $hookCoroutine = null,
+        string|null $phpTemplate = null,
+        string|null $templateLayout = null,
+        array|null $corsOrigins = null,
+        array|null $projectHosts = null,
+        int|null $apiCache = null,
+        bool|null $omissiblePath = null,
+        array|null $urlArguments = null,
+        bool|null $urlPlaceholder = null,
+        array|null $urlSuffix = null,
+        bool|null $lazyMatch = null,
+        string|null $http301 = null,
+        string|null $http302 = null,
+        string|null $jsonpCallback = null,
+        array|null $extra = null,
+    ) {
+        if (is_array($path) && is_string($methods)) {
+            $this->setProperties($this->init($path, $methods));
+            $this->projectName = $methods;
+            ['path_name' => $this->pathName] = $this->genPathInfo();
+        }
     }
 
     /**
@@ -190,5 +243,50 @@ class Node {
             $children[] = $child->arrayify();
         };
         return $children;
+    }
+
+    /**
+     * 取构造函数参数列表
+     * @return array
+     */
+    private static function constructArgs(): array {
+        static $args;
+        if (null === $args) {
+            $args = array_column((new ReflectionClass(self::class))->getConstructor()->getParameters(), 'name');
+        }
+        return $args;
+    }
+
+    /**
+     * 将以反射的形式取到的AttrNode参数转化完善为有效Node配置
+     * @param ReflectionMethod $method
+     * @param ReflectionAttribute $attribute
+     * @return array
+     */
+    public static function refToNodeArguments(ReflectionMethod $method, ReflectionAttribute $attribute): array {
+        $arguments = $attribute->getArguments();
+        foreach ($arguments as $k => $arg) {
+            if (is_int($k)) {
+                $arguments[self::constructArgs()[$k]] = $arg;
+                unset($arguments[$k]);
+            }
+        }
+        $class = $method->getDeclaringClass();
+        // 若未指定methods, 则尝试根据视图匹配
+        if (! key_exists('methods', $arguments)) {
+            static $methodsMapping = [
+                ViewCli::class => ['cli'],
+                ViewConnection::class => ['websocket', 'tcp', 'udp'],
+            ];
+            $parentClassName = $class->getParentClass()->getName();
+            if (key_exists($parentClassName, $methodsMapping)) {
+                $arguments['methods'] = $methodsMapping[$parentClassName];
+            }
+        }
+        // 不要将类魔术方法作为控制器方法
+        if (! str_starts_with($methodName = $method->getName(), '__')) {
+            $arguments['controller'] = preg_replace('/^.+?\bcontroller\\\\(.+)$/', "$1->{$methodName}", $class->getName());
+        }
+        return $arguments;
     }
 }

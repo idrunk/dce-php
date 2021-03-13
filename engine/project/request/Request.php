@@ -6,6 +6,7 @@
 
 namespace dce\project\request;
 
+use dce\base\QuietException;
 use dce\base\SwooleUtility;
 use dce\config\DceConfig;
 use dce\event\Event;
@@ -14,7 +15,6 @@ use dce\project\node\NodeManager;
 use dce\project\Project;
 use dce\project\ProjectManager;
 use dce\project\view\View;
-use dce\project\view\ViewHttp;
 use dce\rpc\DceRpcClient;
 use Swoole\Coroutine;
 
@@ -185,10 +185,12 @@ class Request {
      * @param string $method
      */
     private function runController(string $class, string $method): void {
-        // 执行控制器
-        Event::trigger(Event::BEFORE_CONTROLLER, [$this]);
-        $controller = new $class($this);
-        $controller->call($method);
-        Event::trigger(Event::AFTER_RESPONSE, [$this, $controller]);
+        try {
+            Event::trigger(Event::BEFORE_CONTROLLER, [$this]);
+            $controller = new $class($this);
+            Event::trigger(Event::ENTERING_CONTROLLER, [$this]);
+            $controller->call($method);
+            Event::trigger(Event::AFTER_CONTROLLER, [$controller]);
+        } catch (QuietException) {} // 拦截安静异常不抛出, 用于事件回调中抛出异常截停程序并且不抛出异常
     }
 }

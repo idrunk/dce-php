@@ -107,4 +107,11 @@ class FileCache extends CacheClearable {
             'update_time' => filemtime($filename),
         ];
     }
+
+    /** @inheritDoc */
+    public function clear(): void {
+        foreach (glob($this->dir . '*') as $file) {
+            @unlink($file);
+        }
+    }
 }

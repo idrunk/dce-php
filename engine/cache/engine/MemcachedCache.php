@@ -72,4 +72,9 @@ final class MemcachedCache extends Cache {
         }
         return $this->getInst()->delete($key);
     }
+
+    /** @inheritDoc */
+    public function clear(): void {
+        $this->getInst()->flush();
+    }
 }

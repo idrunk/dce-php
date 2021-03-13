@@ -15,10 +15,13 @@ abstract class RawRequest {
     /** @var string 请求路径 */
     public string $path;
 
-    /** @var mixed 原始请求提交的数据 */
-    protected $rawData;
+    /** @var array 惰性路由匹配时剩余未被匹配的路径组件集 */
+    public array $remainingPaths = [];
 
-    /**
+    /** @var mixed 原始请求提交的数据 */
+    protected mixed $rawData;
+
+        /**
      * 取原始请求信息
      * @return mixed
      */

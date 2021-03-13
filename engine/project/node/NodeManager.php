@@ -7,60 +7,67 @@
 namespace dce\project\node;
 
 use dce\Dce;
+use dce\project\Project;
 use dce\project\ProjectManager;
+use ReflectionClass;
+use ReflectionMethod;
 
 final class NodeManager {
     /**
      * 所有项目根节点树
-     * @var NodeTree|null
+     * @var NodeTree|false
      */
-    private static NodeTree|null $nodeTree;
+    private static NodeTree|false $nodeTree;
 
     /**
      * 路径节点树映射表
-     * @var array|null
+     * @var array|false
      */
-    private static array|null $pathTreeMapping;
+    private static array|false $pathTreeMapping;
 
     /**
      * ID节点树映射表
-     * @var array|null
+     * @var array|false
      */
-    private static array|null $idTreeMapping;
+    private static array|false $idTreeMapping;
 
     /**
      * 扫描并初始化所有项目节点数据
      */
     public static function scanInit (): void {
+        // 一般情况下都是从缓存取, 所以在这直接先尝试取, 不影响性能, 降低逻辑复杂度
+        self::$nodeTree = Dce::$cache->get('dce_node_tree');
+        self::$pathTreeMapping = Dce::$cache->get('dce_path_tree_mapping');
+        self::$idTreeMapping = Dce::$cache->get('dce_id_tree_mapping');
+
+        if (self::$idTreeMapping && Dce::$config->node['cache']) {
+            // 如果缓存有效且开启了节点缓存, 则直接返回
+            return;
+        }
         // 取全部项目节点配置文件
         $projects = ProjectManager::getAll();
-        $nodesFiles = [];
+        $nodesFiles = $nodesFileList = [];
         foreach ($projects as $k => $project) {
             if (is_file($nodesFile = "{$project->path}config/nodes.php")) {
-                $nodesFiles[$project->name] = $nodesFile;
+                $nodesFileList[] = $nodesFiles[$project->name] = $nodesFile;
+            } else {
+                $nodesFiles[$project->name] = self::listControllerFiles($project);
+                $nodesFileList = array_merge($nodesFileList, $nodesFiles[$project->name]);
             }
         }
-        $nodesWasModified = Dce::$cache::fileIsModified($nodesFiles);
-
-        // 尝试从缓存加载节点配置
-        if (! $nodesWasModified) {
-            // 如果开启了缓存, 且缓存有效, 则从缓存中加载
-            self::$nodeTree = Dce::$cache->get('dce_node_tree');
-            self::$pathTreeMapping = Dce::$cache->get('dce_path_tree_mapping');
-            self::$idTreeMapping = Dce::$cache->get('dce_id_tree_mapping') ?: [];
-            if (! empty(self::$idTreeMapping)) {
-                // 如果加载成功, 则返回
-                return;
-            }
+        if (self::$idTreeMapping && ! Dce::$cache::fileIsModified($nodesFileList)) {
+            // 如果文件无变化, 则返回
+            return;
         }
 
-        // 从全部项目加载节点配置
         $rootTree = new NodeTree([
             'node_name' => 'root',
             'path_format' => '',
         ]);
+        // 从全部项目加载节点配置
         foreach ($nodesFiles as $projectName => $nodesFile) {
-            $nodes =  include($nodesFile);
+            // 文件为数组, 则表示是控制器文件集, 则应已AttrNode解析Nodes, 否则直接加载Nodes数组
+            $nodes = is_array($nodesFile) ? self::parseAttrNodes($nodesFile) : include($nodesFile);
             $nodes = self::initFillElder($nodes);
             self::initTree($nodes, $rootTree, $projectName);
         }
@@ -70,6 +77,43 @@ final class NodeManager {
         Dce::$cache->set('dce_node_tree', self::$nodeTree); // cache the nodes config
         Dce::$cache->set('dce_path_tree_mapping', self::$pathTreeMapping);
         Dce::$cache->set('dce_id_tree_mapping', self::$idTreeMapping);
+    }
+
+    /**
+     * 列出项目控制器文件集
+     * @param Project $project
+     * @return array
+     */
+    private static function listControllerFiles(Project $project): array {
+        $files = [];
+        for ($i = 0; $i < Dce::$config->node['deep']; $i ++) {
+            // GLOB_BRACE 在某些操作系统无效, 所以递归来实现吧
+            $files = array_merge($files, glob("{$project->path}controller/*".str_repeat('/*', $i).'.php') ?: []);
+        }
+        return $files;
+    }
+
+    /**
+     * 尝试从控制器文件解析AttrNode提取Node集
+     * @param array $controllerFiles
+     * @return array
+     * @throws \ReflectionException
+     */
+    private static function parseAttrNodes(array $controllerFiles): array {
+        $nodes = [];
+        foreach ($controllerFiles as $file) {
+            if (! preg_match('/\w+\/controller\/.*?(?=.php$)/ui', $file, $className)) {
+                continue;
+            }
+            $className = '\\' . str_replace('/', '\\', $className[0]);
+            $refMethods = (new ReflectionClass($className))->getMethods(ReflectionMethod::IS_PUBLIC);
+            foreach ($refMethods as $method) {
+                if ($attrs = $method->getAttributes(Node::class)) {
+                    $nodes[] = Node::refToNodeArguments($method, $attrs[0]);
+                }
+            }
+        }
+        return $nodes;
     }
 
     /**
@@ -170,7 +214,7 @@ final class NodeManager {
             foreach ($child->nodes as $i => $node) {
                 // 记录ID索引
                 self::$idTreeMapping[$node->id] = $familyPaths;
-                if ($node->urlPathHidden && ! $parent->hasHiddenChild($child->pathFormat)) {
+                if ($node->omissiblePath && ! $parent->hasHiddenChild($child->pathFormat)) {
                     // 如果节点为隐藏路径节点, 且父树种未记录该节点, 则添加到父树隐藏路径节点集中
                     $parent->addHiddenChild($child, $child->pathFormat);
                 }

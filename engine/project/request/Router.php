@@ -21,6 +21,8 @@ class Router {
 
     private array $locatedArguments;
 
+    private array $componentsRemaining;
+
     /**
      * Router constructor.
      * @param RawRequest $rawRequest
@@ -49,6 +51,14 @@ class Router {
     }
 
     /**
+     * 取惰性匹配时剩余未处理的组件
+     * @return array
+     */
+    public function getComponentsRemaining(): array {
+        return $this->componentsRemaining;
+    }
+
+    /**
      * 拆解url为路由组件
      */
     private function parseComponents(): array {
@@ -56,9 +66,9 @@ class Router {
         preg_match('/(?:\.\w+|\/)$/', $queryPath, $suffix);
         $this->urlSuffix = $suffix[0] ?? '';
         $components = [];
-        if (preg_match_all('/([\/-]|^)([^\/\\\.\s&-]+)/', $queryPath, $urlComponents, PREG_SET_ORDER)) {
+        if (preg_match_all('/([\/-]|^)([^\/\\\.\s&-]+)/', $queryPath, $matches, PREG_SET_ORDER)) {
             // 拆解url提取组件, 如: /home/news-1 -> [['/', 'home'], ['/', 'news'], ['-', 1]]
-            foreach ($urlComponents as $v) {
+            foreach ($matches as $v) {
                 $components[] = ['separator' => $v[1], 'argument' => Url::argumentDecode($v[2])];
             }
         }
@@ -68,13 +78,13 @@ class Router {
     /**
      * 根据url路由定位当前访问节点
      * @param NodeTree $nodeTree
-     * @param array $urlComponents
+     * @param array $components
      * @param array $nodeIdElders
      * @param array $urlArguments
      * @return bool|null
      * @throws RouterException
      */
-    private function location(NodeTree $nodeTree, array $urlComponents, array $nodeIdElders = [], array $urlArguments = []) {
+    private function location(NodeTree $nodeTree, array $components, array $nodeIdElders = [], array $urlArguments = []) {
         // 取已匹配到的父路径, 用于后续递归匹配
         $pathParent = self::locationPathByIds($nodeIdElders);
         $isProjectLevel = $pathParent === '';
@@ -88,7 +98,7 @@ class Router {
         }
 
         // 根据Path匹配定位Node
-        $nodeTrees = self::locationByPath($nodeTree, $urlComponents, $pathParent);
+        $nodeTrees = self::locationByPath($nodeTree, $components, $pathParent);
         if (! $nodeTrees) {
             if ($isProjectLevel) {
                 // 如果在根级别定位失败, 则最终定位失败
@@ -99,7 +109,7 @@ class Router {
         }
 
         // 根据Path参数匹配定位Node
-        $isLocated = $this->locationByArguments($nodeTrees, $urlComponents, $nodeIdElders, $urlArguments);
+        $isLocated = $this->locationByArguments($nodeTrees, $components, $nodeIdElders, $urlArguments);
         if (! $isProjectLevel) {
             // 若非根级别, 则直接返回匹配结果
             return $isLocated;
@@ -141,7 +151,7 @@ class Router {
             $nodeTrees[] = $nodeTree->getChild($pathFormat);
             self::componentTakeLock($components, 1);
         } else {
-            // 未命中常规节点时, 收集隐藏节点
+            // 未命中常规节点时, 收集可省略节点
             $nodeTrees = array_values($nodeTree->hiddenChildren);
         }
         return $nodeTrees;
@@ -150,16 +160,16 @@ class Router {
     /**
      * 根据url参数匹配节点
      * @param NodeTree[] $nodeTrees
-     * @param array $urlComponents
+     * @param array $components
      * @param array $nodeIdElders
      * @param array $urlArguments
      * @return bool|null
      * @throws RouterException
      */
-    private function locationByArguments(array $nodeTrees, array $urlComponents, array $nodeIdElders, array $urlArguments): bool|null {
+    private function locationByArguments(array $nodeTrees, array $components, array $nodeIdElders, array $urlArguments): bool|null {
         foreach ($nodeTrees as $nodeTree) {
             foreach ($nodeTree->nodes as $node) {
-                $componentsRemaining = $urlComponents;
+                $componentsRemaining = $components;
                 // 若未指定请求类型, 则不对请求类型做限制, 只要url匹配到即可
                 // 若非目录型节点, 则当前的请求类型必须符合节点配置
                 $methodMatched = in_array($this->rawRequest->method, $node->methods);
@@ -175,7 +185,7 @@ class Router {
                 $nodeIdElders[] = $node->id;
                 if ($node->lazyMatch) {
                     // 如果节点配置了锁定, 则不再尝试继续递归, 节点定位完毕
-                    return $this->locationDone($nodeIdElders, $gottenArguments);
+                    return $this->locationDone($nodeIdElders, $gottenArguments, $componentsRemaining);
                 }
                 // 当前节点元素是否最后一个, (Url组件是否已经处理完毕)
                 $itemIsLast = self::isComponentTakeDone($componentsRemaining);
@@ -197,22 +207,22 @@ class Router {
     /**
      * 匹配节点项参数
      * @param Node $node
-     * @param array $urlComponents
+     * @param array $components
      * @return array|bool
      * @throws RouterException
      */
-    private static function locationMatchArguments(Node $node, array & $urlComponents) {
+    private static function locationMatchArguments(Node $node, array & $components) {
         $gottenArguments = [];
         if (empty($node->urlArguments)) {
             // 如果未配置参数, 则直接返回
             return $gottenArguments;
         }
         $cntComponentTake = count($node->urlArguments);
-        $argumentsPossible = self::componentTake($urlComponents, $cntComponentTake);
+        $argumentsPossible = self::componentTake($components, $cntComponentTake);
         if ($node->urlPlaceholder) {
             // 保留分隔符模式下匹配参数
             foreach ($node->urlArguments as $k => $argument) {
-                $needMatchSeparator = $k || ! $node->urlPathHidden;
+                $needMatchSeparator = $k || ! $node->omissiblePath;
                 $gottenArguments[$argument->name] = self::parseMatchArgument($argumentsPossible[$k], $argument, $gottenArguments, $needMatchSeparator);
                 if (false === $gottenArguments[$argument->name]) {
                     return false;
@@ -230,7 +240,7 @@ class Router {
                     if (array_key_exists($k, $keyLog)) {
                         continue;
                     }
-                    $needMatchSeparator = $k || ! $node->urlPathHidden;
+                    $needMatchSeparator = $k || ! $node->omissiblePath;
                     $gottenArguments[$argument->name] = self::parseMatchArgument($argumentsPossible[$i], $argument, $gottenArguments, $needMatchSeparator);
                     if (! empty($gottenArguments[$argument->name])) {
                         $filled = true;
@@ -243,7 +253,7 @@ class Router {
                 }
             }
         }
-        self::componentTakeLock($urlComponents, $cntComponentTake);
+        self::componentTakeLock($components, $cntComponentTake);
         return $gottenArguments;
     }
 
@@ -326,11 +336,13 @@ class Router {
      * 节点路由定位完毕
      * @param array $nodeIdElders
      * @param array $extractedArguments
+     * @param array $componentsRemaining
      * @return bool
      */
-    private function locationDone(array $nodeIdElders, array $extractedArguments): bool {
+    private function locationDone(array $nodeIdElders, array $extractedArguments, array $componentsRemaining = []): bool {
         $this->locatedNodeIdFamily = $nodeIdElders;
         $this->locatedArguments = $extractedArguments;
+        $this->componentsRemaining = array_column($componentsRemaining, 'argument');
         return true;
     }
 }

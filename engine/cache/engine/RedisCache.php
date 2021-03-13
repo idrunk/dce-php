@@ -7,6 +7,7 @@
 namespace dce\cache\engine;
 
 use dce\cache\Cache;
+use dce\Dce;
 use dce\storage\redis\DceRedis;
 
 final class RedisCache extends Cache {
@@ -67,5 +68,15 @@ final class RedisCache extends Cache {
         $result = $redis->del(self::genKey($key));
         DceRedis::put($redis);
         return !! $result;
+    }
+
+    /** @inheritDoc */
+    public function clear(): void {
+        $redis = DceRedis::get($this->config['index']);
+        // 直接删掉和当前主机应用绑定的, 几乎都是缓存, 非缓存的全服型数据不会与应用ID绑定
+        foreach ($redis->keys(Dce::getId() . ':*') as $key) {
+            $redis->del($key);
+        }
+        DceRedis::put($redis);
     }
 }
