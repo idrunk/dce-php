@@ -10,11 +10,12 @@ use Attribute;
 use dce\base\TraitModel;
 use dce\project\view\ViewCli;
 use dce\service\server\ViewConnection;
+use drunk\Char;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionMethod;
 
-#[Attribute(Attribute::TARGET_METHOD)]
+#[Attribute(Attribute::TARGET_METHOD | Attribute::IS_REPEATABLE)]
 class Node {
     use TraitModel {
         TraitModel::arrayify as baseArrayify;
@@ -97,7 +98,7 @@ class Node {
 
     /**
      * 节点类. 本类同时作为节点实体类与注解类, 仅作为实体类时才会被实例化, 作为注解类时仅用来提供IDE智能提示
-     * @param array|string $path 作为实体类时为节点属性表的数组
+     * @param array|string|null $path 作为实体类时为节点属性表的数组
      * @param string|array|null $methods 作为实体类时为项目名的字符串
      * @param string|null $id
      * @param string|null $name
@@ -117,10 +118,11 @@ class Node {
      * @param string|null $http302
      * @param string|null $jsonpCallback
      * @param array|null $extra
+     * @param bool $controllerPath 是否为控制器根路径
      * @throws NodeException
      */
     public function __construct(
-        array|string $path,
+        array|string|null $path = null,
         string|array|null $methods = null,
         string|null $id = null,
         string|null $name = null,
@@ -140,6 +142,7 @@ class Node {
         string|null $http302 = null,
         string|null $jsonpCallback = null,
         array|null $extra = null,
+        bool $controllerPath = false,
     ) {
         if (is_array($path) && is_string($methods)) {
             $this->setProperties($this->init($path, $methods));
@@ -288,5 +291,28 @@ class Node {
             $arguments['controller'] = preg_replace('/^.+?\bcontroller\\\\(.+)$/', "$1->{$methodName}", $class->getName());
         }
         return $arguments;
+    }
+
+    /**
+     * 自动节点路径, 包括控制器及子目录路径 (给未指定路径的节点以控制器方法作为路径, 自动补上控制器及父目录路径)
+     * @param array $node
+     * @param string $controllerPath
+     * @param string $projectName
+     */
+    public static function fillControllerNodePath(array & $node, string $controllerPath, string $projectName): void {
+        $nodePath = $node['path'] ?? null;
+        if (
+            ! preg_match('/^((?:\w+\\\\)+)?\w+->(\w+)$/', $node['controller'] ?? '', $matches)
+            || (! $matches[1] && $nodePath === $projectName)
+        ) {
+            // 如果当前节点为控制器节点, 或者未根目录下的项目同名节点, 则不作处理直接返回
+            return;
+        }
+        [, $dir, $method] = $matches;
+        $dir = str_replace('\\', '/', $dir);
+        if ($controllerPath && $nodePath !== $controllerPath) {
+            $dir .= "{$controllerPath}/";
+        }
+        $node['path'] = $dir . ($nodePath ?: Char::snakelike($method));
     }
 }

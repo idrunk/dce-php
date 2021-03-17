@@ -26,6 +26,12 @@ class RpcServer {
     /** @var array 预载文件 */
     private array $preloadFiles = [];
 
+    /** @var Server[]|aServer[] 服务器列表 */
+    private array $servers = [];
+
+    /** @var Process 自动创建的进程 */
+    private Process $process;
+
     private function __construct() {}
 
     /**
@@ -89,14 +95,28 @@ class RpcServer {
         return $this;
     }
 
+    /** 关闭服务 */
+    public function stop(): void {
+        if (isset($this->process)) {
+            // mark 此处无法正常关闭
+            Process::kill($this->process->pid);
+        } else {
+            foreach ($this->servers as $server) {
+                $server->shutdown();
+            }
+        }
+    }
+
     /**
      * 启动Rpc服务
      * @param callable|bool $callback 新进程启动回调, 为布尔值时表示是否创建新进程
      * @param bool $useAsyncServer 是否使用异步Tcp服务
+     * @return $this
      */
-    public function start(callable|bool $callback = true, bool $useAsyncServer = false): void {
+    public function start(callable|bool $callback = true, bool $useAsyncServer = false): self {
         if ($callback) {
             $process = new Process(function () use ($callback, $useAsyncServer) {
+                Process::signal(SIGTERM, fn() => $this->stop());
                 $this->prepareService();
                 if (is_callable($callback)) {
                     call_user_func($callback);
@@ -104,11 +124,13 @@ class RpcServer {
                 $this->run($useAsyncServer);
             }, false, SOCK_STREAM, $useAsyncServer ? false : true);
             $process->start();
+            $this->process = $process;
             usleep(200000);
         } else {
             $this->prepareService();
             $this->run($useAsyncServer);
         }
+        return $this;
     }
 
     /**
@@ -145,7 +167,7 @@ class RpcServer {
     private function runAsyncServer() {
         $rpcHosts = array_slice($this->rpcHosts, 0);
         $rpcHost = array_shift($rpcHosts);
-        $server = new aServer($rpcHost->host, $rpcHost->port, SWOOLE_PROCESS, $rpcHost->isUnixSock ? SWOOLE_SOCK_UNIX_STREAM : SWOOLE_SOCK_TCP);
+        $this->servers[] = $server = new aServer($rpcHost->host, $rpcHost->port, SWOOLE_PROCESS, $rpcHost->isUnixSock ? SWOOLE_SOCK_UNIX_STREAM : SWOOLE_SOCK_TCP);
         foreach ($rpcHosts as $rpcHost) {
             $server->listen($rpcHost->host, $rpcHost->port, $rpcHost->isUnixSock ? SWOOLE_SOCK_UNIX_STREAM : SWOOLE_SOCK_TCP);
         }
@@ -196,7 +218,7 @@ class RpcServer {
     private function runCoroutineServer() {
         foreach ($this->rpcHosts as $rpcHost) {
             go(function () use($rpcHost) {
-                $server = new Server(($rpcHost->isUnixSock ? 'unix:' : '') . $rpcHost->host, $rpcHost->port);
+                $this->servers[] = $server = new Server(($rpcHost->isUnixSock ? 'unix:' : '') . $rpcHost->host, $rpcHost->port);
                 $server->handle(function (Server\Connection $connection) use ($rpcHost) {
                     while (1) {
                         try {
@@ -243,7 +265,7 @@ class RpcServer {
         // 先解token, 校验通过才继续解后面的数据
         self::authentication($rpcHost, $clientInfo['client_ip'], $authToken);
         [$className, $methodName, $arguments] = RpcUtility::decode(RpcUtility::REQUEST_FORMATTER, $requestData, 1, $streamOffset);
-        return [$className, $methodName, json_decode($arguments, true)];
+        return [$className, $methodName, unserialize($arguments)];
     }
 
     /**

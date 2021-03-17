@@ -129,14 +129,14 @@ class MysqlModuloExtender extends ModuloExtender {
             }
             $idColumns = $this->getIdColumns(current(array_keys($shardingConfig->extendMapping)), $tableName);
             $sqlOrderBy = implode(',', array_map(fn($column) => "`{$column}`", $idColumns));
-            $shardingIdColumn = $shardingConfig->shardingIdColumn;
             $waitGroup = new WaitGroup();
             // 遍历源库及其拓展库的映射
             foreach ($shardingConfig->extendMapping as $srcDbAlias => ['extends' => $extendMapping]) {
                 $maxId = $this->getMaxExtendId($extendMapping, $tableName, $idColumns);
                 $sqlWhere = $this->getMaxWhereCondition($maxId);
                 $waitGroup->add();
-                go(function () use($waitGroup, $perTransfer, & $wasDone, & $batchLogs, $shardingConfig, $shardingIdColumn, $sqlWhere, $extendMapping, $srcDbAlias, $tableName, $sqlOrderBy) {
+                go(function () use($waitGroup, $perTransfer, & $wasDone, & $batchLogs, $shardingConfig, $sqlWhere, $extendMapping, $srcDbAlias, $tableName, $sqlOrderBy) {
+                    ['name' => $shardingIdName, 'tag' => $shardingIdTag] = $shardingConfig->shardingIdColumn;
                     $limit = $perTransfer + $perTransfer * count($extendMapping);
                     // 取出批次可能需要迁移的源数据
                     $logs = $this->connections[$srcDbAlias]->queryAll(new RawBuilder("SELECT * FROM `{$tableName}` WHERE {$sqlWhere} ORDER BY {$sqlOrderBy} LIMIT {$limit}"));
@@ -152,7 +152,7 @@ class MysqlModuloExtender extends ModuloExtender {
                         }
                         foreach ($logs as $log) {
                             // 提取出排除掉服务ID后的可mod的ID并mod取余
-                            $remainder = Dce::$config->idGenerator->getClient($shardingIdColumn)->extractGene($shardingIdColumn, $log[$shardingIdColumn], $shardingConfig->targetModulus);
+                            $remainder = Dce::$config->idGenerator->getClient($shardingIdTag)->extractGene($shardingIdTag, $log[$shardingIdName], $shardingConfig->targetModulus);
                             // 根据余数定位目标库并将记录与之mapping
                             if (key_exists($remainder, $extendMapping)) {
                                 $targetDbId = $extendMapping[$remainder];
@@ -296,14 +296,14 @@ class MysqlModuloExtender extends ModuloExtender {
     protected function hashClear(): bool {
         // 遍历分库规则数据表配置集
         foreach ($this->shardingConfigs as $tableName => $shardingConfig) {
-            $serverBitWidth = Dce::$config->idGenerator->getClient($shardingConfig->shardingIdColumn)->getBatch($shardingConfig->shardingIdColumn)->serverBitWidth;
+            $serverBitWidth = Dce::$config->idGenerator->getClient($shardingConfig->shardingIdColumn['tag'])->getBatch($shardingConfig->shardingIdColumn['tag'])->serverBitWidth;
             // 遍历源库及其拓展库的映射
             $waitGroup = new WaitGroup();
             foreach ($shardingConfig->targetMapping as $dbAlias => $remainder) {
                 $waitGroup->add();
                 go(function () use($waitGroup, $dbAlias, $tableName, $serverBitWidth, $shardingConfig, $remainder) {
                     // 删除源库中已被迁移到新库的记录 (即按模取余非0的记录)
-                    $cntDeleted = $this->connections[$dbAlias]->execute("DELETE FROM `{$tableName}` WHERE (`{$shardingConfig->shardingIdColumn}` >> {$serverBitWidth}) % {$shardingConfig->targetModulus} > {$remainder}", []);
+                    $cntDeleted = $this->connections[$dbAlias]->execute("DELETE FROM `{$tableName}` WHERE (`{$shardingConfig->shardingIdColumn['name']}` >> {$serverBitWidth}) % {$shardingConfig->targetModulus} > {$remainder}", []);
                     $this->print("成功从{$dbAlias}.{$tableName}删除了{$cntDeleted}条拓表冗余数据");
                     $waitGroup->done();
                 });

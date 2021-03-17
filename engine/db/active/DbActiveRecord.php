@@ -26,7 +26,7 @@ abstract class DbActiveRecord extends ActiveRecord {
     public static function find(int|string|array|RawBuilder|WhereSchema $whereCondition): static|false {
         $instance = new static;
         if (is_scalar($whereCondition)) {
-            $pks = static::getPkFields();
+            $pks = static::getPkNames();
             if (count($pks) > 1) {
                 return false;
             }
@@ -48,7 +48,7 @@ abstract class DbActiveRecord extends ActiveRecord {
         $this->valid();
         $data = $this->extractProperties();
         $insertId = $this->getActiveQuery()->insert($data);
-        $pk = static::getPkFields();
+        $pk = static::getPkNames();
         if ($insertId && count($pk) === 1) {
             if ($needLoadNew) {
                 // 查出数据库中真正储存的数据填充到当前属性, 如插入NOW()则取到插入的实时时间
@@ -103,12 +103,12 @@ abstract class DbActiveRecord extends ActiveRecord {
      * 取数据表主键集
      * @return array
      */
-    public static function getPkFields(): array {
+    public static function getPkNames(): array {
         if (! key_exists(static::class, self::$primaryKeysMapping)) {
             self::$primaryKeysMapping[static::class] = [];
-            foreach (self::getProperties() as $property) {
-                if ($property->field->isPrimaryKey()) {
-                    self::$primaryKeysMapping[static::class][] = $property->field->getName();
+            foreach (static::getFields() as $field) {
+                if ($field->isPrimaryKey()) {
+                    self::$primaryKeysMapping[static::class][] = $field->getName();
                 }
             }
         }

@@ -102,15 +102,24 @@ final class NodeManager {
     private static function parseAttrNodes(array $controllerFiles): array {
         $nodes = [];
         foreach ($controllerFiles as $file) {
-            if (! preg_match('/\w+\/controller\/.*?(?=.php$)/ui', $file, $className)) {
+            if (! preg_match('/(\w+)\/controller\/.*?(?=.php$)/ui', $file, $className)) {
                 continue;
             }
-            $className = '\\' . str_replace('/', '\\', $className[0]);
-            $refMethods = (new ReflectionClass($className))->getMethods(ReflectionMethod::IS_PUBLIC);
-            foreach ($refMethods as $method) {
-                if ($attrs = $method->getAttributes(Node::class)) {
-                    $nodes[] = Node::refToNodeArguments($method, $attrs[0]);
+            $controllerPath = '';
+            $fileNodesOffset = count($nodes);
+            [$className, $projectName] = $className;
+            $className = '\\' . str_replace('/', '\\', $className);
+            foreach ((new ReflectionClass($className))->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+                foreach ($method->getAttributes(Node::class) as $attribute) {
+                    $nodes[] = $node = Node::refToNodeArguments($method, $attribute);
+                    if ($node['controllerPath'] ?? false) {
+                        unset($node['controllerPath']);
+                        $controllerPath = $node['path'];
+                    }
                 }
+            }
+            for ($i = count($nodes) - 1; $i >= $fileNodesOffset; $i --) {
+                Node::fillControllerNodePath($nodes[$i], $controllerPath, $projectName);
             }
         }
         return $nodes;

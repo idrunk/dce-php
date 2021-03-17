@@ -229,7 +229,7 @@ class RpcClient {
      * @throws RpcException
      */
     private static function authPack(string $token, string $className, string $methodName, array $arguments): string {
-        $data = RpcUtility::encode(RpcUtility::REQUEST_FORMATTER, $token, $className, $methodName, json_encode($arguments, JSON_UNESCAPED_UNICODE));
+        $data = RpcUtility::encode(RpcUtility::REQUEST_FORMATTER, $token, $className, $methodName, serialize($arguments));
         return $data;
     }
 

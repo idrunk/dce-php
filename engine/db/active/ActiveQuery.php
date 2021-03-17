@@ -6,6 +6,8 @@
 
 namespace dce\db\active;
 
+use drunk\Char;
+
 abstract class ActiveQuery {
     protected DbActiveRecord $activeRecord;
 
@@ -19,7 +21,7 @@ abstract class ActiveQuery {
      * @return $this
      */
     public function with(string ... $relationNames): static {
-        $this->relationNames = $relationNames;
+        $this->relationNames = array_map(fn($relationName) => Char::camelize($relationName, true), $relationNames);
         return $this;
     }
 

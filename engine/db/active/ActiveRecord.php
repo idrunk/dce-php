@@ -6,10 +6,14 @@
 
 namespace dce\db\active;
 
+use dce\db\entity\Field;
 use dce\db\proxy\Transaction;
 use dce\model\Model;
 
 abstract class ActiveRecord extends Model {
+    /** @var Field[][] 字段集 */
+    private static array $fieldsMapping = [];
+
     /** @var bool 是否通过查询创建的活动记录实例 */
     private bool $createByQuery = false;
 
@@ -25,7 +29,7 @@ abstract class ActiveRecord extends Model {
      */
     public function getPkValues(): array {
         $properties = [];
-        $pks = static::getPkFields();
+        $pks = static::getPkNames();
         foreach ($pks as $pk) {
             $properties[$pk] = $this->$pk;
         }
@@ -182,6 +186,21 @@ abstract class ActiveRecord extends Model {
             $tableName = static::toDbKey($tableName);
         }
         return $tableName;
+    }
+
+    /**
+     * 取字段集
+     * @return Field[]
+     */
+    public static function getFields(): array {
+        if (! key_exists(static::class, self::$fieldsMapping)) {
+            foreach (static::getProperties() as $property) {
+                if (isset($property->field)) {
+                    self::$fieldsMapping[static::class][] = $property->field;
+                }
+            }
+        }
+        return self::$fieldsMapping[static::class];
     }
 
     /**

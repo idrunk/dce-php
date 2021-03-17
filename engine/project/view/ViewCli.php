@@ -18,8 +18,7 @@ abstract class ViewCli extends View {
      * @param string $suffix
      */
     public function print(mixed $value, string $suffix = "\n"): void {
-        print_r($value);
-        echo $suffix;
+        printf('%s%s', is_scalar($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), $suffix);
     }
 
     /**
@@ -27,12 +26,12 @@ abstract class ViewCli extends View {
      * @param string $format
      * @param mixed ...$arguments
      */
-    public function printf(string $format, ... $arguments): void {
+    public function printf(string $format, mixed ... $arguments): void {
         foreach ($arguments as $k => $argument) {
-            if (! is_string($argument)) {
-                $arguments[$k] = json_encode($argument, JSON_UNESCAPED_UNICODE);
+            if (! is_scalar($argument)) {
+                $arguments[$k] = json_encode($argument, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
             }
         }
-        echo sprintf($format, ... $arguments);
+        printf($format, ... $arguments);
     }
 }

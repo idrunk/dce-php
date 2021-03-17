@@ -122,11 +122,11 @@ abstract class Pool {
             // 取最小容量使用率配置集
             // 取最小生产率配置集 (省略)
             // 随机取其中一个配置
-            $minSalesRate = 2;
-            $minSalesRateIndexes = [];
+            $minSalesRate = -1;
             foreach ($this->configs as $i => $config) {
                 $salesRate = $config->getSalesRate();
-                if ($salesRate <= $minSalesRate) {
+                // 如果未初始化最小消费率, 则初始化为第一个, 即时后面有更小的, 也会重新初始化, 所以不会出现都有第一个的问题
+                if ($minSalesRate < 0 || $salesRate <= $minSalesRate) {
                     if ($salesRate !== $minSalesRate) {
                         // 如果当前为最小使用率, 则且暂无相同的值, 则表示为第一个, 需初始化最小使用率索引集, 并更新最小使用率值
                         $minSalesRateIndexes = [];
@@ -212,14 +212,14 @@ abstract class Pool {
                 $this->yield($config, $channel);
             }
         }
+        // 记录一次消费
+        $config->consume();
         // 使用Swoole协程通道时, 若通道中无实例, 则会挂起, 等到有消费方归还后, 再取出, 并继续后续动作
         $instance = $channel->pop();
         if (null === $instance) {
             throw new PoolException('池中暂无空闲实例');
         }
         $this->mapping->update($instance);
-        // 记录一次消费
-        $config->consume();
         return $instance;
     }
 

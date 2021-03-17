@@ -3,6 +3,7 @@ namespace dce\sharding\middleware;
 
 use dce\config\ConfigLibInterface;
 use dce\config\Config;
+use JetBrains\PhpStorm\ArrayShape;
 
 class ShardingConfig extends Config implements ConfigLibInterface {
     /** @var string 按模分库 */
@@ -38,17 +39,21 @@ class ShardingConfig extends Config implements ConfigLibInterface {
     /** @var array 键值翻转的分库规则字典 */
     public array $flipMapping;
 
-    /** @var string|null 分库ID字段 (若配置了ID字段, 则将使用生成器生成ID, 若同时配置了sharding_column, 则该字段将作为ID的基因字段) */
-    public string|null $idColumn = null;
+    /** @var array 分库ID字段 (若配置了ID字段, 则将使用生成器生成ID, 若同时配置了sharding_column, 则该字段将作为ID的基因字段) */
+    #[ArrayShape(['name' => 'string', 'tag' => 'string'])]
+    public array $idColumn;
 
-    /** @var string|null 分库路由字段 (未配置sharding_column时将以id_column作为分库字段) */
-    public string|null $shardingColumn = null;
+    /** @var array 分库路由字段 (未配置sharding_column时将以id_column作为分库字段) */
+    #[ArrayShape(['name' => 'string', 'tag' => 'string'])]
+    public array $shardingColumn;
 
-    /** @var string 分库依据字段, 有配置 $idColumn 则取之, 否则取 $shardingColumn */
-    public string $idShardingColumn;
+    /** @var array 分库依据字段, 有配置 $idColumn 则取之, 否则取 $shardingColumn */
+    #[ArrayShape(['name' => 'string', 'tag' => 'string'])]
+    public array $idShardingColumn;
 
-    /** @var string 分库依据字段, 有配置 $shardingColumn 则取之, 否则取 $idColumn */
-    public string $shardingIdColumn;
+    /** @var array 分库依据字段, 有配置 $shardingColumn 则取之, 否则取 $idColumn */
+    #[ArrayShape(['name' => 'string', 'tag' => 'string'])]
+    public array $shardingIdColumn;
 
     /** @var int 拓库时分库目标模数 */
     public int $targetModulus;
@@ -80,17 +85,26 @@ class ShardingConfig extends Config implements ConfigLibInterface {
             foreach ($tables as $tableName => $tableConfig) {
                 // 若配置了ID字段, 则将使用生成器生成ID, 若同时配置了sharding_column, 则该字段将作为ID的基因字段
                 if (! isset($tableConfig['id_column'])) {
-                    $tableConfig['id_column'] = null;
+                    $tableConfig['id_column'] = ['name' => null, 'tag' => null];
+                } else if (is_string($tableConfig['id_column'])) {
+                    $tableConfig['id_column'] = ['name' => $tableConfig['id_column'], 'tag' => $tableConfig['id_column']];
+                } else if (! isset($tableConfig['id_column']['name']) || ! isset($tableConfig['id_column']['tag'])) {
+                    throw new MiddlewareException("分库配置 {$alias} > {$tableName} > id_column 异常");
                 }
                 // 若未配置ID字段, 则将不主动生成ID, 分库将仅以sharding_column字段划分
                 if (! isset($tableConfig['sharding_column'])) {
-                    $tableConfig['sharding_column'] = null;
+                    $tableConfig['sharding_column'] = ['name' => null, 'tag' => null];
+                } else if (is_string($tableConfig['sharding_column'])) {
+                    $tableConfig['sharding_column'] = ['name' => $tableConfig['id_column'], 'tag' => $tableConfig['id_column']];
+                } else if (! isset($tableConfig['sharding_column']['name']) || ! isset($tableConfig['sharding_column']['tag'])) {
+                    throw new MiddlewareException("分库配置 {$alias} > {$tableName} > sharding_column 异常");
                 }
-                if (! $tableConfig['id_column'] && ! $tableConfig['sharding_column']) {
+                if (! $tableConfig['id_column']['name'] && ! $tableConfig['sharding_column']['name']) {
                     throw new MiddlewareException("分库配置错误, 未配置{$tableName}表内容切分依据字段");
                 }
-                $tableConfig['id_sharding_column'] = $tableConfig['id_column'] ?? $tableConfig['sharding_column'];
-                $tableConfig['sharding_id_column'] = $tableConfig['sharding_column'] ?? $tableConfig['id_column'];
+
+                $tableConfig['id_sharding_column'] = $tableConfig['id_column']['name'] ? $tableConfig['id_column'] : $tableConfig['sharding_column'];
+                $tableConfig['sharding_id_column'] = $tableConfig['sharding_column']['name'] ? $tableConfig['sharding_column'] : $tableConfig['id_column'];
                 $config = $tableConfig + $config;
                 $config['table_name'] = $tableName;
                 $config['alias'] = $alias;

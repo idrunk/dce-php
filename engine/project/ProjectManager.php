@@ -64,7 +64,7 @@ class ProjectManager {
     /**
      * 取指定项目
      * @param string $projectName
-     * @return Project
+     * @return Project|null
      */
     public static function get(string $projectName): Project|null {
         return self::$projects[$projectName] ?? null;
