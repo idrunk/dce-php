@@ -35,9 +35,12 @@ abstract class SchemaAbstract implements SchemaInterface {
         return $this->conditions;
     }
 
-    final protected function pushCondition(string|array|int|StatementAbstract $condition, bool|null $unshiftOrEmpty = null): void {
-        if (false === $unshiftOrEmpty) {
+    final protected function pushCondition(string|array|int|StatementAbstract|false $condition, bool|null $unshiftOrEmpty = null): void {
+        if (false === $unshiftOrEmpty || false === $condition) {
             $this->conditions = [];
+            if (false === $condition) {
+                return;
+            }
         }
         if ($unshiftOrEmpty) {
             array_unshift($this->conditions, $condition);
@@ -90,7 +93,7 @@ abstract class SchemaAbstract implements SchemaInterface {
         } else {
             $table = self::tableWrap($string, $isAllowAlias);
             if (!$table) {
-                throw new QueryException("{$string} 非法");
+                throw new QueryException("表/字段名 {$string} 非法");
             }
         }
         return $table;

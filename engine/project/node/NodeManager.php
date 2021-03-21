@@ -224,7 +224,7 @@ final class NodeManager {
                 // 记录ID索引
                 self::$idTreeMapping[$node->id] = $familyPaths;
                 if ($node->omissiblePath && ! $parent->hasHiddenChild($child->pathFormat)) {
-                    // 如果节点为隐藏路径节点, 且父树种未记录该节点, 则添加到父树隐藏路径节点集中
+                    // 如果节点为隐藏路径节点, 且父树中未记录该节点, 则添加到父树隐藏路径节点集中
                     $parent->addHiddenChild($child, $child->pathFormat);
                 }
                 if (! isset($node->corsOrigins)) {

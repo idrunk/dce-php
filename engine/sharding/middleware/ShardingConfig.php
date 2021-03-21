@@ -95,7 +95,7 @@ class ShardingConfig extends Config implements ConfigLibInterface {
                 if (! isset($tableConfig['sharding_column'])) {
                     $tableConfig['sharding_column'] = ['name' => null, 'tag' => null];
                 } else if (is_string($tableConfig['sharding_column'])) {
-                    $tableConfig['sharding_column'] = ['name' => $tableConfig['id_column'], 'tag' => $tableConfig['id_column']];
+                    $tableConfig['sharding_column'] = ['name' => $tableConfig['sharding_column'], 'tag' => $tableConfig['sharding_column']];
                 } else if (! isset($tableConfig['sharding_column']['name']) || ! isset($tableConfig['sharding_column']['tag'])) {
                     throw new MiddlewareException("分库配置 {$alias} > {$tableName} > sharding_column 异常");
                 }

@@ -11,7 +11,7 @@ use dce\db\query\builder\SchemaAbstract;
 use dce\db\query\builder\Statement\SelectStatement;
 
 class WhereConditionSchema extends SchemaAbstract {
-    public string|null $column;
+    public string|null $columnPure;
 
     public function __construct(
         public string|false|RawBuilder $columnWrapped,
@@ -19,7 +19,7 @@ class WhereConditionSchema extends SchemaAbstract {
         public string|int|float|array|false|RawBuilder|SelectStatement|null $value,
         public string|null $placeHolder = null,
     ) {
-        $this->column = trim($columnWrapped, '`');
+        $this->columnPure = preg_replace('/^.*\b(\w+)`?\s*$/u', '$1', $columnWrapped);
     }
 
     public function __toString(): string {

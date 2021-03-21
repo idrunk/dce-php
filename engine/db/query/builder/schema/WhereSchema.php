@@ -62,42 +62,40 @@ class WhereSchema extends SchemaAbstract {
                     $conditionPackage[] = $conditionSqlPackage[] = $isRawCondition ? "$condition" : "($condition)";
                     $params = array_merge($params, $condition->getParams());
                 } else {
-                    // 条件包为条件数组
                     $column = $columnName = $condition[0] ?? false;
-                    $isSubConditions = is_array($column);
-                    if ($isSubConditions) {
+                    if (is_array($column)) {
                         // 当字段名为数组时, 表示当前条件为子条件包, 进行递归
                         [$subConditionSqlPackage, $subConditionPackage, $conditionPackageParams] = $this->conditionPack($condition);
                         $conditionSqlPackage[] = $subConditionSqlPackage;
                         $conditionPackage[] = $subConditionPackage;
                         $params = array_merge($params, $conditionPackageParams);
-                    } else {
+                    } else if ($column instanceof WhereSchema) {
+                        $conditionPackage[] = $conditionSqlPackage[] = (string) $column;
+                        $params = $column->getParams();
+                    } else if (($leftIsRaw = $column instanceof RawBuilder) || is_string($column)) {
                         $operator = key_exists(1, $condition) ? $condition[1] : false;
                         $value = key_exists(2, $condition) ? $condition[2] : false;
                         // 原生比较运算左值
-                        $leftIsRaw = $column instanceof RawBuilder;
-                        if ($leftIsRaw || is_string($column)) {
-                            if (! $leftIsRaw) {
-                                $evacuatedUpper = strtoupper(str_replace(' ', '', $column));
-                                if (in_array($evacuatedUpper, ['EXISTS', 'NOTEXISTS'])) {
-                                    // 处理无左比较值的查询条件
-                                    $column = false;
-                                    $value = $operator;
-                                    $operator = $evacuatedUpper;
-                                } else {
-                                    // 处理校验字段名
-                                    $column = self::tableWrap($column);
-                                    if (! $column) {
-                                        throw new QueryException("查询条件无效, 左比较值\"{$columnName}\"非法", 1);
-                                    }
+                        if (! $leftIsRaw) {
+                            $evacuatedUpper = strtoupper(str_replace(' ', '', $column));
+                            if (in_array($evacuatedUpper, ['EXISTS', 'NOTEXISTS'])) {
+                                // 处理无左比较值的查询条件
+                                $column = false;
+                                $value = $operator;
+                                $operator = $evacuatedUpper;
+                            } else {
+                                // 处理校验字段名
+                                $column = self::tableWrap($column);
+                                if (! $column) {
+                                    throw new QueryException("查询条件无效, 左比较值\"{$columnName}\"非法", 1);
                                 }
                             }
-                            [$conditionInstance, $conditionParams] = $this->conditionBuild($column, $operator, $value);
-                            $conditionPackage[] = $conditionSqlPackage[] = $conditionInstance;
-                            $params = array_merge($params, $conditionParams);
-                        } else {
-                            throw new QueryException('查询条件无效, 左比较值非法', 1);
                         }
+                        [$conditionInstance, $conditionParams] = $this->conditionBuild($column, $operator, $value);
+                        $conditionPackage[] = $conditionSqlPackage[] = $conditionInstance;
+                        $params = array_merge($params, $conditionParams);
+                    } else {
+                        throw new QueryException('查询条件无效, 左比较值非法', 1);
                     }
                 }
             } else if (is_string($condition) && ($upper = strtoupper(trim($condition))) && in_array($upper, ['AND', 'OR'])) {
@@ -186,7 +184,7 @@ class WhereSchema extends SchemaAbstract {
             case 'EXISTS': // 无左值
             case 'NOT EXISTS':
                 if (($isRaw = $value instanceof RawBuilder) || $value instanceof SelectStatement) {
-                    $condition->column = null;
+                    $condition->columnPure = null;
                     $condition->placeHolder = $isRaw ? "$value" : "($value)";
                     $params = $value->getParams();
                     $this->logHasSubQuery(! $isRaw);

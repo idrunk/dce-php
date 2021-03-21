@@ -10,6 +10,7 @@ use dce\db\entity\DbField;
 use dce\db\proxy\DbProxy;
 use dce\db\query\builder\RawBuilder;
 use dce\db\query\builder\schema\WhereSchema;
+use dce\db\query\builder\SchemaAbstract;
 
 abstract class DbActiveRecord extends ActiveRecord {
     /** @inheritDoc */
@@ -80,7 +81,7 @@ abstract class DbActiveRecord extends ActiveRecord {
         $data = [];
         foreach ($counters as $fieldName => $increment) {
             $increment = (float) $increment;
-            $data[$fieldName] = new RawBuilder("{$fieldName} + {$increment}", false);
+            $data[SchemaAbstract::tableWrapThrow($fieldName)] = new RawBuilder("{$fieldName} + {$increment}", false);
         }
         $where = $this->genPropertyConditions();
         return $this->getActiveQuery()->where($where)->update($data);

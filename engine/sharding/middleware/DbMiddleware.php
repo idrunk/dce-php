@@ -255,10 +255,10 @@ class DbMiddleware extends Middleware {
         if ($this->shardingConfig->isModulo()) {
             foreach ($storeData as $datum) {
                 // ID或者外键分库ID皆可作为分库依据
-                $id = $datum[$shardingIdName];
-                $remainder = Dce::$config->idGenerator->getClient($shardingIdTag)->extractGene($shardingIdTag, $id, $this->shardingConfig->modulus);
+                $shardingId = $datum[$shardingIdName];
+                $remainder = Dce::$config->idGenerator->getClient($shardingIdTag)->extractGene($shardingIdTag, $shardingId, $this->shardingConfig->modulus);
                 $dbAlias = $mapping[$remainder] ?? null;
-                self::dataSorting($dbStoreData, $dbAlias, $id, $datum);
+                self::dataSorting($dbStoreData, $dbAlias, $shardingId, $datum);
             }
         } else if ($this->shardingConfig->isRange()) {
             foreach ($storeData as $datum) {
@@ -303,7 +303,7 @@ class DbMiddleware extends Middleware {
                     $subDbSet = $this->navigationByCondition($condition);
                 } else if ($condition instanceof WhereConditionSchema) {
                     // 如果当前字段为分库依据字段, 则尝试根据筛选值定位数据库集
-                    if (in_array($condition->column, [$this->shardingConfig->idColumn['name'], $this->shardingConfig->shardingColumn['name']])) {
+                    if (in_array($condition->columnPure, [$this->shardingConfig->idColumn['name'], $this->shardingConfig->shardingColumn['name']])) {
                         $subDbSet = $this->locatingDbByCondition($condition);
                     }
                 }

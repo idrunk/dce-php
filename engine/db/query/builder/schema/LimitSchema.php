@@ -15,6 +15,9 @@ class LimitSchema extends SchemaAbstract {
             if ($offset > 0) {
                 $this->pushCondition($offset, true);
             }
+        } else {
+            // 否则清空Limit条件
+            $this->pushCondition(false);
         }
     }
 

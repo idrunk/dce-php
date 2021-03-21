@@ -6,6 +6,8 @@
 
 namespace dce\db\active;
 
+use drunk\Char;
+
 /**
  * 关联数据查询器
  * Class ActiveRelation
@@ -78,7 +80,7 @@ class ActiveRelation {
     public function setMapping(ActiveRecord $activeRecord, array $relationMap, string|null $viaRelationName): self {
         $this->refActiveRecord = $activeRecord;
         $this->relationMapping = $relationMap;
-        $this->viaRelationName = $viaRelationName;
+        $this->viaRelationName = $viaRelationName ? Char::camelize($viaRelationName, true) : $viaRelationName;
         return $this;
     }
 

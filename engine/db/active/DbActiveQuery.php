@@ -82,10 +82,9 @@ class DbActiveQuery extends ActiveQuery {
             // 如果要取数组式的结果, 则不加载关系数据, 因为必须一次性取出, 造成不必要的io浪费
             return $data;
         }
-        $activeRecordClass = $this->activeRecord::class;
         foreach ($data as $k => $datum) {
             /** @var ActiveRecord $activeRecord */
-            $activeRecord = new $activeRecordClass;
+            $activeRecord = new $this->{activeRecord::class};
             $activeRecord->setQueriedProperties($datum);
             foreach ($datum as $property => $value) {
                 // 从普通properties中剔除出属于getterValues的属性赋值到getterValues
@@ -100,7 +99,7 @@ class DbActiveQuery extends ActiveQuery {
     }
 
     /**
-     * 将批量查出的关联数据按映射关系分配绑定到主体数据
+     * 将批量查出的 with 的关联数据按映射关系分配绑定到主体数据
      * @param array $data
      * @return array
      * @throws ActiveException
@@ -151,7 +150,7 @@ class DbActiveQuery extends ActiveQuery {
     }
 
     /**
-     * 批量查出载入所有关系数据
+     * 批量查出载入所有 with 的关系数据
      * @param string $relationName
      * @param array $data
      * @param array $viaRelationQueue
@@ -183,7 +182,8 @@ class DbActiveQuery extends ActiveQuery {
             if (! $relationWhereParams) {
                 throw new ActiveException("{$relationName} 关联getter方法未包含 {$foreignKey} 为键的数据");
             }
-            $activeQueryRelation->getActiveQuery()->where($foreignKey, 'in', $relationWhereParams);
+            // 取一条关联关系数据时允许用户设置limit:1以提升性能, 但如果通过with批量查的, 则不能limit了, 需要清除limit条件
+            $activeQueryRelation->getActiveQuery()->where($foreignKey, 'in', $relationWhereParams)->limit(0);
         }
         // 根据依赖关系批量查出所有关联数据
         $relationData = $activeQueryRelation->getActiveQuery()->select();
@@ -204,8 +204,8 @@ class DbActiveQuery extends ActiveQuery {
             if ($this->arrayify) {
                 return $data;
             }
-            $activeRecordClass = $this->activeRecord::class;
-            $activeRecord = new $activeRecordClass;
+            /** @var DbActiveRecord $activeRecord */
+            $activeRecord = new $this->{activeRecord::class};
             $activeRecord->setQueriedProperties($data);
             return $activeRecord;
         });
