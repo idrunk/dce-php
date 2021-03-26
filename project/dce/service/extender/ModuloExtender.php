@@ -6,12 +6,12 @@
 
 namespace dce\service\extender;
 
-use dce\project\view\ViewCli;
+use dce\project\Controller;
 
 abstract class ModuloExtender extends Extender {
     protected string $shardingType = 'modulo';
 
-    final public static function run(ViewCli $cli): void {
+    final public static function run(Controller $cli): void {
         static $instance;
         if (null !== $instance) {
             return;

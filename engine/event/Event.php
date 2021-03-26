@@ -24,13 +24,13 @@ class Event {
 
     /**
      * 进入控制器时回调 (控制器实例化后触发)
-     * @callable(View)
+     * @callable(Controller)
      */
     public const ENTERING_CONTROLLER = 'ENTERING_CONTROLLER';
 
     /**
      * 控制器执行完毕回调
-     * @callable(View)
+     * @callable(Controller)
      */
     public const AFTER_CONTROLLER = 'AFTER_RESPONSE';
 

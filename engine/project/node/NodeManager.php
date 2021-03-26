@@ -9,6 +9,7 @@ namespace dce\project\node;
 use dce\Dce;
 use dce\project\Project;
 use dce\project\ProjectManager;
+use dce\project\render\Renderer;
 use ReflectionClass;
 use ReflectionMethod;
 
@@ -234,6 +235,13 @@ final class NodeManager {
                 if (! isset($node->methods)) {
                     // 继承method属性, 或初始化为get
                     $node->methods = $parentNode->methods ?? ['get', 'head'];
+                }
+                if (! isset($node->render)) {
+                    // 继承方式型(非模板文件)render属性, 或初始化为'json', 输出json
+                    $node->render = isset($parentNode->render) && ! str_contains($parentNode->render, '.') ? $parentNode->render : Renderer::TYPE_JSON;
+                } else if (! str_contains($node->render, '.')) {
+                    // 对含有后缀名的大概非模板的自动转为小写
+                    $node->render = strtolower($node->render);
                 }
                 if (! isset($node->templateLayout)) {
                     // 继承templateLayout属性, 或初始化为'', 即不使用布局

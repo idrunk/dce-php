@@ -1,20 +1,17 @@
 <?php
 /**
- * Author: Drunk
- * Date: 2016-12-18 5:20
+ * Author: Drunk (drunkce.com; idrunk.net)
+ * Date: 2021/3/23 23:23
  */
 
-namespace dce\project\view\engine;
+namespace dce\project\render;
 
 use dce\Dce;
+use dce\project\Controller;
+use dce\project\request\RawRequest;
 use dce\project\request\Request;
-use dce\project\view\ViewException;
-use dce\project\view\ViewHttp;
 
-abstract class ViewHttpHtml extends ViewHttp {
-    /** @var string $viewRoot 项目视图根目录 */
-    private string $viewRoot;
-
+class TemplateRenderer extends Renderer {
     /** @var string $templatePath 模板文件路径 */
     private string $templatePath;
 
@@ -24,65 +21,61 @@ abstract class ViewHttpHtml extends ViewHttp {
     /** @var string $templateCacheDir 模板缓存目录 */
     private string $templateCacheDir;
 
-    /**
-     * HtmlViewCgi constructor.
-     * @param Request $request
-     * @throws ViewException
-     */
-    function __construct(Request $request) {
-        $this->warmUp($request);
-        parent::__construct($request);
-        $this->assign('request', $request);
+    /** @inheritDoc */
+    protected function prepare(Controller $controller, bool $isHttpRequest): void {
+        // 需先预热, 因为父构造函数可能会直接从缓存渲染, 渲染时需要模板文件
+        $this->warmUp($controller->request);
+        parent::prepare($controller, $isHttpRequest);
+        $controller->assign('request', $controller->request);
     }
 
     /**
      * 模板预热
      * @param Request $request
-     * @throws ViewException
+     * @throws RenderException
      */
-    private function warmUp(Request $request): void {
-        $this->viewRoot = "{$request->project->path}view/";
-        if (! ($request->node->phpTemplate ?? 0)) {
-            throw new ViewException("当前节点{$request->node->pathFormat}未配置php_template属性");
-        }
-        $this->templatePath = $this->viewRoot . $request->node->phpTemplate;
+    protected function warmUp(Request $request): void {
+        $templateRoot = "{$request->project->path}template/";
+        $this->templatePath = $templateRoot . $request->node->render;
         if (! is_file($this->templatePath) ) {
-            throw new ViewException("模版文件 {$this->templatePath} 不存在");
+            throw new RenderException("模版文件 {$this->templatePath} 不存在");
         }
-        $this->layoutPath = ($request->node->templateLayout ?? '') ? $this->viewRoot . $request->node->templateLayout : '';
+        $this->layoutPath = ($request->node->templateLayout ?? '') ? $templateRoot . $request->node->templateLayout : '';
         if ($this->layoutPath && ! is_file($this->layoutPath)) {
-            throw new ViewException("布局文件 {$this->layoutPath} 不存在");
+            throw new RenderException("布局文件 {$this->layoutPath} 不存在");
         }
         $this->templateCacheDir = $request->config->cache['file']['template_dir'] ?: APP_RUNTIME . 'tpl/';
     }
 
     /** @inheritDoc */
-    protected function setContentType(): void {
-        @$this->httpRequest->header('Content-Type', 'text/html; charset=utf-8');
+    protected function setContentType(RawRequest $rawRequest): void {
+        // 不一定是html, 可能是xml/text等一切其他的内容, 所以不自动header
+        // @$rawRequest->header('Content-Type', 'text/html; charset=utf-8');
     }
 
     /** @inheritDoc */
-    protected function rendering(): string {
-        extract($this->getAllAssigned());
+    protected function rendering(Controller $controller, mixed $data): string {
+        extract(false === $data ? $controller->getAllAssigned() : $data);
         ob_start();
-        require $this->template();
+        require $this->template($controller);
         return ob_get_clean();
     }
 
     /**
      * 编译模板取文件名
+     * @param Controller $controller
      * @return string
      */
-    private function template(): string {
+    protected function template(Controller $controller): string {
         $cacheTemplatePath = $this->templateCacheDir . hash('md5', $this->templatePath) . '.php';
         // 如果缓存模板不存在, 或者未开启模板缓存, 且模板文件有变化了, 则进入编译缓存流程
         if (
             ! is_file($cacheTemplatePath)
-            || ! ($this->request->node->apiCache & 2)
+            || ! ($controller->request->node->renderCache & 2)
             && Dce::$cache::fileIsModified([$this->templatePath, $this->layoutPath])
         ) {
             if (! is_dir($this->templateCacheDir)) {
-                mkdir($this->templateCacheDir, 0777, true);
+                mkdir($this->templateCacheDir, 0755, true);
             }
             // 如果模板文件改变了, 或者未找到缓存文件, 则重建缓存
             $fullCode = $this->compile();
@@ -95,12 +88,12 @@ abstract class ViewHttpHtml extends ViewHttp {
      * 编译模板, 提取合并所有关系文件内容
      * @return string
      */
-    private function compile() {
+    protected function compile(): string {
         if ($this->layoutPath) {
             $rootDir = dirname($this->layoutPath);
             $rootContent = file_get_contents($this->layoutPath);
             // 使用布局时, 内容模板文件若有PHP脚本, 则脚本必须闭合
-            $rootContent = preg_replace('/(\blayout_content\b[\s\S]+?\?>)/', '$1'."\n".'<?php require \''.$this->templatePath.'\'; ?>', $rootContent);
+            $rootContent = preg_replace('/(\blayout_content\b[\s\S]+?\?>)/', "\$1\n".'<?php require \''.$this->templatePath.'\'; ?>', $rootContent);
         } else {
             $rootDir = dirname($this->templatePath);
             $rootContent = file_get_contents($this->templatePath);
@@ -114,7 +107,7 @@ abstract class ViewHttpHtml extends ViewHttp {
      * @param string $rootDir
      * @return string
      */
-    private function loadAllContent(string $rootContent, string $rootDir) {
+    protected function loadAllContent(string $rootContent, string $rootDir): string {
         $fragments = token_get_all($rootContent);
         $fragmentCount = count($fragments);
         $rootContent = '';
@@ -140,14 +133,12 @@ abstract class ViewHttpHtml extends ViewHttp {
                         $subRootDir = dirname($childPath);
                         $rootContent .= $this->loadAllContent($subContent, $subRootDir);
                     }
+                } else if (in_array($type, [T_INCLUDE, T_INCLUDE_ONCE, T_REQUIRE, T_REQUIRE_ONCE])) {
+                    // 如果进到引用语句, 则关掉前面的PHP语句, 如果前面部分是赋值等运算符, 则会报错fatal_error, 因此禁止在模板中将引用参与计算
+                    $rootContent .= ";?>";
+                    $isInInclude = true;
                 } else {
-                    if (in_array($type, [T_INCLUDE, T_INCLUDE_ONCE, T_REQUIRE, T_REQUIRE_ONCE])) {
-                        // 如果进到引用语句, 则关掉前面的PHP语句, 如果前面部分是赋值等运算符, 则会报错fatal_error, 因此禁止在模板中将引用参与计算
-                        $rootContent .= ";?>";
-                        $isInInclude = true;
-                    } else {
-                        $rootContent .= $content;
-                    }
+                    $rootContent .= $content;
                 }
             }
         }

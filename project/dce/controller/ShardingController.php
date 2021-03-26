@@ -6,10 +6,10 @@
 
 namespace dce\controller;
 
+use dce\project\Controller;
 use dce\service\extender\MysqlModuloExtender;
-use dce\project\view\ViewCli;
 
-class ShardingController extends ViewCli {
+class ShardingController extends Controller {
     public function extend() {
         MysqlModuloExtender::run($this);
     }

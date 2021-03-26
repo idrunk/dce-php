@@ -41,7 +41,7 @@ abstract class RawRequestHttp extends RawRequest {
      * 响应Http请求
      * @param string $content
      */
-    abstract public function response (string $content): void;
+    abstract public function response(string $content): void;
 
     /**
      * 导出文件
@@ -49,7 +49,7 @@ abstract class RawRequestHttp extends RawRequest {
      * @param int $offset
      * @param int $length
      */
-    abstract public function export (string $filepath, int $offset = 0, int $length = 0): void;
+    abstract public function export(string $filepath, int $offset = 0, int $length = 0): void;
 
     /**
      * 对象属性初始化

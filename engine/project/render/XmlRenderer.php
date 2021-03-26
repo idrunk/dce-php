@@ -1,23 +1,24 @@
 <?php
 /**
- * Author: Drunk
- * Date: 2017-3-13 11:01
+ * Author: Drunk (drunkce.com; idrunk.net)
+ * Date: 2021/3/23 23:23
  */
 
-namespace dce\project\view\engine;
+namespace dce\project\render;
 
-use dce\project\view\ViewHttpApi;
+use dce\project\Controller;
+use dce\project\request\RawRequest;
 use SimpleXMLElement;
 
-abstract class ViewHttpXml extends ViewHttpApi {
+class XmlRenderer extends Renderer {
     /** @inheritDoc */
-    protected function setContentType(): void {
-        @$this->httpRequest->header('Content-Type', 'text/xml; charset=utf-8');
+    protected function setContentType(RawRequest $rawRequest): void {
+        @$rawRequest->header('Content-Type', 'text/xml; charset=utf-8');
     }
 
     /** @inheritDoc */
-    protected function rendering(): string {
-        return self::arrayToXml($this->getAllAssignedStatus());
+    protected function rendering(Controller $controller, mixed $data): string {
+        return self::arrayToXml(false === $data ? $controller->getAllAssignedStatus() : $data);
     }
 
     /**

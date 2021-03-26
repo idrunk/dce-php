@@ -10,25 +10,23 @@ return [
         'methods' => 'cli',
         'path' => 'dce',
         'omissible_path' => true,
-        'controller' => 'CliController->index',
+        'controller' => 'EmptyController->cli',
     ],
-
     // 响应空路径长连接请求
     [
         'methods' => ['websocket', 'tcp', 'udp'],
         'path' => 'empty/connection',
-        'controller' => 'ConnectionController->empty'
+        'controller' => 'EmptyController->connection'
     ],
-
     // 响应空路径HTTP请求
     [
         'methods' => ['get', 'post', 'put', 'delete', 'options', 'head'],
         'path' => 'empty/http',
-        'controller' => 'HttpController->empty'
+        'controller' => 'EmptyController->http'
     ],
     [
         'path' => 'empty/http/ajax',
-        'controller' => 'HttpController->emptyAjax'
+        'controller' => 'EmptyController->ajax'
     ],
 
     // 分库拓库工具

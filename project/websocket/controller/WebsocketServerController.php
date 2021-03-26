@@ -7,16 +7,15 @@
 namespace websocket\controller;
 
 use dce\config\ConfigException;
+use dce\project\Controller;
 use dce\project\request\Request;
-use dce\project\view\ViewCli;
 use rpc\dce\service\RpcServerApi;
 use websocket\service\WebsocketServer;
 
-class WebsocketServerController extends ViewCli {
+class WebsocketServerController extends Controller {
     private WebsocketServer $server;
 
-    public function __construct(Request $request) {
-        parent::__construct($request);
+    public function __init(): void {
         $serverClass = $this->request->config->websocket['service'];
         if (! is_a($serverClass, WebsocketServer::class, true)) {
             throw new ConfigException('websocket.service配置非有效WebsocketService类');

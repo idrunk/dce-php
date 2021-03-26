@@ -10,11 +10,11 @@ use dce\base\QuietException;
 use dce\base\SwooleUtility;
 use dce\config\DceConfig;
 use dce\event\Event;
+use dce\project\Controller;
 use dce\project\node\Node;
 use dce\project\node\NodeManager;
 use dce\project\Project;
 use dce\project\ProjectManager;
-use dce\project\view\View;
 use dce\rpc\DceRpcClient;
 use Swoole\Coroutine;
 
@@ -111,7 +111,7 @@ class Request {
      * 路由定位并执行控制器
      * @throws RequestException
      */
-    public function route() {
+    public function route(): void {
         Event::trigger(Event::BEFORE_REQUEST, [$this->rawRequest]);
         $this->node = $this->rawRequest->routeGetNode();
         // 当前项目赋值
@@ -158,8 +158,8 @@ class Request {
         }
         [$className, $method] = $controller;
         $class = "\\{$this->project->name}\\controller\\{$className}";
-        if (! is_subclass_of($class, View::class)) {
-            throw new RequestException("控制器 {$class} 异常或不存在, 需继承View子类");
+        if (! is_subclass_of($class, Controller::class)) {
+            throw new RequestException("控制器 {$class} 异常或不存在, 需继承Controller子类");
         }
         if (! method_exists($class, $method)) {
             throw new RequestException("控制器方法 {$method} 不存在");

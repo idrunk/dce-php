@@ -21,7 +21,7 @@ abstract class RawRequest {
     /** @var mixed 原始请求提交的数据 */
     protected mixed $rawData;
 
-        /**
+    /**
      * 取原始请求信息
      * @return mixed
      */

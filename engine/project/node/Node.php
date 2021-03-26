@@ -8,8 +8,6 @@ namespace dce\project\node;
 
 use Attribute;
 use dce\base\TraitModel;
-use dce\project\view\ViewCli;
-use dce\service\server\ViewConnection;
 use drunk\Char;
 use ReflectionAttribute;
 use ReflectionClass;
@@ -51,14 +49,14 @@ class Node {
     /** @var bool 是否协程化IO操作, 当$enableCoroutine=true时此参数将默认为true, {会被继承} */
     public bool $hookCoroutine;
 
-    /** @var string PHP模板文件路径, 相对于项目模板根目录(project/home/view/)路径, 如news/detail.php */
-    public string $phpTemplate;
+    /** @var string 渲染方式, json/xml/jsonp, 或PHP模板文件路径, 相对于项目模板根目录(project/home/template/)路径, 如news/detail.php */
+    public string $render;
 
     /** @var string 模板布局, 相对于项目模板根目录路径, 如layout/default.php, 留空则不使用布局, {会被继承} */
     public string $templateLayout;
 
-    /** @var int 接口缓存 {0: 不缓存, 1: 缓存Api数据, 2: 缓存模板, 4: 缓存页面} */
-    public int $apiCache = 0;
+    /** @var int 渲染缓存 {0: 不缓存, 1: 缓存Api数据, 2: 缓存模板, 4: 缓存渲染页面} */
+    public int $renderCache = 0;
 
     /** @var bool 可省略的节点路径, 如home节点配置为真, 则home/news节点的url可简化为news */
     public bool $omissiblePath = false;
@@ -104,7 +102,7 @@ class Node {
      * @param string|null $name
      * @param bool|null $enableCoroutine
      * @param bool|null $hookCoroutine
-     * @param string|null $phpTemplate
+     * @param string|null $render
      * @param string|null $templateLayout
      * @param array|null $corsOrigins
      * @param array|null $projectHosts
@@ -128,7 +126,7 @@ class Node {
         string|null $name = null,
         bool|null $enableCoroutine = null,
         bool|null $hookCoroutine = null,
-        string|null $phpTemplate = null,
+        string|null $render = null,
         string|null $templateLayout = null,
         array|null $corsOrigins = null,
         array|null $projectHosts = null,
@@ -275,17 +273,6 @@ class Node {
             }
         }
         $class = $method->getDeclaringClass();
-        // 若未指定methods, 则尝试根据视图匹配
-        if (! key_exists('methods', $arguments)) {
-            static $methodsMapping = [
-                ViewCli::class => ['cli'],
-                ViewConnection::class => ['websocket', 'tcp', 'udp'],
-            ];
-            $parentClassName = $class->getParentClass()->getName();
-            if (key_exists($parentClassName, $methodsMapping)) {
-                $arguments['methods'] = $methodsMapping[$parentClassName];
-            }
-        }
         // 不要将类魔术方法作为控制器方法
         if (! str_starts_with($methodName = $method->getName(), '__')) {
             $arguments['controller'] = preg_replace('/^.+?\bcontroller\\\\(.+)$/', "$1->{$methodName}", $class->getName());
@@ -305,7 +292,7 @@ class Node {
             ! preg_match('/^((?:\w+\\\\)+)?\w+->(\w+)$/', $node['controller'] ?? '', $matches)
             || (! $matches[1] && $nodePath === $projectName)
         ) {
-            // 如果当前节点为控制器节点, 或者未根目录下的项目同名节点, 则不作处理直接返回
+            // 如果当前节点为控制器节点, 或者为根目录下的项目同名节点, 则不作处理直接返回
             return;
         }
         [, $dir, $method] = $matches;

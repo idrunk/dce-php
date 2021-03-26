@@ -17,7 +17,7 @@ abstract class SchemaAbstract implements SchemaInterface {
 
     private bool $subQueryBool = false;
 
-    public function isEmpty() {
+    public function isEmpty(): bool {
         return empty($this->conditions);
     }
 
@@ -57,7 +57,7 @@ abstract class SchemaAbstract implements SchemaInterface {
         return $this->params;
     }
 
-    final protected function pushParam($param): void {
+    final protected function pushParam(mixed $param): void {
         $this->params[] = $param;
     }
 
@@ -92,7 +92,7 @@ abstract class SchemaAbstract implements SchemaInterface {
             $table = $string;
         } else {
             $table = self::tableWrap($string, $isAllowAlias);
-            if (!$table) {
+            if (! $table) {
                 throw new QueryException("表/字段名 {$string} 非法");
             }
         }
@@ -101,10 +101,10 @@ abstract class SchemaAbstract implements SchemaInterface {
 
     /**
      * 将数据转为可打印的类型并返回
-     * @param $value
+     * @param mixed $value
      * @return string
      */
-    final public static function printable($value): string {
+    final public static function printable(mixed $value): string {
         if (is_object($value)) {
             $value = get_class($value);
         } else if (is_array($value)) {

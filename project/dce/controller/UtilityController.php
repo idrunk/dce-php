@@ -7,9 +7,9 @@
 namespace dce\controller;
 
 use dce\Dce;
-use dce\project\view\ViewCli;
+use dce\project\Controller;
 
-class UtilityController extends ViewCli {
+class UtilityController extends Controller {
     // 清除缓存
     public function cacheClear() {
         $cacheType = $this->request->cli['--type'] ?? $this->request->cli['-t'] ?? 'file';

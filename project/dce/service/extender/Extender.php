@@ -6,8 +6,8 @@
 
 namespace dce\service\extender;
 
+use dce\project\Controller;
 use dce\sharding\middleware\ShardingConfig;
-use dce\project\view\ViewCli;
 
 abstract class Extender {
     protected string $shardingType;
@@ -27,7 +27,7 @@ abstract class Extender {
 
     protected array $connections;
 
-    protected ViewCli $cli;
+    protected Controller $cli;
 
     protected function input(string $value = ''): string {
         $value = date('[H:i:s] ') . $value;

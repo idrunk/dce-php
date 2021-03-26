@@ -1,15 +1,28 @@
 <?php
 /**
  * Author: Drunk (drunkce.com;idrunk.net)
- * Date: 2021-02-11 03:54
+ * Date: 2021-02-11 01:36
  */
 
 namespace dce\controller;
 
-use dce\project\view\engine\ViewHttpJson;
+use dce\project\Controller;
 
-class HttpController extends ViewHttpJson {
-    public function empty() {
+class EmptyController extends Controller {
+    public function cli() {
+        $this->print("\n你正在cli模式以空路径请求Dce接口");
+    }
+
+    public function connection() {
+        $this->assign('info', '恭喜！服务端收到了你的消息并给你作出了回应');
+        $this->response();
+    }
+
+    public function ajax() {
+        $this->assign('info', '请求成功，祝你愉快 (*^▽^*)');
+    }
+
+    public function http() {
         $this->response('<!doctype html>
 <html lang="zh">
 <head>
@@ -33,9 +46,5 @@ return [
 <p>上述配置定义了名为`home`的项目的节点配置，通过设置`omissible_path`为`true`实现可省略路径访问，即你可以通过`http://127.0.0.1/`路径请求`IndexController->index`控制器方法</p>
 </body>
 </html>');
-    }
-
-    public function emptyAjax() {
-        $this->assign('info', '请求成功，祝你愉快 (*^▽^*)');
     }
 }

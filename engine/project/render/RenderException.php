@@ -4,8 +4,8 @@
  * Date: 2020-04-13 12:51
  */
 
-namespace dce\project\view;
+namespace dce\project\render;
 
 use dce\base\Exception;
 
-class ViewException extends Exception {}
+class RenderException extends Exception {}
