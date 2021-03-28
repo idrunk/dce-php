@@ -34,10 +34,10 @@ class XmlRenderer extends Renderer {
             $xmlElement = new SimpleXMLElement('<root></root>');
         }
         foreach ($data as $key => $value) {
+            if (is_int($key)){
+                $key = "item";
+            }
             if (is_array($value)) {
-                if (is_numeric($key)){
-                    $key = "item-{$key}";
-                }
                 $childXmlElement = $xmlElement->addChild($key);
                 self::arrayToXml($value, $childXmlElement);
             } else {

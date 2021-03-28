@@ -22,9 +22,9 @@ class Controller {
 
     private bool $isHttpRequest;
 
-    private Renderer $renderer;
+    private Renderer $rendererInstance;
 
-    private array $data = [];
+    private array $statusData = [];
 
     /**
      * 控制器构造函数, 为了防止用户在子类重写了构造函数却未调用父构造函数破坏控制器, 所以将其设为了final禁止子类重写, 子类若需构造函数可定义__init方法实现
@@ -35,7 +35,7 @@ class Controller {
     ) {
         $this->rawRequest = $this->request->rawRequest;
         $this->isHttpRequest = $this->rawRequest instanceof RawRequestHttp;
-        $this->renderer = Renderer::inst($this, $this->isHttpRequest);
+        $this->rendererInstance = Renderer::inst($this, $this->isHttpRequest);
         $this->__init();
     }
 
@@ -67,7 +67,7 @@ class Controller {
      * @param string|false|null $path
      */
     public function render(mixed $data = false, string|false|null $path = null): void {
-        $this->renderer->render($this, $this->isHttpRequest, $data, $path);
+        $this->rendererInstance->render($this, $this->isHttpRequest, $data, $path);
     }
 
     /**
@@ -130,7 +130,7 @@ class Controller {
      */
     public function success(string|null $message = null, int|null $code = null): void {
         $this->assignStatus('status', true);
-        $this->result($message, $code);
+        $this->renderResult($message, $code);
     }
 
     /**
@@ -140,7 +140,7 @@ class Controller {
      */
     public function fail(string|null $message = null, int|null $code = null): void {
         $this->assignStatus('status', false);
-        $this->result($message, $code);
+        $this->renderResult($message, $code);
     }
 
     /**
@@ -156,7 +156,7 @@ class Controller {
      * @param string|null $message
      * @param int|null $code
      */
-    private function result(string|null $message, int|null $code): void {
+    private function renderResult(string|null $message, int|null $code): void {
         if (null !== $message) {
             $this->assignStatus('message', $message);
         }
@@ -189,8 +189,8 @@ class Controller {
      * @param mixed $value
      * @return $this
      */
-    public function assign(string $key, mixed $value): self {
-        $this->data['data'][$key] = $value;
+    public function assign(string $key, mixed $value): static {
+        $this->statusData['data'][$key] = $value;
         return $this;
     }
 
@@ -199,7 +199,7 @@ class Controller {
      * @param array $mapping
      * @return $this
      */
-    public function assignMapping(array $mapping): self {
+    public function assignMapping(array $mapping): static {
         foreach ($mapping as $k=>$v) {
             $this->assign($k, $v);
         }
@@ -212,7 +212,7 @@ class Controller {
      * @return mixed
      */
     public function getAssigned(string $key): mixed {
-        return $this->data['data'][$key] ?? null;
+        return $this->statusData['data'][$key] ?? null;
     }
 
     /**
@@ -220,14 +220,14 @@ class Controller {
      * @return array
      */
     public function getAllAssigned(): array {
-        return $this->data['data'] ?? [];
+        return $this->statusData['data'] ?? [];
     }
 
     /**
      * 清除所有指派的值
      */
     public function clearAssigned(): void {
-        unset($this->data['data']);
+        unset($this->statusData['data']);
     }
 
     /**
@@ -236,8 +236,8 @@ class Controller {
      * @param mixed $value
      * @return $this
      */
-    public function assignStatus(string $key, mixed $value): self {
-        $this->data[$key] = $value;
+    public function assignStatus(string $key, mixed $value): static {
+        $this->statusData[$key] = $value;
         return $this;
     }
 
@@ -246,6 +246,6 @@ class Controller {
      * @return array
      */
     public function getAllAssignedStatus(): array {
-        return $this->data;
+        return $this->statusData;
     }
 }

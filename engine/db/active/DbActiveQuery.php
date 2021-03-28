@@ -84,7 +84,7 @@ class DbActiveQuery extends ActiveQuery {
         }
         foreach ($data as $k => $datum) {
             /** @var ActiveRecord $activeRecord */
-            $activeRecord = new $this->{activeRecord::class};
+            $activeRecord = new ($this->activeRecord::class);
             $activeRecord->setQueriedProperties($datum);
             foreach ($datum as $property => $value) {
                 // 从普通properties中剔除出属于getterValues的属性赋值到getterValues
@@ -205,7 +205,7 @@ class DbActiveQuery extends ActiveQuery {
                 return $data;
             }
             /** @var DbActiveRecord $activeRecord */
-            $activeRecord = new $this->{activeRecord::class};
+            $activeRecord = new ($this->activeRecord::class);
             $activeRecord->setQueriedProperties($data);
             return $activeRecord;
         });

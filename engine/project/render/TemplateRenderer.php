@@ -13,13 +13,13 @@ use dce\project\request\Request;
 
 class TemplateRenderer extends Renderer {
     /** @var string $templatePath 模板文件路径 */
-    private string $templatePath;
+    protected string $templatePath;
 
     /** @var string $layoutPath 布局文件路径 */
-    private string $layoutPath;
+    protected string $layoutPath;
 
     /** @var string $templateCacheDir 模板缓存目录 */
-    private string $templateCacheDir;
+    protected string $templateCacheDir;
 
     /** @inheritDoc */
     protected function prepare(Controller $controller, bool $isHttpRequest): void {

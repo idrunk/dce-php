@@ -150,7 +150,7 @@ class Request {
      * 解析并执行控制器方法
      * @throws RequestException
      */
-    private function controller (): void {
+    private function controller(): void {
         // 解析控制器
         $controller = explode('->', $this->node->controller ?? '');
         if (2 !== count($controller)) {
