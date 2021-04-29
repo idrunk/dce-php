@@ -37,7 +37,7 @@ abstract class Renderer {
      */
     final public static function extend(string $typeName, string $renderClass): void {
         if (! is_subclass_of($renderClass, self::class)) {
-            throw new RenderException('渲染器必须继承 ' . self::class);
+            throw (new RenderException(RenderException::RENDERER_EXTENDS_ERROR))->format(self::class);
         }
         self::$renderMapping[strtolower($typeName)] = $renderClass;
     }

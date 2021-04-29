@@ -44,7 +44,7 @@ abstract class MysqlParser extends SqlParser {
         ){
             return $instance;
         } else {
-            throw new StatementParserException("操作符'{$operator}'无效");
+            throw (new StatementParserException(StatementParserException::INVALID_OPERATOR))->format($operator);
         }
     }
 
@@ -62,7 +62,7 @@ abstract class MysqlParser extends SqlParser {
                     MysqlStatementParser::build($this->statement, $this->offset, $word) ?:
                         MysqlFieldParser::buildByWord($this->statement, $this->offset, $word);
         if (null === $allowedStatements && $instance instanceof MysqlStatementParser || $allowedStatements && ! in_array(get_class($instance), $allowedStatements)) {
-            throw new StatementParserException("语句'{$word}'出现在无效位置");
+            throw (new StatementParserException(StatementParserException::INVALID_STATEMENT_PLACE))->format($word);
         }
         return $instance;
     }
@@ -98,7 +98,7 @@ abstract class MysqlParser extends SqlParser {
             $result = call_user_func_array($followupCall, []);
             if (self::TRAVERSE_CALLBACK_EXCEPTION === $result) {
 //                test_dump($char, $offset, '语句异常, 无法解析');
-                throw new StatementParserException('语句异常, 无法解析');
+                throw new StatementParserException(StatementParserException::INVALID_STATEMENT);
             } else if (self::TRAVERSE_CALLBACK_BREAK === $result) {
                 break;
             }
@@ -180,7 +180,7 @@ abstract class MysqlParser extends SqlParser {
         });
 
         if (! $alias && $as) {
-            throw new StatementParserException('未定义别名');
+            throw new StatementParserException(StatementParserException::UNDEFINED_ALIAS);
         }
 
         return $alias;

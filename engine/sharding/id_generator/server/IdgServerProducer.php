@@ -37,7 +37,7 @@ trait IdgServerProducer {
             $batch->timeId = $time;
         }
         if (! isset($batch->batchBitWidth)) {
-            throw new IdgException('服务端必须配置单秒ID池:batch_bit_width');
+            throw new IdgException(IdgException::BATCH_BIT_WIDTH_MISSING);
         }
         if (! isset($batch->batchCount)) {
             $batch->batchCount = self::$default_batch_count;

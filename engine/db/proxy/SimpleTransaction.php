@@ -19,10 +19,10 @@ class SimpleTransaction extends Transaction {
     /** @inheritDoc */
     protected function envValid(): void {
         if (SwooleUtility::inCoroutine()) {
-            throw new TransactionException('TransactionSimple不支持Swoole协程环境');
+            throw new TransactionException(TransactionException::CANNOT_RUN_IN_COROUTINE);
         }
         if (self::proxyMatch($this->proxy)) {
-            throw new TransactionException('已开启该库事务, 请勿重复开启');
+            throw new TransactionException(TransactionException::REPEATED_OPEN);
         }
     }
 

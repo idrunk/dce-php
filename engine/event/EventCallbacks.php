@@ -104,15 +104,14 @@ class EventCallbacks {
      * @param array $args
      * @return bool
      */
-    public function trigger(array $args = []): bool {
+    public function trigger(mixed ... $args): bool {
         foreach ($this->callbacks as $k=>&$v) {
             // 如果设置了过期时间, 且已过期, 则删除回调并跳过
             if ($v['expired_seconds'] > 0 && time() - $v['package_time'] > $v['expired_seconds']) {
                 $this->removeByIndex($k);
                 continue;
             }
-            $args = array_merge($v['args'], $args);
-            call_user_func_array($v['callback'], $args);
+            call_user_func_array($v['callback'], [... $v['args'], ... $args]); // 这里可能无法
             if ($v['max_trigger_count'] > 0) {
                 $v['trigger_count'] ++;
                 if ($v['trigger_count'] >= $v['max_trigger_count']) { // 如果回调执行次数到达上限, 则删除回调并跳过

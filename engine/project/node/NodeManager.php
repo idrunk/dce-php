@@ -11,6 +11,7 @@ use dce\project\Project;
 use dce\project\ProjectManager;
 use dce\project\render\Renderer;
 use ReflectionClass;
+use ReflectionException;
 use ReflectionMethod;
 
 final class NodeManager {
@@ -35,7 +36,7 @@ final class NodeManager {
     /**
      * 扫描并初始化所有项目节点数据
      */
-    public static function scanInit (): void {
+    public static function scanInit(): void {
         // 一般情况下都是从缓存取, 所以在这直接先尝试取, 不影响性能, 降低逻辑复杂度
         self::$nodeTree = Dce::$cache->get('dce_node_tree');
         self::$pathTreeMapping = Dce::$cache->get('dce_path_tree_mapping');
@@ -67,7 +68,7 @@ final class NodeManager {
         ]);
         // 从全部项目加载节点配置
         foreach ($nodesFiles as $projectName => $nodesFile) {
-            // 文件为数组, 则表示是控制器文件集, 则应已AttrNode解析Nodes, 否则直接加载Nodes数组
+            // 文件为数组, 则表示是控制器文件集, 则应以注解Node解析Nodes, 否则直接加载Nodes数组
             $nodes = is_array($nodesFile) ? self::parseAttrNodes($nodesFile) : include($nodesFile);
             $nodes = self::initFillElder($nodes);
             self::initTree($nodes, $rootTree, $projectName);
@@ -98,7 +99,7 @@ final class NodeManager {
      * 尝试从控制器文件解析AttrNode提取Node集
      * @param array $controllerFiles
      * @return array
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     private static function parseAttrNodes(array $controllerFiles): array {
         $nodes = [];
@@ -131,7 +132,7 @@ final class NodeManager {
      * @param array $nodes
      * @return array
      */
-    private static function initFillElder (array $nodes): array {
+    private static function initFillElder(array $nodes): array {
         // 取出路径集并反转为以之为下标的数组
         $paths = array_flip(array_column($nodes, 'path'));
         foreach ($paths as $path => $v) {
@@ -161,12 +162,13 @@ final class NodeManager {
      * @param array $nodes
      * @param NodeTree $rootTree
      * @param string $projectName
+     * @throws NodeException
      */
-    private static function initTree (array $nodes, NodeTree $rootTree, string $projectName): void {
+    private static function initTree(array $nodes, NodeTree $rootTree, string $projectName): void {
         $hasRoot = 0;
         // 节点树列表, 供后续做树形化计算
         $nodeTrees = [];
-        foreach ($nodes as $k => $v) {
+        foreach ($nodes as $v) {
             $node = new Node($v, $projectName);
             if ($node->path === $projectName) {
                 $hasRoot = 1;
@@ -179,10 +181,6 @@ final class NodeManager {
             // 如果未定义项目根节点, 则定义
             $nodeTrees[$projectName] = self::initRootTree($projectName);
         }
-        /**
-         * 待寻子节点树集
-         * @var NodeTree[] $rootTrees
-         */
         $rootTrees = [$rootTree];
         while ($parentTree = array_pop($rootTrees)) {
             foreach ($nodeTrees as $path => $nodeTree) {
@@ -203,7 +201,7 @@ final class NodeManager {
      * @param string $projectName
      * @return NodeTree
      */
-    private static function initRootTree (string $projectName): NodeTree {
+    private static function initRootTree(string $projectName): NodeTree {
         $rootNode = new Node(['path' => $projectName], $projectName);
         $rootNodeTree = new NodeTree($rootNode->genPathInfo());
         $rootNodeTree->addNode($rootNode, $rootNode->id);
@@ -214,7 +212,7 @@ final class NodeManager {
      * 根据树形化结构补全的节点属性
      * @param NodeTree $nodeTree
      */
-    private static function initTreeItem (NodeTree $nodeTree): void {
+    private static function initTreeItem(NodeTree $nodeTree): void {
         $nodeTree->traversal(function (NodeTree $child, NodeTree $parent) {
             $isDir = !! $child->children;
             $familyPaths = $child->getFamilyIds();
@@ -264,7 +262,7 @@ final class NodeManager {
      * 取根节点树
      * @return NodeTree
      */
-    public static function getRootTree (): NodeTree {
+    public static function getRootTree(): NodeTree {
         return self::$nodeTree;
     }
 
@@ -299,7 +297,7 @@ final class NodeManager {
      * @param string $id
      * @return Node
      */
-    public static function getNode (string $id): Node|null {
+    public static function getNode(string $id): Node|null {
         $nodeTree = self::getTreeById($id);
         if ($nodeTree) {
             return $nodeTree->getNode($id);
@@ -326,11 +324,9 @@ final class NodeManager {
      * @param string $elderPath
      * @return bool
      */
-    public static function isSubOf (string $needlePath, string $elderPath): bool {
+    public static function isSubOf(string $needlePath, string $elderPath): bool {
         $elderNodeTree = self::getTreeByPath($elderPath);
-        return $elderNodeTree
-            ? in_array($needlePath, $elderNodeTree->getFamilyIds())
-            : false;
+        return $elderNodeTree && in_array($needlePath, $elderNodeTree->getFamilyIds());
     }
 
     /**

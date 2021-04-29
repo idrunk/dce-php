@@ -4,9 +4,10 @@
  * Date: 2020-04-13 10:20
  */
 
-namespace dce\project\request;
+namespace dce\project\session;
 
 use dce\Dce;
+use dce\project\request\Request;
 use dce\storage\redis\DceRedis;
 
 abstract class Session {
@@ -53,7 +54,7 @@ abstract class Session {
         }
         self::$config = Dce::$config->session;
         if (! self::$config['class']) {
-            self::$config['class'] = DceRedis::isAvailable() ? '\dce\project\request\SessionRedis' : '\dce\project\request\SessionFile';
+            self::$config['class'] = DceRedis::isAvailable() ? '\dce\project\session\SessionRedis' : '\dce\project\session\SessionFile';
         }
     }
 
@@ -75,7 +76,7 @@ abstract class Session {
      */
     final protected function setId(string $sid): static {
         if (isset($this->sid)) {
-            throw new SessionException('Session实例仅能绑定一个sid');
+            throw new SessionException(SessionException::SID_CAN_BIND_ONCE);
         }
         $this->sid = $sid;
         return $this;

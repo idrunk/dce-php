@@ -25,14 +25,14 @@ class OrderSchema extends SchemaAbstract {
                 }
                 $column = $column instanceof RawBuilder ? $column : self::tableWrap($column);
                 if (! $column) {
-                    throw new QueryException("排序条件\"".self::printable($condition[0] ?? '')."\"异常");
+                    throw (new QueryException(QueryException::ORDER_BY_INVALID))->format(self::printable($condition[0] ?? ''));
                 }
                 $order = strtoupper(trim($condition[1] ?? ''));
                 $this->pushCondition($column . (in_array($order, ['ASC', 'DESC']) ? " {$order}" : ''));
             } else if (($isRaw = $condition instanceof RawBuilder) || is_string($condition) && $column = self::tableWrap($condition)) {
                 $this->pushCondition($isRaw ? $condition : $column);
             } else {
-                throw new QueryException("排序条件\"".self::printable($condition)."\"异常");
+                throw (new QueryException(QueryException::ORDER_BY_INVALID))->format(self::printable($condition));
             }
         }
     }

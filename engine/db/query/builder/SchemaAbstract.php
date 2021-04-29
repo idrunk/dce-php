@@ -93,7 +93,7 @@ abstract class SchemaAbstract implements SchemaInterface {
         } else {
             $table = self::tableWrap($string, $isAllowAlias);
             if (! $table) {
-                throw new QueryException("表/字段名 {$string} 非法");
+                throw (new QueryException(QueryException::TABLE_OR_COLUMN_INVALID))->format($string);
             }
         }
         return $table;

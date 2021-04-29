@@ -6,7 +6,6 @@
 
 namespace dce\project\request;
 
-use dce\base\Exception;
 use dce\project\node\Node;
 use dce\project\node\NodeManager;
 use dce\project\ProjectManager;
@@ -200,12 +199,12 @@ class Url {
             return $url; // 若为全地址, 则无需处理
         }
         if (! self::validate($urlReference)) {
-            throw new Exception('Url不合法');
+            throw new RequestException(RequestException::INVALID_URL);
         }
         $isAbsolute = substr($url, 0, 1) === '/'; // 是否绝对路径
         $parse = parse_url($urlReference);
         if (empty($parse)) {
-            throw new Exception('无法解析Url');
+            throw new RequestException(RequestException::CANNOT_PARSE_URL);
         }
         if (! $isAbsolute) { // 若非绝对路径, 则需取参考url的路径补上当前处理的相对路径url作为绝对路径url
             if (substr($url, 0, 2) === './') {

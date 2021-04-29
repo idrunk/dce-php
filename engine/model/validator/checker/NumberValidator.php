@@ -26,26 +26,26 @@ class NumberValidator extends TypeChecker {
      */
     protected function check(string|int|float|null|false $value):ValidatorException|null {
         if (! is_numeric($value)) {
-            $this->addError($this->getGeneralError(null, '{{label}}非有效数字'));
+            $this->addError($this->getGeneralError(null, lang(ValidatorException::INVALID_NUMBER)));
         } else {
             $negative = $this->getProperty('negative');
             if (! ($negative->value ?? null) && $value < 0) {
-                $this->addError($this->getGeneralError($negative->error ?? null, '{{label}}不能为负数'));
+                $this->addError($this->getGeneralError($negative->error ?? null, lang(ValidatorException::CANNOT_BE_NEGATIVE)));
             }
 
             $decimal = $this->getProperty('decimal');
             if (! ($decimal->value ?? null) && ! ctype_digit((string) $value)) {
-                $this->addError($this->getGeneralError($decimal->error ?? null, '{{label}}不能为小数'));
+                $this->addError($this->getGeneralError($decimal->error ?? null, lang(ValidatorException::CANNOT_BE_FLOAT)));
             }
 
             $min = $this->getProperty('min');
             if ($min && $value < $min->value) {
-                $this->addError($this->getGeneralError($min->error, '{{label}}不能小于{{min}}'));
+                $this->addError($this->getGeneralError($min->error, lang(ValidatorException::CANNOT_SMALL_THAN)));
             }
 
             $max = $this->getProperty('max');
             if ($max && $value > $max->value) {
-                $this->addError($this->getGeneralError($max->error, '{{label}}不能大于{{max}}'));
+                $this->addError($this->getGeneralError($max->error, lang(ValidatorException::CANNOT_LARGE_THAN)));
             }
         }
 

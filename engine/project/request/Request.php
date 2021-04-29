@@ -10,11 +10,14 @@ use dce\base\QuietException;
 use dce\base\SwooleUtility;
 use dce\config\DceConfig;
 use dce\event\Event;
+use dce\i18n\Locale;
 use dce\project\Controller;
 use dce\project\node\Node;
 use dce\project\node\NodeManager;
 use dce\project\Project;
 use dce\project\ProjectManager;
+use dce\project\session\Cookie;
+use dce\project\session\Session;
 use dce\rpc\DceRpcClient;
 use Swoole\Coroutine;
 
@@ -39,6 +42,9 @@ class Request {
 
     /** @var Session 当前项目Session对象, (用于全部类型请求) */
     public Session $session;
+
+    /** @var Locale 客户端本地化参数 */
+    public Locale $locale;
 
     /**
      * @var mixed 原始请求数据, (用于全部类型请求)
@@ -112,7 +118,7 @@ class Request {
      * @throws RequestException
      */
     public function route(): void {
-        Event::trigger(Event::BEFORE_REQUEST, [$this->rawRequest]);
+        Event::trigger(Event::BEFORE_REQUEST, $this->rawRequest);
         $this->node = $this->rawRequest->routeGetNode();
         // 当前项目赋值
         $this->project = ProjectManager::get($this->node->projectName);
@@ -130,6 +136,7 @@ class Request {
         }
         // 补充请求对象相关属性
         $this->rawRequest->supplementRequest($this);
+        $this->locale = new Locale($this);
         // 执行控制器方法
         $this->controller();
     }
@@ -154,15 +161,15 @@ class Request {
         // 解析控制器
         $controller = explode('->', $this->node->controller ?? '');
         if (2 !== count($controller)) {
-            throw new RequestException("节点 {$this->node->pathFormat} 未配置控制器或配置错误");
+            throw (new RequestException(RequestException::NODE_NO_CONTROLLER))->format($this->node->pathFormat);
         }
         [$className, $method] = $controller;
         $class = "\\{$this->project->name}\\controller\\{$className}";
         if (! is_subclass_of($class, Controller::class)) {
-            throw new RequestException("控制器 {$class} 异常或不存在, 需继承Controller子类");
+            throw (new RequestException(RequestException::NODE_CONTROLLER_INVALID))->format($class);
         }
         if (! method_exists($class, $method)) {
-            throw new RequestException("控制器方法 {$method} 不存在");
+            throw (new RequestException(RequestException::CONTROLLER_METHOD_INVALID))->format($method);
         }
         if (SwooleUtility::inSwoole()) {
             if ($this->node->hookCoroutine) {
@@ -174,7 +181,7 @@ class Request {
                 return;
             }
         } else if ($this->node->hookCoroutine || $this->node->enableCoroutine) {
-            throw new RequestException('未安装Swoole扩展, 无法开启协程');
+            throw new RequestException(RequestException::COROUTINE_NEED_SWOOLE);
         }
         $this->runController($class, $method);
     }
@@ -186,11 +193,11 @@ class Request {
      */
     private function runController(string $class, string $method): void {
         try {
-            Event::trigger(Event::BEFORE_CONTROLLER, [$this]);
+            Event::trigger(Event::BEFORE_CONTROLLER, $this);
             $controller = new $class($this);
-            Event::trigger(Event::ENTERING_CONTROLLER, [$controller]);
+            Event::trigger(Event::ENTERING_CONTROLLER, $controller);
             $controller->call($method);
-            Event::trigger(Event::AFTER_CONTROLLER, [$controller]);
+            Event::trigger(Event::AFTER_CONTROLLER, $controller);
         } catch (QuietException) {} // 拦截安静异常不抛出, 用于事件回调中抛出异常截停程序并且不抛出异常
     }
 }

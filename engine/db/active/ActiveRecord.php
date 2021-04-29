@@ -117,7 +117,7 @@ abstract class ActiveRecord extends Model {
      */
     public function delete(): int {
         if (! $this->createByQuery) {
-            throw new ActiveException('当前对象尚未保存，无法删除');
+            throw new ActiveException(ActiveException::CANNOT_DELETE_BEFORE_SAVE);
         }
         $where = $this->genPropertyConditions();
         return $this->getActiveQuery()->where($where)->delete();
@@ -134,7 +134,7 @@ abstract class ActiveRecord extends Model {
     private function buildRelation(string $className, array $relationMap, string|null $viaRelationName): ActiveRelation {
         $activeRecord = new $className;
         if (! $activeRecord instanceof ActiveRecord) {
-            throw new ActiveException("{$className} 必须继承自 " . self::class);
+            throw (new ActiveException(ActiveException::RELATION_ACTIVE_RECORD_INVALID))->format($className, self::class);
         }
         $activeQueryClass = $this->getActiveQuery()::class;
         $activeQuery = new $activeQueryClass($activeRecord);

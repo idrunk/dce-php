@@ -30,12 +30,12 @@ class RawBuilder extends StatementAbstract {
                     $statement = preg_replace("/$placeholder\b/", '?', $statement, 1);
                 }
                 if (! key_exists($k, $params) && (($k = ltrim($k, ':')) && ! key_exists($k, $params))) {
-                    throw new QueryException("缺少对应占位符的参数{$k}");
+                    throw (new QueryException(QueryException::PLACEHOLDER_NOT_MATCH))->format($k);
                 }
                 $convertedParams[] = $params[$k];
             }
             if (! $isQuestionPlaceholder && ! $isNamingPlaceholder) {
-                throw new QueryException('请勿使用混合占位符');
+                throw new QueryException(QueryException::NOT_ALLOW_MIXED_PLACEHOLDER);
             }
             $this->mergeParams($convertedParams);
         }

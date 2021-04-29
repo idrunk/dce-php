@@ -71,7 +71,7 @@ class MysqlFieldParser extends MysqlParser {
         $partsCount = count($parts);
         if ($partsCount > 3) {
             $partsString = implode('.', array_column($parts, 'value'));
-            throw new StatementParserException("非法字段名'{$partsString}'");
+            throw (new StatementParserException(StatementParserException::INVALID_COLUMN))->format($partsString);
         }
 
         $parts = array_reverse($parts);

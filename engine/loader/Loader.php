@@ -4,12 +4,19 @@
  * Date: 2016-11-27 2:24
  */
 
-namespace dce;
+namespace dce\loader;
 
 use Closure;
+use dce\event\Event;
 use dce\project\Project;
 
 class Loader {
+    /**
+     * @var string 类加载完成事件名
+     * @callable($className)
+     */
+    public const EVENT_ON_CLASS_LOAD = 'EVENT_ON_CLASS_LOADED';
+
     /** @var array 自动加载名字空间映射表 */
     private static array $mapping = [];
 
@@ -33,6 +40,7 @@ class Loader {
      */
     private static function autoload(string $className): string|bool {
         if (null !== $loader = self::autoloadClass($className)) {
+            $loader && self::triggerOnLoad($className);
             return $loader;
         }
         $prefix = $className;
@@ -44,11 +52,20 @@ class Loader {
             $relativeClass = substr($className, $pos + 1);
             $mappedFile = self::autoloadFile($prefix, $relativeClass);
             if ($mappedFile) {
+                self::triggerOnLoad($className);
                 return $mappedFile;
             }
             $prefix = rtrim($prefix, '\\');
         }
         return false;
+    }
+
+    /**
+     * 触发类加载事件
+     * @param string $className
+     */
+    private static function triggerOnLoad(string $className): void {
+        Event::trigger(self::EVENT_ON_CLASS_LOAD, $className);
     }
 
     /**
@@ -176,6 +193,8 @@ class Loader {
         self::prepare('\service\*', APP_COMMON . 'service/');
         // 加载方法库
         self::dirOnce(APP_COMMON . 'function/');
+        // 初始化类装饰器
+        ClassDecoratorManager::bindDceClassLoad();
     }
 
     /**

@@ -18,7 +18,7 @@ class SelectModifierSchema extends SchemaAbstract {
         $upperModifier = strtoupper(trim($modifier));
         if ($upperModifier) {
             if (! in_array($upperModifier, self::MODIFIER_SET)) {
-                throw new QueryException("无效的select修饰符{$modifier}");
+                throw (new QueryException(QueryException::SELECT_MODIFIER_INVALID))->format($modifier);
             }
             $this->pushCondition($upperModifier);
         }

@@ -6,8 +6,7 @@
 
 namespace dce\rpc;
 
-use dce\Dce;
-use dce\Loader;
+use dce\loader\Loader;
 use Swoole\Process;
 use Swoole\Coroutine\Server;
 use Swoole\Server as aServer;
@@ -75,7 +74,7 @@ class RpcServer {
      */
     public function prepare(string $wildcard, string $root): self {
         if (! is_dir($root)) {
-            throw new RpcException('预载命名空间根目录不存在');
+            throw new RpcException(RpcException::PREPARE_ROOT_NOT_EXISTS);
         }
         $this->prepares[] = ['wildcard' => $wildcard, 'root' => $root];
         return $this;
@@ -89,7 +88,7 @@ class RpcServer {
      */
     public function preload(string $filename): self {
         if (! is_file($filename)) {
-            throw new RpcException('预载文件不存在');
+            throw new RpcException(RpcException::PRELOAD_NOT_EXISTS);
         }
         $this->preloadFiles[] = $filename;
         return $this;
@@ -284,21 +283,21 @@ class RpcServer {
             // 凡是本机请求, 无视授权限制
             return;
         } else if ($rpcHost->needNative) {
-            throw new RpcException('异常跨域请求, 授权校验失败');
+            throw new RpcException(RpcException::NEED_NATIVE);
         }
         if ($rpcHost->needLocal) {
             if (! RpcUtility::isLocalIp($clientIp)) {
-                throw new RpcException('非法跨域请求, 授权校验失败');
+                throw new RpcException(RpcException::NEED_LOCAL);
             }
         }
         if ($rpcHost->ipWhiteList) {
             if (! in_array($clientIp, $rpcHost->ipWhiteList)) {
-                throw new RpcException('非法请求, 授权校验失败');
+                throw new RpcException(RpcException::NOT_IN_WHITE_LIST);
             }
         }
         if ($rpcHost->password) {
             if (! RpcUtility::verifyToken($rpcHost->password, $authToken)) {
-                throw new RpcException('异常请求, 授权校验失败');
+                throw new RpcException(RpcException::VALID_FAILED);
             }
         }
     }
@@ -313,7 +312,7 @@ class RpcServer {
      */
     private static function execute(string $className, string $methodName, array $arguments) {
         if (! is_subclass_of($className, RpcMatrix::class)) {
-            throw new RpcException("{$className}非RPC类");
+            throw (new RpcException(RpcException::NOT_RPC_CLASS))->format($className);
         }
         try {
             $result = call_user_func_array([$className, $methodName], $arguments);

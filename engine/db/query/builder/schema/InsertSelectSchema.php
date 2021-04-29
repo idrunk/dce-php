@@ -21,13 +21,13 @@ class InsertSelectSchema extends SchemaAbstract {
         if (is_array($columns)) {
             foreach ($columns as $column) {
                 if (! is_string($column) || ! $columnsName = self::tableWrap($column)) {
-                    throw new QueryException('非法字段名' . self::printable($column));
+                    throw (new QueryException(QueryException::COLUMN_NAME_INVALID))->format(self::printable($column));
                 }
                 $this->columns[] = $columnsName;
             }
         }
         if (! ($isSelect = $selectStatement instanceof SelectStatement) && ! $selectStatement instanceof RawBuilder) {
-            throw new QueryException('非法select查询结构' . self::printable($selectStatement));
+            throw (new QueryException(QueryException::SELECT_STRUCT_INVALID))->format(self::printable($selectStatement));
         }
         $this->mergeParams($selectStatement->getParams());
         $this->pushCondition($selectStatement);

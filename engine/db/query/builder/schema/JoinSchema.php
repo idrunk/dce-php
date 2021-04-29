@@ -31,8 +31,8 @@ class JoinSchema extends SchemaAbstract {
             $whereSchema->addCondition($on, false, false, 'AND');
         }
         $typeUpper = strtoupper(trim($type));
-        if (!in_array($typeUpper, ['INNER', 'LEFT', 'RIGHT'])) {
-            throw new QueryException("INNER类型\"$typeUpper\"无效", 1);
+        if (! in_array($typeUpper, ['INNER', 'LEFT', 'RIGHT'])) {
+            throw (new QueryException(QueryException::INNER_TYPE_INVALID))->format($typeUpper);
         }
         $this->mergeParams($tableSchema->getParams());
         $this->mergeParams($whereSchema->getParams());

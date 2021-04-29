@@ -18,7 +18,7 @@ class TcpServerController extends Controller {
     public function __init(): void {
         $serverClass = $this->request->config->tcp['service'];
         if (! is_a($serverClass, TcpServer::class, true)) {
-            throw new ConfigException('websocket.service配置非有效WebsocketService类');
+            throw new ConfigException(ConfigException::TCP_SERVICE_INVALID);
         }
         // 构造函数内会挂载RPC客户端, 所以整个公共的呗
         $this->server = new $serverClass();

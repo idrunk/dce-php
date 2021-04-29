@@ -18,5 +18,5 @@ defined('APP_RUNTIME') or define('APP_RUNTIME', APP_ROOT .'runtime/');
 // Cgi入口/静态文件目录
 defined('APP_WWW') or define('APP_WWW', APP_ROOT .'www/');
 
-require_once DCE_ROOT . 'engine/Loader.php';
-dce\Loader::init();
+require_once DCE_ROOT . 'engine/loader/Loader.php';
+dce\loader\Loader::init();

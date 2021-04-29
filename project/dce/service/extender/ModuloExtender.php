@@ -39,11 +39,11 @@ abstract class ModuloExtender extends Extender {
      */
     private function prepare(): void {
         if (! $this->checkExtendConfig()) {
-            throw new ExtenderException("请准备扩展库, 并创建扩展配置" .$this->dbType. "_extend");
+            throw (new ExtenderException(ExtenderException::PLEASE_PREPARE_EXTENDS_CONFIG))->format($this->dbType);
         }
         $this->print("扩展配置校验通过");
         if (! $this->dbsExists()) {
-            throw new ExtenderException('扩展库不存在');
+            throw new ExtenderException(ExtenderException::EXTEND_DATABASE_NOT_EXISTS);
         }
         $this->print("数据库已连接");
     }
@@ -54,11 +54,11 @@ abstract class ModuloExtender extends Extender {
      */
     private function fillExtend(): void {
         if (! $this->createExtendTable()) {
-            throw new ExtenderException('拓展表不存在或创建失败');
+            throw new ExtenderException(ExtenderException::EXTEND_TABLE_CREATE_FAILED);
         }
         $this->print("扩展表已就绪");
         if (! $this->runSync()) {
-            throw new ExtenderException('拓展库数据迁移失败');
+            throw new ExtenderException(ExtenderException::EXTEND_DATA_TRANSFER_FAILED);
         }
     }
 
@@ -82,7 +82,7 @@ abstract class ModuloExtender extends Extender {
         if (! $this->checkApplyExtendConfig()) {
             $this->applyExtendConfig();
             if (! $this->checkApplyExtendConfig()) {
-                throw new ExtenderException('扩展配置尚未正式配置到分库配置中');
+                throw new ExtenderException(ExtenderException::EXTENDS_CONFIG_NOT_APPLIED);
             }
         }
     }
@@ -93,7 +93,7 @@ abstract class ModuloExtender extends Extender {
      */
     private function applyDoneSync(): void {
         if (! $this->runSync()) {
-            throw new ExtenderException('拓展库数据迁移失败');
+            throw new ExtenderException(ExtenderException::DATA_TRANSFER_FAILED);
         }
     }
 
@@ -103,7 +103,7 @@ abstract class ModuloExtender extends Extender {
      */
     private function clearRedundant(): void {
         if (! $this->hashClear()) {
-            throw new ExtenderException('冗余数据清除失败');
+            throw new ExtenderException(ExtenderException::REDUNDANT_CLEAR_FAILED);
         }
         $this->print("源冗余数据清除完毕");
         $this->print("分库拓展完毕!");

@@ -38,11 +38,11 @@ class TemplateRenderer extends Renderer {
         $templateRoot = "{$request->project->path}template/";
         $this->templatePath = $templateRoot . $request->node->render;
         if (! is_file($this->templatePath) ) {
-            throw new RenderException("模版文件 {$this->templatePath} 不存在");
+            throw (new RenderException(RenderException::TEMPLATE_NOTFOUND))->format($this->templatePath);
         }
         $this->layoutPath = ($request->node->templateLayout ?? '') ? $templateRoot . $request->node->templateLayout : '';
         if ($this->layoutPath && ! is_file($this->layoutPath)) {
-            throw new RenderException("布局文件 {$this->layoutPath} 不存在");
+            throw (new RenderException(RenderException::LAYOUT_NOTFOUND))->format($this->layoutPath);
         }
         $this->templateCacheDir = $request->config->cache['file']['template_dir'] ?: APP_RUNTIME . 'tpl/';
     }

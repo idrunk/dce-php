@@ -6,6 +6,7 @@
 
 namespace dce\db\query\builder;
 
+use dce\base\BaseException;
 use dce\db\query\builder\schema\DeleteSchema;
 use dce\db\query\builder\schema\GroupSchema;
 use dce\db\query\builder\schema\HavingSchema;
@@ -139,7 +140,7 @@ abstract class StatementAbstract implements StatementInterface {
         $params = $this->getParams();
         $sql = self::fill($this, $params);
         if (! $iKnowThisJustForReference) {
-            throw new \Exception("\n当前语句未做转义, 不安全, 请勿用于真实查询中, 仅作调试参考 (若不想抛出此异常, 请传入参数true)\n$sql\n");
+            throw new BaseException("\n当前语句未做转义, 不安全, 请勿用于真实查询中, 仅作调试参考 (若不想抛出此异常, 请传入参数true)\n{$sql}\n");
         }
         return $sql;
     }

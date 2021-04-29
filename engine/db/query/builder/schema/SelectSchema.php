@@ -31,7 +31,7 @@ class SelectSchema extends SchemaAbstract {
         if ($column instanceof RawBuilder || is_numeric($column)) {
             $columnName = $column;
         } else if (! (is_string($column) && $columnName = self::tableWrap($column, true))) {
-            throw new QueryException("筛选字段名\"".self::printable($column)."\"无效");
+            throw (new QueryException(QueryException::SELECT_COLUMN_INVALID))->format(self::printable($column));
         }
         $columnName .= $alias ? " {$alias}" : '';
         if (! in_array($columnName, $this->getConditions())) {

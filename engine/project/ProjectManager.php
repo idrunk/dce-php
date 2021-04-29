@@ -8,7 +8,7 @@ namespace dce\project;
 
 use dce\base\Exception;
 use dce\Dce;
-use dce\Loader;
+use dce\loader\Loader;
 
 class ProjectManager {
     /** @var Project[] $projects 所有项目 */

@@ -64,24 +64,24 @@ class DeleteStatement extends StatementAbstract {
 
     protected function valid(): void {
         if ($this->tableSchema->isEmpty()) {
-            throw new QueryException('未配置删除表', 1);
+            throw new QueryException(QueryException::DELETE_TABLE_NOT_SPECIFIED);
         }
         if (count($this->tableSchema->getConditions()) > 1 || ! $this->joinSchema->isEmpty()) {
             if (! $this->orderSchema->isEmpty() || ! $this->limitSchema->isEmpty()) {
-                throw new QueryException('多表无法排序删除指定条数', 1);
+                throw new QueryException(QueryException::CANNOT_DELETE_WITH_MULTIPLE_SORTED_TABLE);
             }
         } else {
             // mark Mysql的Delete语句, 单表不能用别名, 多表可以
             if (!empty($this->tableSchema->getConditions()[0]['alias'])) {
-                throw new QueryException('待删数据表不支持指定别名');
+                throw new QueryException(QueryException::DELETE_TABLE_NOT_SUPPORT_ALIAS);
             }
         }
         if (! $this->allowEmptyConditionOrMustEqual) {
             if ($this->whereSchema->isEmpty()) {
-                throw new QueryException('当前设置不允许空条件删除全表', 1);
+                throw new QueryException(QueryException::EMPTY_DELETE_FULL_NOT_ALLOW);
             }
             if (false === $this->allowEmptyConditionOrMustEqual && ! $this->whereSchema->hasEqual()) {
-                throw new QueryException('当前设置不允许无等于条件删除数据', 1);
+                throw new QueryException(QueryException::NO_EQUAL_DELETE_NOT_ALLOW);
             }
         }
     }

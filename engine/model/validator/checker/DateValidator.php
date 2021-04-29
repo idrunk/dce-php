@@ -39,24 +39,24 @@ class DateValidator extends TypeChecker {
      */
     protected function check(string|int|float|null|false $value):ValidatorException|null {
         $formatSet = $this->getProperty('formatSet');
-        $type = $this->getProperty('type', '{{label}}校验器未配置formatSet或type属性');
+        $type = $this->getProperty('type', lang(ValidatorException::FORMATSET_OR_TYPE_REQUIRED));
         if ($formatSet) {
             $formatSetValue = $formatSet->value;
         } else {
             $formatSetValue = $type ? (self::$defaultFormatMap[$type->value] ?? null): null;
         }
         if (null === $formatSetValue) {
-            $this->addError('{{label}}校验器未配置有效type属性');
+            $this->addError(lang(ValidatorException::TYPE_REQUIRED));
         } else if (! self::validDate($formatSetValue, $value)) {
-            $this->addError($this->getGeneralError($formatSet->error ?? $type->error ?? null, '{{label}}格式不正确'));
+            $this->addError($this->getGeneralError($formatSet->error ?? $type->error ?? null, lang(ValidatorException::FORMAT_INVALID)));
         } else {
             $max = $this->getProperty('max');
             if ($max && strtotime($value) > strtotime($max->value)) {
-                $this->addError($this->getGeneralError($max->error, '{{label}}不能迟于{{max}}'));
+                $this->addError($this->getGeneralError($max->error, lang(ValidatorException::CANNOT_LATE_THAN)));
             }
             $min = $this->getProperty('min');
             if ($min && strtotime($min->value) > strtotime($value)) {
-                $this->addError($this->getGeneralError($min->error, '{{label}}不能早于{{min}}'));
+                $this->addError($this->getGeneralError($min->error, lang(ValidatorException::CANNOT_EARLIER_THAN)));
             }
         }
 

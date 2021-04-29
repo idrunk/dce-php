@@ -4,7 +4,7 @@
  * Date: 2020/4/19 3:14
  */
 
-namespace dce\project\request;
+namespace dce\project\session;
 
 use dce\storage\redis\DceRedis;
 

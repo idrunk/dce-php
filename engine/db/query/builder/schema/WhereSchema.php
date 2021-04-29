@@ -87,7 +87,7 @@ class WhereSchema extends SchemaAbstract {
                                 // 处理校验字段名
                                 $column = self::tableWrap($column);
                                 if (! $column) {
-                                    throw new QueryException("查询条件无效, 左比较值\"{$columnName}\"非法", 1);
+                                    throw (new QueryException(QueryException::LEFT_COMPARE_VALUE_INVALID))->format($columnName);
                                 }
                             }
                         }
@@ -95,13 +95,13 @@ class WhereSchema extends SchemaAbstract {
                         $conditionPackage[] = $conditionSqlPackage[] = $conditionInstance;
                         $params = array_merge($params, $conditionParams);
                     } else {
-                        throw new QueryException('查询条件无效, 左比较值非法', 1);
+                        throw new QueryException(QueryException::LEFT_SPECIAL_COMPARE_VALUE_INVALID);
                     }
                 }
             } else if (is_string($condition) && ($upper = strtoupper(trim($condition))) && in_array($upper, ['AND', 'OR'])) {
                 $conditionPackage[] = $conditionSqlPackage[] = $upper;
             } else {
-                throw new QueryException('查询条件无效, 非查询条件或逻辑运算符', 1);
+                throw new QueryException(QueryException::WHERE_OR_LOGIC_CONDITION_INVALID);
             }
         }
         $conditionPackageSqlTmpl = count($conditionPackage) > 1 ? '(%s)' : '%s';
@@ -111,9 +111,9 @@ class WhereSchema extends SchemaAbstract {
 
     /**
      * 构建查询条件及提取参数
-     * @param $column
-     * @param $operator
-     * @param $value
+     * @param string|false|RawBuilder $column
+     * @param string|int|float|false|RawBuilder|SelectStatement|null $operator
+     * @param string|int|float|array|false|RawBuilder|SelectStatement|null $value
      * @return array
      * @throws QueryException
      */
@@ -158,7 +158,7 @@ class WhereSchema extends SchemaAbstract {
                     $params = array_merge($params, $paramsLast);
                 } else {
                     $condition->placeHolder = self::printable($value);
-                    throw new QueryException("非法\"{$operator}\"运算右值:\n{$condition}", 1);
+                    throw (new QueryException(QueryException::RIGHT_VALUE_INVALID))->format($operator, $condition);
                 }
                 break;
             case 'IN':
@@ -178,7 +178,7 @@ class WhereSchema extends SchemaAbstract {
                     $this->logHasSubQuery(! $isRaw);
                 } else {
                     $condition->placeHolder = self::printable($value);
-                    throw new QueryException("非法\"{$operator}\"运算右值:\n{$condition}", 1);
+                    throw (new QueryException(QueryException::RIGHT_VALUE_INVALID))->format($operator, $condition);
                 }
                 break;
             case 'EXISTS': // 无左值
@@ -190,22 +190,22 @@ class WhereSchema extends SchemaAbstract {
                     $this->logHasSubQuery(! $isRaw);
                 } else {
                     $condition->placeHolder = self::printable($value);
-                    throw new QueryException("非法\"{$operator}\"运算右值:\n{$condition}", 1);
+                    throw (new QueryException(QueryException::RIGHT_VALUE_INVALID))->format($operator, $condition);
                 }
                 break;
             case false: // 仅有左值的情况
                 $condition->operator = null;
                 break;
             default: // 没有匹配到的为暂不支持的操作
-                throw new QueryException("非法比较运算符{$operator}", 1);
+                throw (new QueryException(QueryException::COMPARE_OPERATOR_INVALID))->format($operator);
         }
         return [$condition, $params];
     }
 
     /**
      * 处理右值
-     * @param $value
-     * @param $operator
+     * @param string|int|float|RawBuilder|SelectStatement $value
+     * @param string|false $operator
      * @return array
      * @throws QueryException
      */
@@ -219,7 +219,7 @@ class WhereSchema extends SchemaAbstract {
             $this->logHasSubQuery(! $isRaw);
         } else {
             $value = self::printable($value);
-            throw new QueryException("非法\"{$operator}\"运算右值:\n{$value}", 1);
+            throw (new QueryException(QueryException::RIGHT_VALUE_INVALID))->format($operator, $value);
         }
         return [$rightValue, $params];
     }

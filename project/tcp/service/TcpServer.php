@@ -24,7 +24,7 @@ class TcpServer extends ServerMatrix {
      */
     final public function start(array $param): void {
         if (! is_subclass_of(static::$rawRequestTcpClass, RawRequestConnection::class)) {
-            throw new TcpException('$rawRequestClass属性值非RawRequestPersistent类名');
+            throw new TcpException(TcpException::RAW_REQUEST_TCP_CLASS_ERROR);
         }
 
         $this->projectConfig = ProjectManager::get('tcp')->getConfig();
@@ -89,7 +89,7 @@ class TcpServer extends ServerMatrix {
         }
 
         $this->runApiService();
-        print_r("Tcp server started with {$host}:{$port}.\n");
+        echo self::$langStarted->format('Tcp/Udp', $host, $port);
         $this->server->start();
     }
 

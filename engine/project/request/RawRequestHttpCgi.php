@@ -6,6 +6,9 @@
 
 namespace dce\project\request;
 
+use dce\project\session\CookieCgi;
+use dce\project\session\Session;
+
 class RawRequestHttpCgi extends RawRequestHttp {
     /** @inheritDoc */
     protected function initProperties(): void {

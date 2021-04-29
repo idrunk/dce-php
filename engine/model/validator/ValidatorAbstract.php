@@ -6,10 +6,12 @@
 
 namespace dce\model\validator;
 
+use dce\i18n\Language;
 use dce\model\Model;
 use drunk\Utility;
 use ReflectionObject;
 use ReflectionProperty;
+use Stringable;
 
 abstract class ValidatorAbstract {
     /** @var string|int|float|false|null 待校验值 */
@@ -104,19 +106,19 @@ abstract class ValidatorAbstract {
         $value = $this->getValue();
         if (! $valid) {
             $class = static::class;
-            throw new ValidatorException("{$value} 无法通过 {$class} 校验");
+            throw (new ValidatorException(ValidatorException::VALIDATE_FAILED))->format($value, $class);
         }
         return $value;
     }
 
     /**
      * @param string $name
-     * @param string|int|float|array $value
+     * @param string|Stringable|int|float|array $value
      * @param bool $isArrayType
      * @return $this
      * @throws ValidatorException
      */
-    private function setProperty(string $name, string|int|float|array $value, bool $isArrayType = false): self {
+    private function setProperty(string $name, string|Stringable|int|float|array $value, bool $isArrayType = false): self {
         $property = new ValidatorProperty($name, $value, $isArrayType, static::class);
         $this->properties[$name] = $property;
         $this->$name = $property->value;
@@ -125,10 +127,10 @@ abstract class ValidatorAbstract {
 
     /**
      * @param string $name
-     * @param string|null $requiredError
+     * @param string|Stringable|null $requiredError
      * @return ValidatorProperty|null
      */
-    protected function getProperty(string $name, string|null $requiredError = null): ValidatorProperty|null {
+    protected function getProperty(string $name, string|Stringable|null $requiredError = null): ValidatorProperty|null {
         if (key_exists($name, $this->properties)) {
             return $this->properties[$name];
         } else {
@@ -140,29 +142,29 @@ abstract class ValidatorAbstract {
     }
 
     /**
-     * @param string|null $definedError
-     * @param string|null $defaultError
-     * @return string|null
+     * @param string|Stringable|null $definedError
+     * @param string|Stringable|null $defaultError
+     * @return string|Stringable|null
      */
-    protected function getGeneralError(string|null $definedError, string|null $defaultError): string|null {
+    protected function getGeneralError(string|Stringable|null $definedError, string|Stringable|null $defaultError): string|Stringable|null {
         if ($definedError) {
             return $definedError;
         }
         $generalError = $this->getProperty('error');
         if ($generalError) {
-            return $generalError->value;
+            return $generalError->error ?? $generalError->value;
         }
         return $defaultError;
     }
 
     /**
-     * @param string $message
+     * @param string|Stringable $message
      * @param int $errorCode
      * @return $this
      */
-    final protected function addError(string $message, int $errorCode = 0): self {
-        $message = $this->makeError($message);
-        $this->errors[] = new ValidatorException($message, $errorCode);
+    final protected function addError(string|Stringable $message, int $errorCode = 0): self {
+        $this->errors[] = new ValidatorException($this->makeError($message), $errorCode ?:
+            ($message instanceof Language && is_int($message->id ?? '') ? $message->id : 0));
         return $this;
     }
 
@@ -174,10 +176,10 @@ abstract class ValidatorAbstract {
     }
 
     /**
-     * @param string $errorTemplate
+     * @param string|Stringable $errorTemplate
      * @return string
      */
-    private function makeError(string $errorTemplate): string {
+    private function makeError(string|Stringable $errorTemplate): string {
         $replacementMap = [
             '{{property}}' => $this->modelPropertyName,
             '{{label}}' => $this->modelPropertyAlias,

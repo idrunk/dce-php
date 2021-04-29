@@ -8,9 +8,9 @@ namespace websocket\service;
 
 use dce\Dce;
 use dce\project\ProjectManager;
-use dce\project\request\Request as DceRequest;
-use dce\project\request\Session;
-use dce\project\request\SessionManager;
+use dce\project\request\RequestManager;
+use dce\project\session\Session;
+use dce\project\session\SessionManager;
 use dce\service\server\RawRequestConnection;
 use dce\service\server\ServerMatrix;
 use Swoole\Http\Request;
@@ -41,7 +41,7 @@ class WebsocketServer extends ServerMatrix {
      */
     final public function start(array $param): void {
         if (! is_subclass_of(static::$rawRequestWebsocketClass, RawRequestConnection::class)) {
-            throw new WebsocketException('$rawRequestClass属性值非RawRequestPersistent类名');
+            throw new WebsocketException(WebsocketException::RAW_REQUEST_WEBSOCKET_CLASS_ERROR);
         }
 
         $this->projectConfig = ProjectManager::get('websocket')->getConfig();
@@ -112,7 +112,7 @@ class WebsocketServer extends ServerMatrix {
         }
 
         $this->runApiService();
-        print_r("Websocket server started with {$host}:{$port}.\n");
+        echo self::$langStarted->format('Websocket', $host, $port);
         $this->server->start();
     }
 
@@ -124,6 +124,7 @@ class WebsocketServer extends ServerMatrix {
     protected function takeoverOpen(Server $server, Request $request): void {
         $session = Session::newBySid($request->cookie[Session::getSidName()] ?? true);
         Dce::$cache->var->set(['session', $request->fd], $session);
+        Dce::$cache->var->set(['cookie', $request->fd], $request->cookie);
         SessionManager::inst()->connect($session->getId(), $request->fd, $this->apiHost, $this->apiPort, self::SM_EXTRA_WS);
         $this->eventOnOpen($server, $request);
     }
@@ -137,8 +138,7 @@ class WebsocketServer extends ServerMatrix {
     private function takeoverMessage(Server $server, Frame $frame): void {
         $rawRequest = new static::$rawRequestWebsocketClass($this, $frame);
         $rawRequest->init();
-        $request = new DceRequest($rawRequest);
-        $request->route();
+        RequestManager::route($rawRequest);
     }
 
     /**

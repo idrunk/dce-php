@@ -4,7 +4,7 @@
  * Date: 2020-04-13 10:56
  */
 
-namespace dce\project\request;
+namespace dce\project\session;
 
 abstract class Cookie {
     /**

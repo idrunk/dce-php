@@ -21,9 +21,9 @@ class SetValidator extends TypeChecker {
      * @return ValidatorException|null
      */
     protected function check(string|int|float|null|false $value):ValidatorException|null {
-        $set = $this->getProperty('set', '{{label}}校验器未配置set属性');
+        $set = $this->getProperty('set', lang(ValidatorException::SET_REQUIRED));
         if ($set && ! in_array($value, $set->value)) {
-            $this->addError($this->getGeneralError($set->error, '{{label}}值{{value}}必须为{{set}}中的一个'));
+            $this->addError($this->getGeneralError($set->error, lang(ValidatorException::VALUE_NOT_IN_SET)));
         }
 
         return $this->getError();

@@ -102,13 +102,13 @@ class Event {
      * 触发事件
      * @param string $eventName
      * @param array $args
-     * @return bool
+     * @return bool|null
      */
-    public static function trigger(string $eventName, array $args = []): bool|null {
+    public static function trigger(string $eventName, mixed ... $args): bool|null {
         if (! $callbacks = self::get($eventName)) {
             return null;
         }
-        $trigger = $callbacks->trigger($args);
+        $trigger = $callbacks->trigger(... $args);
         if ($callbacks->isEmpty()) {
             self::off($eventName);
         }

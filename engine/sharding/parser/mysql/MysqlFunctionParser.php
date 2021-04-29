@@ -48,9 +48,8 @@ class MysqlFunctionParser extends MysqlParser {
             $paramSeparator = $this->preParseOperator();
             $isParamSeparator = in_array($paramSeparator, self::$paramSeparators);
             if (! $isParamSeparator && ! in_array($paramSeparator, self::$closeBrackets)) {
-                testDump($paramSeparator, $this->offset, "方法'{$this->name}'调用未正常闭合");
                 // 如果后续为参数分隔符, 则继续解析下一个参数, 若为收括号, 则结束当前函数解析, 但若为其他符号或非符号, 则表示当前语句不合法
-                throw new StatementParserException("方法'{$this->name}'调用未正常闭合");
+                throw (new StatementParserException(StatementParserException::FUNCTION_UNCLOSE))->format($this->name);
             }
             return $isParamSeparator ? self::TRAVERSE_CALLBACK_STEP : self::TRAVERSE_CALLBACK_BREAK;
         });

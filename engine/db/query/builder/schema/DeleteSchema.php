@@ -17,7 +17,7 @@ class DeleteSchema extends SchemaAbstract {
         if (! empty($tableNames)) {
             foreach ($tableNames as $tableName) {
                 if (! is_string($tableName) || ! $table = self::tableWrap($tableName)) {
-                    throw new QueryException('非法table名', 1);
+                    throw new QueryException(QueryException::TABLE_NAME_INVALID);
                 }
                 $this->pushCondition($table);
             }

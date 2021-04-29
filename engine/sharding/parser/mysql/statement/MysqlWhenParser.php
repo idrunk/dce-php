@@ -20,7 +20,7 @@ class MysqlWhenParser extends MysqlStatementParser {
         $this->when = $this->parseWithOffset(null);
         $then = $this->preParseWord();
         if (! $then || 'THEN' !== strtoupper($then)) {
-            throw new StatementParserException('缺少THEN');
+            throw new StatementParserException(StatementParserException::THEN_MISSING);
         }
         $this->then = $this->parseWithOffset(null);
     }

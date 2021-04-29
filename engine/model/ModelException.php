@@ -7,5 +7,10 @@
 namespace dce\model;
 
 use dce\base\Exception;
+use dce\i18n\Language;
 
-class ModelException extends Exception {}
+// 1100-1109
+class ModelException extends Exception {
+    #[Language(['未定义属性 %s 对应的getter方法'])]
+    public const GETTER_UNDEFINED = 1100;
+}

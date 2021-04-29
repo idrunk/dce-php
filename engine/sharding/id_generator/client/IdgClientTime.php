@@ -20,7 +20,7 @@ class IdgClientTime extends IdgClient {
     protected static function checkBatchIntegrity(IdgBatch $batch): void {
         parent::checkBatchIntegrity($batch);
         if (empty($batch->timeId)) {
-            throw new IdgException("未取到时间ID种子time_id");
+            throw new IdgException(IdgException::BASE_TIME_ID_MISSING);
         }
     }
 

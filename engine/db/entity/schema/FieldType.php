@@ -116,7 +116,7 @@ class FieldType extends SchemaAbstract {
                 $length = 0;
                 break;
             default:
-                throw new SchemaException("暂不支持\"{$typeName}\"类型字段");
+                throw (new SchemaException(SchemaException::FIELD_TYPE_NOT_SUPPORT))->format($typeName);
         }
 
         $this->typeName = $typeNameUpper;

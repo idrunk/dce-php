@@ -12,12 +12,13 @@ use dce\cache\CacheManager;
 use dce\config\ConfigManager;
 use dce\config\DceConfig;
 use dce\event\Event;
+use dce\loader\Loader;
 use dce\log\LogManager;
 use dce\project\node\NodeManager;
 use dce\project\ProjectManager;
 use dce\project\request\RawRequestHttpCgi;
 use dce\project\request\RawRequestCli;
-use dce\project\request\Request;
+use dce\project\request\RequestManager;
 
 final class Dce {
     private const DEV_PROJECT_NAME = 'developer';
@@ -71,7 +72,7 @@ final class Dce {
     public static function getId(): string {
         static $id;
         if (null === $id) {
-            $id = self::$config->appId ?? 0;
+            $id = self::$config->app['id'] ?? 0;
         }
         return $id;
     }
@@ -127,13 +128,8 @@ final class Dce {
         }
         self::$initState = 3;
 
-        if (DCE_CLI_MODE) {
-            $rawRequest = new RawRequestCli();
-        } else {
-            $rawRequest = new RawRequestHttpCgi();
-        }
+        $rawRequest = DCE_CLI_MODE ? new RawRequestCli() : new RawRequestHttpCgi();
         $rawRequest->init();
-        $request = new Request($rawRequest);
-        $request->route();
+        RequestManager::route($rawRequest);
     }
 }

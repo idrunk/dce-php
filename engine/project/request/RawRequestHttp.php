@@ -89,7 +89,7 @@ abstract class RawRequestHttp extends RawRequest {
         $this->path = $this->getPath();
         if (in_array($this->requestUri, Dce::$config->blockPaths)) {
             $this->status(404, 'Not Found');
-            throw new RequestException("{$this->requestUri} 页面不存在");
+            throw (new RequestException(RequestException::PATH_WAS_BLOCKED))->format($this->requestUri);
         }
     }
 

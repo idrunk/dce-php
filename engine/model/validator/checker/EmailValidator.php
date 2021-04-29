@@ -16,7 +16,7 @@ class EmailValidator extends TypeChecker {
      */
     protected function check(string|int|float|null|false $value): ValidatorException|null {
         if (! filter_var($value, FILTER_VALIDATE_EMAIL)) {
-            $this->addError($this->getGeneralError(null, '{{label}}非有效Email地址'));
+            $this->addError($this->getGeneralError(null, lang(ValidatorException::INVALID_EMAIL)));
         }
 
         return $this->getError();

@@ -34,20 +34,20 @@ final class DceRpcClient {
             return;
         }
         if (! isset($rpcServers[0]['hosts'][0]['host'])) {
-            throw new RpcException('rpc_servers配置异常');
+            throw new RpcException(RpcException::INVALID_RPC_SERVERS_CONFIG);
         }
         foreach ($rpcServers as $rpcServer) {
             $hosts = $rpcServer['hosts'] ?? null;
             $wildcards = $rpcServer['wildcards'] ?? null;
             if (! is_array($hosts) || ! is_array($wildcards)) {
-                throw new RpcException('rpc_servers[]配置异常');
+                throw new RpcException(RpcException::INVALID_RPC_SERVERS_CONFIG2);
             }
             if (! is_array(current([$hosts]))) {
                 $hosts = [$hosts];
             }
             foreach ($hosts as $host) {
                 if (! isset($host['host'])) {
-                    throw new RpcException('rpc_servers[][]配置异常');
+                    throw new RpcException(RpcException::INVALID_RPC_SERVERS_CONFIG3);
                 }
             }
             RpcClient::prepare($wildcards, $hosts);

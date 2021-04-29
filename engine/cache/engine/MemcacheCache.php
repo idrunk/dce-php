@@ -7,6 +7,7 @@
 namespace dce\cache\engine;
 
 use dce\base\Exception;
+use dce\cache\CacheException;
 use memcache;
 use dce\cache\Cache;
 
@@ -29,7 +30,7 @@ final class MemcacheCache extends Cache {
     }
 
     public function exists(string|array $key): bool {
-        throw new Exception('Memcache不支持exists');
+        throw (new CacheException(CacheException::NOT_SUPPORT_EXISTS))->format('Memcache');
     }
 
     public function get(string|array $key): mixed {

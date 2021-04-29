@@ -24,7 +24,7 @@ class MysqlCaseParser extends MysqlStatementParser {
 
         $this->traverse(function ($operator) {
             if (! in_array($operator, self::$partSeparators)) {
-                throw new StatementParserException("符号'{$operator}'异常, CASE未正常关闭");
+                throw (new StatementParserException(StatementParserException::INVALID_OPERATOR_CASE_UNCLOSE))->format($operator);
             }
         }, function ($word) {
             $wordUpper = strtoupper($word);
@@ -35,7 +35,7 @@ class MysqlCaseParser extends MysqlStatementParser {
             } else if ('END' === $wordUpper) {
                 return self::TRAVERSE_CALLBACK_BREAK;
             } else {
-                throw new StatementParserException("'{$word}'附近出现错误, CASE语句未正常关闭");
+                throw (new StatementParserException(StatementParserException::INVALID_STATEMENT_CASE_UNCLOSE))->format($word);
             }
         });
     }

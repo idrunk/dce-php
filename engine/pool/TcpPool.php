@@ -24,7 +24,7 @@ class TcpPool extends Pool {
 
     private function initTick(Client $connection): void {
         $this->tickMapping[spl_object_id($connection)] = Timer::tick(30000, function() use($connection) {
-            $lastFetchTime = $this->getProductMap($connection)['last_fetch_time'] ?? 0;
+            $lastFetchTime = $this->getProduct($connection)->lastFetch ?? 0;
             if (time() - $lastFetchTime >= 28) {
                 // 如果到了闹铃点, 且距上次取连接已过了闹铃间隔时间(未过则不必发, 因为取连接则肯定用来send过业务数据了, send数据能覆盖ping功能), 则发送ping包
                 $connection->send(0);

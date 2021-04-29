@@ -132,7 +132,7 @@ class Validator {
         array|null $set = null,
         string|array|null $regexp = null,
         string|array|null $keyword = null,
-        string|null $error = null,
+        string|array|null $error = null,
         array|null $combined = null,
         string|array|null $type = null,
         array|null $formatSet = null,
@@ -277,7 +277,7 @@ class Validator {
         $validatorEchelon = [];
         foreach ($validators as $validator) {
             if (! $validator instanceof self) {
-                throw new ValidatorException("校验器 " .$validator::class. " 无效");
+                throw (new ValidatorException(ValidatorException::VALIDATOR_INVALID))->format($validator::class);
             } else if ($validator->validator instanceof TypeEnding) {
                 $validatorEchelon['ending'][] = $validator;
             } else if ($validator->validator instanceof TypeChecker) {
@@ -287,7 +287,7 @@ class Validator {
             } else if ($validator->validator instanceof TypeAssignment) {
                 $validatorEchelon['assignment'][] = $validator;
             } else {
-                throw new ValidatorException("校验器 " .$validator->validator::class. " 未继承自分类校验器");
+                throw (new ValidatorException(ValidatorException::VALIDATOR_MUST_BE_EXTENDS))->format($validator->validator::class);
             }
         }
         return $validatorEchelon;

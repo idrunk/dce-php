@@ -8,6 +8,8 @@ namespace dce\config;
 
 use Closure;
 use dce\db\connector\DbConfig;
+use dce\i18n\Language;
+use dce\i18n\Locale;
 use dce\sharding\id_generator\DceIdGenerator;
 use dce\sharding\middleware\ShardingConfig;
 use JetBrains\PhpStorm\ArrayShape;
@@ -16,8 +18,20 @@ use JetBrains\PhpStorm\ArrayShape;
  * Class config 配置操作基础类
  */
 class DceConfig extends Config {
-    /** @var string 应用ID (用于多应用部署在同台机器时, 标识其依赖公共组件的用户身份) */
-    public string $appId;
+    /** @var array 应用配置 */
+    #[ArrayShape([
+        'id' => 'int', // 应用ID, 用于多应用部署在同台机器时, 标识其依赖公共组件的用户身份
+        'name' => 'Stringable', // 应用名
+        'lang' => 'string', // 默认语言码
+        'country' => 'string', // 默认国家码
+        'lang_parse' => 'callable(Request):string', // 语言码解析器, 返回语言码
+        'country_parse' => 'callable(Request):string', // 国家码解析器, 返回国家码
+        'lang_mapping' => 'callable(int|string):[int|string=>string]', // 语种映射工厂, 根据语言ID返回语言码与语种文本的映射表, 可以以此扩展多语种
+    ])]
+    public array $app = [
+        'lang' => Language::ZH,
+        'country' => Locale::CN,
+    ];
 
     /** @var Closure|null 引导回调 (可以在此做全局初始化工作, 如设置池通道, 设置数据库代理等) */
     public Closure|null $bootstrap = null;
@@ -322,7 +336,7 @@ class DceConfig extends Config {
 
     /** @inheritDoc */
     public function __construct($config) {
-        $this->appId = hash('crc32', APP_ROOT);
+        $this->app['id'] = hash('crc32', APP_ROOT);
         parent::__construct($config);
     }
 }

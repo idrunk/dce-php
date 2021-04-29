@@ -7,5 +7,10 @@
 namespace tcp\service;
 
 use dce\base\Exception;
+use dce\i18n\Language;
 
-class TcpException extends Exception {}
+// 610-629
+class TcpException extends Exception {
+    #[Language(['$rawRequestTcpClass属性值非RawRequestConnection族类'])]
+    public const RAW_REQUEST_TCP_CLASS_ERROR = 610;
+}

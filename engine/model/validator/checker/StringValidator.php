@@ -20,7 +20,7 @@ class StringValidator extends TypeChecker {
      */
     protected function check(string|int|float|null|false $value):ValidatorException|null {
         if (! is_string($value)) {
-            $this->addError($this->getGeneralError(null, '{{label}}非有效字符'));
+            $this->addError($this->getGeneralError(null, lang(ValidatorException::INVALID_STRING)));
         } else {
             $min = $this->getProperty('min');
             $max = $this->getProperty('max');
@@ -28,11 +28,11 @@ class StringValidator extends TypeChecker {
                 $length = mb_strlen($value);
 
                 if ($min && $length < $min->value) {
-                    $this->addError($this->getGeneralError($min->error, '{{label}}不能小于{{min}}个字符'));
+                    $this->addError($this->getGeneralError($min->error, lang(ValidatorException::CANNOT_LESS_THAN)));
                 }
 
                 if ($max && $length > $max->value) {
-                    $this->addError($this->getGeneralError($max->error, '{{label}}不能多于{{max}}个字符'));
+                    $this->addError($this->getGeneralError($max->error, lang(ValidatorException::CANNOT_MORE_THAN)));
                 }
             }
         }

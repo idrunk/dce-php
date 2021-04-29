@@ -31,7 +31,7 @@ abstract class DebugMatrix {
      */
     public function point(): void {
         if (! $this instanceof CliDebug) {
-            throw new DebugException('Point不能用在非Cli模式下');
+            throw new DebugException(DebugException::CLI_NOT_SUPPORT_POINT);
         }
         $context = self::extractBacktrace();
         $context = $this->makeContext($context);
@@ -93,7 +93,7 @@ abstract class DebugMatrix {
                 return $backtrace[$i];
             }
         }
-        throw new DebugException('获取上下文失败，请勿包装debug方法');
+        throw new DebugException(DebugException::GET_CONTEXT_FAILED);
     }
 
     /**

@@ -7,7 +7,7 @@
 namespace dce\rpc;
 
 use Closure;
-use dce\Loader;
+use dce\loader\Loader;
 use dce\pool\PoolException;
 use dce\pool\TcpPool;
 use Swoole\Coroutine\Client;
@@ -55,7 +55,7 @@ class RpcClient {
                 self::$wildcardMapping[$wildcard] = $identity;
                 Loader::prepare($wildcard, self::getAutoload());
             } else if (self::$wildcardMapping[$wildcard] !== $identity) {
-                throw new RpcException("命名空间 {$wildcard} 当前集与前次命名空间集不一致");
+                throw (new RpcException(RpcException::NAMESPACE_CONFLICT))->format($wildcard);
             }
         }
         self::$namingMapping[$identity] = [
@@ -79,7 +79,7 @@ class RpcClient {
                 self::$classMapping[$className] = $identity;
                 Loader::preload($className, self::getAutoload());
             } else if (self::$classMapping[$className] !== $identity) {
-                throw new RpcException("类名 {$className} 当前集与前次类名集不一致, 或者已通过名字空间设置");
+                throw (new RpcException(RpcException::CLASS_CONFLICT))->format($className);
             }
         }
         self::$namingMapping[$identity] = [
@@ -107,7 +107,7 @@ class RpcClient {
                     // 因为callStatic时才会进到这里, 所以classname是绝对合法的, 所以此处不会有安全漏洞
                     eval($scripts);
                 } catch (Throwable) {
-                    throw new RpcException("{$className} 不是合法类");
+                    throw (new RpcException(RpcException::INVALID_CLASS))->format($className);
                 }
             };
         }
@@ -129,7 +129,7 @@ class RpcClient {
                 return;
             }
         }
-        throw new RpcException("类 {$className} 未注册远程过程服务");
+        throw (new RpcException(RpcException::CLASS_NOT_REGISTER))->format($className);
     }
 
     /**
@@ -179,7 +179,7 @@ class RpcClient {
         }
         $pool = self::getPool($className);
         $client = $pool->fetch($specifiedConfig);
-        $data = self::authPack($pool->getProductMap($client)['config']->token ?? '', $className, $methodName, $arguments);
+        $data = self::authPack($pool->getProduct($client)->config->token ?? '', $className, $methodName, $arguments);
         $response = self::request($client, $data);
         $result = self::responseHandling($response);
         $pool->put($client);
@@ -207,14 +207,14 @@ class RpcClient {
      */
     private static function request(Client $client, string $data): string {
         if (! $client->send($data)) {
-            throw new RpcException($client->errMsg ?: '请求发送失败', $client->errCode);
+            throw new RpcException($client->errMsg ?: lang(RpcException::REQUEST_FAILED), $client->errCode);
         }
         $response = $client->recv(self::$receiveTimeout);
         if ($client->errCode > 0) {
-            throw new RpcException($client->errMsg ?: '响应超时', $client->errCode);
+            throw new RpcException($client->errMsg ?: RpcException::RESPONSE_TIMEOUT, $client->errCode);
         }
         if (! $response) {
-            throw new RpcException('空响应, 可能远程服务异常导致');
+            throw new RpcException(RpcException::EMPTY_RESPONSE);
         }
         return $response;
     }

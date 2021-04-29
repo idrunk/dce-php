@@ -34,7 +34,7 @@ class TableSchema extends SchemaAbstract {
             $params = $table->getParams();
             $this->logHasSubQuery(true);
         } else {
-            throw new QueryException('非法table对象', 1);
+            throw new QueryException(QueryException::TABLE_INVALID);
         }
         return [$tableSql, $params];
     }

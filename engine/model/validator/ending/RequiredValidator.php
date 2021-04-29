@@ -17,10 +17,10 @@ class RequiredValidator extends TypeEnding {
             $allowEmpty = $this->getProperty('allowEmpty');
             if ($allowEmpty->value) {
                 if (false === $value) {
-                    $this->addError($this->getGeneralError(null, '缺少必传参数{{label}}'));
+                    $this->addError($this->getGeneralError(null, lang(ValidatorException::REQUIRED_MISSING)));
                 }
             } else {
-                $this->addError($this->getGeneralError(null, '{{label}}不能为空'));
+                $this->addError($this->getGeneralError(null, lang(ValidatorException::CANNOT_BE_EMPTY)));
             }
         }
         return $this->getError();

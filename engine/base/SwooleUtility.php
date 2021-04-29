@@ -194,7 +194,7 @@ final class SwooleUtility {
     public static function rootProcessConstraint(): void {
         $ppid = posix_getppid();
         if ($ppid) {
-            throw new Exception('请在根进程初始化计数锁');
+            throw new BaseException(BaseException::NEED_ROOT_PROCESS);
         }
     }
 }

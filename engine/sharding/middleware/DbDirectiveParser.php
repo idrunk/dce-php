@@ -87,9 +87,9 @@ class DbDirectiveParser extends DirectiveParser {
                             $this->whereConditions = $statement->getWhereSchema()->getConditions();
                         }
                     } else if ($shardingConfig->allowJoint) {
-                        throw new MiddlewareException('非按模型分库禁止连表查询');
+                        throw new MiddlewareException(MiddlewareException::NO_MOD_SHARDING_NO_JOINT);
                     } else {
-                        throw new MiddlewareException('未开启分库连表查询 (可以设置allow_joint=true开启)');
+                        throw new MiddlewareException(MiddlewareException::ALLOW_JOINT_NOT_OPEN);
                     }
                 }
                 if (! $statement instanceof SelectStatement) {

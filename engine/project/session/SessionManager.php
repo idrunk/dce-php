@@ -4,7 +4,7 @@
  * Date: 2020/4/26 16:47
  */
 
-namespace dce\project\request;
+namespace dce\project\session;
 
 use dce\Dce;
 use dce\rpc\RpcClient;
@@ -51,7 +51,7 @@ abstract class SessionManager {
         }
         self::$config = Dce::$config->session;
         if (! self::$config['manager_class']) {
-            self::$config['manager_class'] = DceRedis::isAvailable() ? '\dce\project\request\SessionManagerRedis' : '\dce\project\request\SessionManagerFile';
+            self::$config['manager_class'] = DceRedis::isAvailable() ? '\dce\project\session\SessionManagerRedis' : '\dce\project\session\SessionManagerFile';
         }
     }
 
@@ -119,7 +119,7 @@ abstract class SessionManager {
     public function fdSignIn(int $mid, int $fd, string $apiHost, int $apiPort): void {
         $fdid = self::genFdid($fd, $apiHost, $apiPort);
         if (! $sid = $this->getFdForm($fdid)['sid'] ?? 0) {
-            throw new SessionException("Fdid {$fdid} 异常, 无法找到对应的sid");
+            throw (new SessionException(SessionException::SID_BY_FDID_NOTFOUND))->format($fdid);
         }
         $this->setSessionForm($sid, mid: $mid);
         $this->setMemberForm($mid, $fdid, $sid);

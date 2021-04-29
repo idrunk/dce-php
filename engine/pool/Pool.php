@@ -16,7 +16,7 @@ abstract class Pool {
     /** @var ChannelAbstract[] */
     private array $channelMapping = [];
 
-    private PoolProductMapping $mapping;
+    private PoolProduct $productMapping;
 
     /** @var PoolProductionConfig[] */
     private array $configs = [];
@@ -25,12 +25,12 @@ abstract class Pool {
 
     private function __construct(string $configClass) {
         if (! is_subclass_of($configClass, PoolProductionConfig::class)) {
-            throw new PoolException('配置类无效');
+            throw new PoolException(PoolException::INVALID_CONFIG_CLASS);
         }
         if (! is_subclass_of(self::$channelClass, ChannelAbstract::class)) {
-            throw new PoolException('实例队列通道无效');
+            throw new PoolException(PoolException::INVALID_CHANNEL);
         }
-        $this->mapping = new PoolProductMapping($this);
+        $this->productMapping = PoolProduct::new();
         $this->configClass = $configClass;
     }
 
@@ -171,12 +171,10 @@ abstract class Pool {
      * @throws null
      */
     final public function put(object $instance): bool {
-        $map = $this->mapping->getMap($instance);
-        $channel = $map['channel'];
-        $config = $map['config'];
+        $product = $this->productMapping->get($instance);
         // 归还一个销量
-        $config->return();
-        return $channel->push($instance);
+        $product->config->return();
+        return $product->channel->push($instance);
     }
 
     /**
@@ -189,25 +187,27 @@ abstract class Pool {
         if ($config) {
             $configIndex = $this->getConfigIndex($config);
             if (null === $configIndex) {
-                throw new PoolException('所传$config无法与池生产配置相匹配');
+                throw new PoolException(PoolException::CONFIG_PRODUCTION_NOT_MATCH);
             }
             $config = $this->getProductionConfig($configIndex);
         } else {
             $config = $this->getProductionConfig($configIndex);
         }
         $channel = $this->getChannel($configIndex);
+        // 根据此产销率, 实现了惰性生产的特性, 只有当生产的实例被销售完后, 才尝试生产新的
         if ($config->getYieldSalesRate() >= 1) {
             // 如果生产的实例都被消费了, 则准备生产新实例
             if ($config->getYieldRate() >= 1) {
                 // 如果实例已生产完, 则尝试清除由于异常等情况导致未能正常回收的实例
                 // 如果还是没有剩余配额就表示实例都正常, 在短时间内被消费完了, 且实例已满, 无需新建实例, 待别人归还再消费
-                // 此机制间接惰性的解决了连接断开后重连的问题
-                // mark 此机制还有漏洞, 如果全部通道堵住了, 而不是发生异常, 就会导致一直堵塞根本无法进入回收的逻辑
-                $this->mapping->clear($config);
+                // 此机制间接惰性的解决了连接断开后重连的问题, 因为连接断开后再获取查询时会抛出异常, 抛出异常则无法被回收, 无法被回收时会被PHP垃圾回收, 之后再进入此处逻辑则会被clear
+                $this->productMapping->clear($config);
                 $config = $this->getProductionConfig($configIndex);
             }
             if ($config->getYieldRate() < 1) {
                 $config->yield();
+                // 刚生产不应该增加销量或退还量, 但put会增加退还量, 所以这里先调个消费配平下吧
+                $config->consume();
                 // 如果当前通道为空, 且当前生产方案未生产满, 则新建实例
                 $this->yield($config, $channel);
             }
@@ -217,20 +217,20 @@ abstract class Pool {
         // 使用Swoole协程通道时, 若通道中无实例, 则会挂起, 等到有消费方归还后, 再取出, 并继续后续动作
         $instance = $channel->pop();
         if (null === $instance) {
-            throw new PoolException('池中暂无空闲实例');
+            throw new PoolException(PoolException::CHANNEL_BUSYING);
         }
-        $this->mapping->update($instance);
+        $this->productMapping->refresh($instance);
         return $instance;
     }
 
     /**
      * 根据实例取其映射的配置通道等
      * @param object $object
-     * @return array
+     * @return PoolProduct
      * @throws PoolException
      */
-    final public function getProductMap(object $object) {
-        return $this->mapping->getMap($object);
+    final public function getProduct(object $object): PoolProduct {
+        return $this->productMapping->get($object);
     }
 
     /**
@@ -241,30 +241,14 @@ abstract class Pool {
     private function yield(PoolProductionConfig $config, ChannelAbstract $channel): void {
         $this->setConfigsInterface();
         $instance = $this->produce($config);
-        $this->mapping->mark($instance, $config, $channel);
-        // 刚生产不应该增加销量或退还量, 但put会增加退还量, 所以这里先调个消费配平下吧
-        $config->consume();
+        $this->productMapping->set($instance, $config, $channel);
         $this->put($instance); // 入池
-    }
-
-    /**
-     * 弹出释放一个实例 (get后不put回即为释放)
-     */
-    final public function pop(): void {
-        $instance = $this->get();
-        $this->mapping->remove($instance);
     }
 
     /**
      * 子类可以覆盖此方法, 用于从配置中心动态取配置
      */
     protected function setConfigsInterface(): void {}
-
-    /**
-     * 子类可以覆盖此方法断开连接 (若不能随对象注销自动断开)
-     * @param object $object
-     */
-    public function destroyProduct(object $object): void {}
 
     /**
      * 生产实例

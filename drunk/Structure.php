@@ -74,7 +74,7 @@ final class Structure {
      * @param bool $lazyMode  是否惰性模式
      * @return array|string|int|false
      */
-    public static function arraySearch (array $needle, array $haystack, bool $lazyMode = true): array|string|int|false {
+    public static function arraySearch(array $needle, array $haystack, bool $lazyMode = true): array|string|int|false {
         $itemHaystack = current($haystack);
         if (empty($needle) || empty($itemHaystack)) {
             return false;
@@ -103,7 +103,7 @@ final class Structure {
      * @param string & $rootKey
      * @param array & $keyArray
      */
-    public static function arraySplitKey (string $key, string & $rootKey, array|null & $keyArray) {
+    public static function arraySplitKey(string $key, string & $rootKey, array|null & $keyArray) {
         $key = explode('.', $key);
         $keyArray = array_slice($key, 1);
         $rootKey = $key[0];
@@ -116,7 +116,7 @@ final class Structure {
      * @param mixed $value
      * @return array|false
      */
-    public static function arrayAssign (array $array, array $keyArray, mixed $value): array|false {
+    public static function arrayAssign(array $array, array $keyArray, mixed $value): array|false {
         if (empty($keyArray) || ! is_array($keyArray)) {
             return false;
         }
@@ -138,9 +138,9 @@ final class Structure {
      * 按结构数组下标取数组元素
      * @param array $array
      * @param array $keyArray
-     * @return array|null
+     * @return mixed
      */
-    public static function arrayIndexGet (array $array, array $keyArray): array|null {
+    public static function arrayIndexGet(array $array, array $keyArray): mixed {
         if (empty($keyArray) || ! is_array($keyArray)) {
             return null;
         }
@@ -159,7 +159,7 @@ final class Structure {
      * @param array $keyArray
      * @return null|bool
      */
-    public static function arrayIndexDelete (array & $array, array $keyArray): null|bool {
+    public static function arrayIndexDelete(array & $array, array $keyArray): null|bool {
         if (empty($keyArray) || ! is_array($keyArray)) {
             return null;
         }

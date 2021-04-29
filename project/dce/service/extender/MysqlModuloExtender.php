@@ -55,17 +55,17 @@ class MysqlModuloExtender extends ModuloExtender {
             $shardingConfig->targetMapping = $mapping;
             if ($ruleModel % $srcRuleCount) {
                 // 如果没有扩展配置, 或扩展配置非源配置的正数倍, 则表示配置异常
-                throw new ExtenderException("sharding_extend.mapping配置错误, 缺少或有多余规则");
+                throw new ExtenderException(ExtenderException::INVALID_MAPPING_CONFIG);
             }
             for (; -- $ruleModel;) {
                 if (! in_array($ruleModel, $mapping)) {
                     // 如果该有的模值在映射中找不到, 则表示配置错误
-                    throw new ExtenderException("sharding_extend.mapping模值配置错误, 缺少'{$ruleModel}'");
+                    throw (new ExtenderException(ExtenderException::MAPPING_CONFIG_MISSING_PROPERTY))->format($ruleModel);
                 }
             }
             foreach ($extendMapping as $dbAlias => $remainder) {
                 if (! key_exists($dbAlias, $this->extendDatabases)) {
-                    throw new ExtenderException("扩展库sharding_extend.database配置错误, 无法与sharding_extend.mapping.{$shardingConfig->alias}对应");
+                    throw (new ExtenderException(ExtenderException::DATABASE_MAPPING_NOT_MATCH))->format($shardingConfig->alias);
                 }
                 foreach ($shardingMapping as $srcDbAlias => $srcRemainder) {
                     if ($remainder % $srcRuleCount === $srcRemainder % $srcRuleCount) {

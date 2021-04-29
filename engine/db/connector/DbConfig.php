@@ -42,7 +42,7 @@ class DbConfig extends Config implements ConfigLibInterface {
             }
             foreach ($databases as $dbAlias => $dbNode) {
                 if (! $dbNode) {
-                    throw new ConfigException("数据库配置 {$dbAlias} 为空");
+                    throw (new ConfigException(ConfigException::DB_CONFIG_EMPTY))->format($dbAlias);
                 } else if (! isset($dbNode[0])) { // 若节点为单库, 则通用化为多库形式
                     $dbNode = [$dbNode];
                 }

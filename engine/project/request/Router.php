@@ -91,7 +91,7 @@ class Router {
         if ($nodeTree->isEmpty()) {
             if ($isProjectLevel) {
                 // 如果根级下无子节点, 则表示未定义任何节点配置, 则无法路由定位
-                throw new RouterException('项目定位失败，请检查是否未设置默认项目或节点配置错误');
+                throw new RouterException(RouterException::PROJECT_NO_CHILD);
             } else {
                 return false;
             }
@@ -102,7 +102,7 @@ class Router {
         if (! $nodeTrees) {
             if ($isProjectLevel) {
                 // 如果在根级别定位失败, 则最终定位失败
-                throw new RouterException('项目定位失败，请检查是否未设置默认项目或节点配置错误');
+                throw new RouterException(RouterException::PROJECT_LOCATION_FAILED);
             } else {
                 return false;
             }
@@ -116,7 +116,7 @@ class Router {
         }
         if ($isLocated !== true) {
             // 如果在根级别定位失败, 则最终定位失败
-            throw new RouterException('节点定位失败，请检查节点配置或url是否正确');
+            throw new RouterException(RouterException::NODE_LOCATION_FAILED);
         } else {
             return true;
         }
@@ -300,7 +300,7 @@ class Router {
             // 如果定义的是匹配方法, 则返回执行该方法的结果, (该匹配方法返回字符串参数值或假, 为假则表示参数匹配失败, 否则为匹配到的参数)
             return call_user_func($match, $argument, $getArguments);
         } else {
-            throw new RouterException('节点匹配规则配置错误');
+            throw new RouterException(RouterException::NODE_CONFIG_ERROR);
         }
     }
 

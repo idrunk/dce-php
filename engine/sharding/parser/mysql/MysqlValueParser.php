@@ -50,7 +50,7 @@ class MysqlValueParser extends MysqlParser {
             // 解析负数
             $value = $instance->preParseWord();
             if (! is_numeric($value)) {
-                throw new StatementParserException('负号后跟的不是有效数字');
+                throw new StatementParserException(StatementParserException::INVALID_NUMBER_AFTER_MINUS);
             }
             $instance->isNumeric = true;
             $instance->parse(- $value);

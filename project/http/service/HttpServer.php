@@ -26,7 +26,7 @@ class HttpServer extends ServerMatrix {
      */
     final public function start(array $param): void {
         if (! is_subclass_of(static::$rawRequestHttpClass, RawRequestHttp::class)) {
-            throw new HttpException('$rawRequestClass属性值非RawRequestHttp类名');
+            throw new HttpException(HttpException::RAW_REQUEST_HTTP_CLASS_ERROR);
         }
 
         $this->projectConfig = ProjectManager::get('http')->getConfig();
@@ -70,7 +70,7 @@ class HttpServer extends ServerMatrix {
         }
 
         $this->runApiService();
-        print_r("Http server started with {$host}:{$port}.\n");
+        echo self::$langStarted->format('Http', $host, $port);
         $this->server->start();
     }
 

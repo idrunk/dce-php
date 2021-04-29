@@ -7,11 +7,12 @@
 namespace dce\model;
 
 use ArrayAccess;
+use dce\loader\ClassDecorator;
 use drunk\Char;
 use ReflectionClass;
 use ReflectionProperty;
 
-abstract class Model implements ArrayAccess {
+abstract class Model implements ArrayAccess, ClassDecorator {
     /** @var string 默认场景名 */
     public const SCENARIO_DEFAULT = 'default';
 
@@ -124,26 +125,30 @@ abstract class Model implements ArrayAccess {
     }
 
     /**
+     * 初始化模型属性实例表 (本方法在ClassDecoratorManager中调用)
+     * @param ReflectionClass $refClass
+     */
+    private static function initProperties(ReflectionClass $refClass): void {
+        $staticClass = $refClass->getName();
+        foreach ($refClass->getProperties(ReflectionProperty::IS_PUBLIC) as $refProperty) {
+            if ($attributes = $refProperty->getAttributes(Property::class)) {
+                $properties[$refProperty->name] = $propertyInstance = $attributes[0]->newInstance();
+                $validatorInstances = [];
+                foreach ($refProperty->getAttributes(Validator::class) as $ruleProperty) {
+                    $validatorInstances[] = $ruleProperty->newInstance()->setProperty($propertyInstance);
+                }
+                $fieldInstance = isset($staticClass::$fieldClass) && ($fieldAttrs = $refProperty->getAttributes($staticClass::$fieldClass)) ? $fieldAttrs[0]->newInstance() : null;
+                $propertyInstance->applyProperties($staticClass, $refProperty, $validatorInstances, $fieldInstance);
+            }
+        }
+        self::$properties[$staticClass] = $properties ?? [];
+    }
+
+    /**
      * 取实例类的模型属性实例表
      * @return Property[]
      */
     protected static function getProperties(): array {
-        if (! key_exists(static::class, self::$properties)) {
-            $refClass = new ReflectionClass(static::class);
-            $refProperties = $refClass->getProperties(ReflectionProperty::IS_PUBLIC);
-            foreach ($refProperties as $refProperty) {
-                if ($attributes = $refProperty->getAttributes(Property::class)) {
-                    $properties[$refProperty->name] = $propertyInstance = $attributes[0]->newInstance();
-                    $validatorInstances = [];
-                    foreach ($refProperty->getAttributes(Validator::class) as $ruleProperty) {
-                        $validatorInstances[] = $ruleProperty->newInstance()->setProperty($propertyInstance);
-                    }
-                    $fieldInstance = isset(static::$fieldClass) && ($fieldAttrs = $refProperty->getAttributes(static::$fieldClass)) ? $fieldAttrs[0]->newInstance() : null;
-                    $propertyInstance->applyProperties(static::class, $refProperty, $validatorInstances, $fieldInstance);
-                }
-            }
-            self::$properties[static::class] = $properties ?? [];
-        }
         return self::$properties[static::class];
     }
 
@@ -184,7 +189,7 @@ abstract class Model implements ArrayAccess {
     public function callGetter(string $name, bool $throwable = false): mixed {
         $methodName = 'get' . Char::camelize($name, true);
         if ($throwable && ! method_exists($this, $methodName)) {
-            throw new ModelException("未定义属性 {$name} 对应的getter方法");
+            throw (new ModelException(ModelException::GETTER_UNDEFINED))->format($name);
         }
         return $this->$methodName();
     }

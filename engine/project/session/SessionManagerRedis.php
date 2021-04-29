@@ -4,10 +4,9 @@
  * Date: 2021-02-23 22:12
  */
 
-namespace dce\project\request;
+namespace dce\project\session;
 
 use dce\storage\redis\DceRedis;
-use Iterator;
 
 class SessionManagerRedis extends SessionManager {
     private const TTL = 259200; // 秒内未主动删除的将自动过期
@@ -152,7 +151,7 @@ class SessionManagerRedis extends SessionManager {
      */
     protected function setMemberForm(int $mid , string|array|null $fdids = null , string|null $sid = null): void {
         if (! $sid && ! $fdids) {
-            throw new SessionException("未指定要绑定给SessionForm {$mid} 的sid或fdid");
+            throw (new SessionException(SessionException::EMPTY_FORM_PARAMETERS))->format($mid);
         }
         $redis = DceRedis::get(self::$config['manager_index']);
         $form = $redis->hGetAll(self::MID_PREFIX . $mid);

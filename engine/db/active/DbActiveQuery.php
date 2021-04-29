@@ -164,7 +164,7 @@ class DbActiveQuery extends ActiveQuery {
         }
         $activeQueryRelation = $this->activeRecord->callGetter($relationName);
         if (! $activeQueryRelation instanceof ActiveRelation) {
-            throw new ActiveException("关系名 {$relationName} 无效");
+            throw (new ActiveException(ActiveException::RELATION_NAME_INVALID))->format($relationName);
         }
         // 将靠近主体的关系压入表头, 方便推出多级关联数据
         array_unshift($viaRelationQueue, [$relationName, $activeQueryRelation]);
@@ -180,7 +180,7 @@ class DbActiveQuery extends ActiveQuery {
         foreach ($relationMapping as $foreignKey => $relationKey) {
             $relationWhereParams = array_column($conditionRelationData, $activeQueryRelation->getActiveQuery()->activeRecord::toModelKey($relationKey));
             if (! $relationWhereParams) {
-                throw new ActiveException("{$relationName} 关联getter方法未包含 {$foreignKey} 为键的数据");
+                throw (new ActiveException(ActiveException::NO_FOREIGN_IN_VIA_GETTER))->format($relationName, $foreignKey);
             }
             // 取一条关联关系数据时允许用户设置limit:1以提升性能, 但如果通过with批量查的, 则不能limit了, 需要清除limit条件
             $activeQueryRelation->getActiveQuery()->where($foreignKey, 'in', $relationWhereParams)->limit(0);
@@ -198,7 +198,7 @@ class DbActiveQuery extends ActiveQuery {
      */
     public function each(): Iterator {
         if ($this->relationNames) {
-            throw new ActiveException("不支持按 with 方式的 each 操作");
+            throw new ActiveException(ActiveException::EACH_NO_SUPPORT_WITH);
         }
         $iterator = $this->query->each('*', false, function ($data) {
             if ($this->arrayify) {

@@ -29,14 +29,14 @@ class UniqueValidator extends TypeEnding {
             if (! empty($rows)) { // 如果找到了记录
                 if ($this->model->isCreateByQuery()) { // 如果创建自查询, 且如果查询到的数据大于两条, 或查出的主键与当前主键不同, 则表示有重复
                     if (count($rows) > 1 || ! empty(array_diff_assoc($rows[0]->getPkValues(), $this->model->getPkValues()))) {
-                        $this->addError($this->getGeneralError($combined->error ?? null, '{{label}}不能重复'));
+                        $this->addError($this->getGeneralError($combined->error ?? null, lang(ValidatorException::CANNOT_REPEAT)));
                     }
                 } else { // 如果非创建自查询, 则为插入, 则只要有查到即为重复的
-                    $this->addError($this->getGeneralError($combined->error ?? null, '{{label}}不能重复'));
+                    $this->addError($this->getGeneralError($combined->error ?? null, lang(ValidatorException::CANNOT_REPEAT)));
                 }
             }
         } else {
-            $this->addError('当前模型不支持唯一值校验');
+            $this->addError(lang(ValidatorException::NOT_SUPPORT_UNIQUE));
         }
 
         return $this->getError();

@@ -186,7 +186,7 @@ final class IdGenerator {
     private function register(string $tag): IdgBatch {
         $batch = $this->request->register($tag);
         if (! $batch) {
-            throw new IdgException("服务端未配置 {$tag} 标签");
+            throw (new IdgException(IdgException::TAG_CONFIG_MISSING_IN_SERVER))->format($tag);
         }
         $batch->batchId = $batch->batchFrom;
         $batch->batchApplyTime = time();

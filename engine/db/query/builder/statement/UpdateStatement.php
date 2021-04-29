@@ -63,20 +63,20 @@ class UpdateStatement extends StatementAbstract {
 
     protected function valid(): void {
         if ($this->tableSchema->isEmpty()) {
-            throw new QueryException('未配置更新表', 1);
+            throw new QueryException(QueryException::UPDATE_TABLE_NOT_SPECIFIED);
         }
         if ($this->updateSchema->isEmpty()) {
-            throw new QueryException('未传入更新数据', 1);
+            throw new QueryException(QueryException::NO_UPDATE_DATA);
         }
         if ((count($this->tableSchema->getConditions()) > 1 || ! $this->joinSchema->isEmpty()) && ! ($this->orderSchema->isEmpty() && $this->limitSchema->isEmpty())) {
-            throw new QueryException('多表无法排序更新指定条数', 1);
+            throw new QueryException(QueryException::CANNOT_UPDATE_WITH_MULTIPLE_SORTED_TABLE);
         }
         if (! $this->allowEmptyConditionOrMustEqual) {
             if ($this->whereSchema->isEmpty()) {
-                throw new QueryException('当前设置不允许空条件更新全表', 1);
+                throw new QueryException(QueryException::EMPTY_UPDATE_FULL_NOT_ALLOW);
             }
             if (false === $this->allowEmptyConditionOrMustEqual && ! $this->whereSchema->hasEqual()) {
-                throw new QueryException('当前设置不允许无等于条件更新数据', 1);
+                throw new QueryException(QueryException::NO_EQUAL_UPDATE_NOT_ALLOW);
             }
         }
     }

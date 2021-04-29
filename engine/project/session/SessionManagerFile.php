@@ -4,10 +4,9 @@
  * Date: 2020/4/26 1:41
  */
 
-namespace dce\project\request;
+namespace dce\project\session;
 
 use dce\Dce;
-use Iterator;
 
 class SessionManagerFile extends SessionManager {
     private const FDID_MAPPING_KEY = 'session-manager-fdid';
@@ -119,7 +118,7 @@ class SessionManagerFile extends SessionManager {
      */
     protected function setMemberForm(int $mid, string|array|null $fdids = null, string|null $sid = null): void {
         if (! $sid && ! $fdids) {
-            throw new SessionException("未指定要绑定给SessionForm {$mid} 的sid或fdids");
+            throw (new SessionException(SessionException::EMPTY_FORM_PARAMETERS))->format($mid);
         }
         $mapping = Dce::$cache->file->get(self::MID_MAPPING_KEY) ?: [];
         if ($sid && ! in_array($sid, $mapping[$mid]['sid'] ?? [])) {

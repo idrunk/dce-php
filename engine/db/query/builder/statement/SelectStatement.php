@@ -90,7 +90,7 @@ class SelectStatement extends StatementAbstract {
 
     protected function valid(): void {
         if ($this->selectSchema->isEmpty()) {
-            throw new QueryException('无效查询语句, 缺少查询字段', 1);
+            throw new QueryException(QueryException::SELECT_COLUMN_MISSED);
         }
     }
 }

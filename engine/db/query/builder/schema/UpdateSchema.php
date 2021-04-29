@@ -20,7 +20,7 @@ class UpdateSchema extends SchemaAbstract {
         foreach ($this->columns as $k=>$column) {
             $columnName = self::tableWrap($column);
             if (!$columnName) {
-                throw new QueryException("字段{$column}非法");
+                throw (new QueryException(QueryException::COLUMN_INVALID))->format($column);
             }
             $this->columns[$k] = $columnName;
         }

@@ -72,7 +72,7 @@ class ShardingConfig extends Config implements ConfigLibInterface {
         foreach ($data as $alias => $config) {
             $config['type'] = strtolower($config['type'] ?? null);
             if (! in_array($config['type'], [self::TYPE_MODULO, self::TYPE_RANGE])) {
-                throw new MiddlewareException("分库配置错误, 分库类型异常或未配置");
+                throw new MiddlewareException(MiddlewareException::CONFIG_SHARDING_TYPE_INVALID);
             }
             if (self::TYPE_MODULO === $config['type']) {
                 $config['modulus'] = count($config['mapping']);
@@ -89,7 +89,7 @@ class ShardingConfig extends Config implements ConfigLibInterface {
                 } else if (is_string($tableConfig['id_column'])) {
                     $tableConfig['id_column'] = ['name' => $tableConfig['id_column'], 'tag' => $tableConfig['id_column']];
                 } else if (! isset($tableConfig['id_column']['name']) || ! isset($tableConfig['id_column']['tag'])) {
-                    throw new MiddlewareException("分库配置 {$alias} > {$tableName} > id_column 异常");
+                    throw (new MiddlewareException(MiddlewareException::CONFIG_ID_COLUMN_INVALID))->format($alias, $tableName);
                 }
                 // 若未配置ID字段, 则将不主动生成ID, 分库将仅以sharding_column字段划分
                 if (! isset($tableConfig['sharding_column'])) {
@@ -97,10 +97,10 @@ class ShardingConfig extends Config implements ConfigLibInterface {
                 } else if (is_string($tableConfig['sharding_column'])) {
                     $tableConfig['sharding_column'] = ['name' => $tableConfig['sharding_column'], 'tag' => $tableConfig['sharding_column']];
                 } else if (! isset($tableConfig['sharding_column']['name']) || ! isset($tableConfig['sharding_column']['tag'])) {
-                    throw new MiddlewareException("分库配置 {$alias} > {$tableName} > sharding_column 异常");
+                    throw (new MiddlewareException(MiddlewareException::CONFIG_SHARDING_COLUMN_INVALID))->format($alias, $tableName);
                 }
                 if (! $tableConfig['id_column']['name'] && ! $tableConfig['sharding_column']['name']) {
-                    throw new MiddlewareException("分库配置错误, 未配置{$tableName}表内容切分依据字段");
+                    throw (new MiddlewareException(MiddlewareException::CONFIG_TABLE_SHARDING_RULE_EMPTY))->format($tableName);
                 }
 
                 $tableConfig['id_sharding_column'] = $tableConfig['id_column']['name'] ? $tableConfig['id_column'] : $tableConfig['sharding_column'];

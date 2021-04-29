@@ -94,7 +94,7 @@ class Config implements ArrayAccess {
             }
             $valueRoot = Structure::arrayAssign($this->dynamics[$key], $keyArray, $value);
             if (! $valueRoot) {
-                throw new ConfigException('配置迭代赋值出错');
+                throw new ConfigException(ConfigException::ITERATION_ASSIGNMENT_ERROR);
             }
             $this->dynamics[$key] = $valueRoot;
         }
@@ -127,7 +127,7 @@ class Config implements ArrayAccess {
                 if (false !== $valueObjectArray) {
                     $value = $valueObjectArray;
                 } else if (! $valueIsArray && ! $value instanceof ArrayAccess) {
-                    throw new ConfigException(sprintf("配置 %s 非法", $key));
+                    throw (new ConfigException(ConfigException::CONFIG_ITEM_ERROR))->format($key);
                 }
                 if ($typeIsConfig) {
                     // 当配置已实例化过且新的配置为数组时, 则为扩展配置, 否则为替换配置

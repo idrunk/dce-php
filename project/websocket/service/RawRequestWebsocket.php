@@ -16,6 +16,9 @@ class RawRequestWebsocket extends RawRequestConnection {
 
     private Frame $frame;
 
+    /** @var array Websocket的cookie是在open时缓存的, 在请求中是只读的 */
+    public array $cookie;
+
     public function __construct(WebsocketServer $server, Frame $frame) {
         $this->websocketServer = $server;
         $this->frame = $frame;
@@ -50,6 +53,7 @@ class RawRequestWebsocket extends RawRequestConnection {
         if (is_array($this->dataParsed)) {
             $request->request = $this->dataParsed;
         }
+        $this->cookie = Dce::$cache->var->get(['cookie', $request->fd]) ?: [];
         $request->session = Dce::$cache->var->get(['session', $request->fd]);
     }
 

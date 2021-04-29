@@ -23,7 +23,7 @@ class RedisConnector {
             ? ! $this->redis->pconnect($config['host'], $config['port'], 3)
             : ! $this->redis->connect($config['host'], $config['port'], 3)
         ) {
-            throw new PoolException('生成连接实例失败, 无法连接到Redis服务');
+            throw new PoolException(PoolException::CONNECT_REDIS_FAILED);
         }
         if ($config['index'] > 0) {
             $this->redis->select($config['index']);

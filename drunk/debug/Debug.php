@@ -53,7 +53,7 @@ final class Debug {
                 self::END_LOG => LogDebug::class,
             };
         } catch (Throwable) {
-            throw new DebugException("无效终端名{$endName}");
+            throw (new DebugException(DebugException::INVALID_END))->format($endName);
         }
         return $this;
     }
@@ -91,7 +91,7 @@ final class Debug {
     public function storage(string|DebugStorage|null $storage, string $root = ''): self {
         if (is_string($storage)) {
             if (! $root && ! $root = $storage === self::STORAGE_FILE ? Dce::$config->debug['file_root'] : Dce::$config->debug['url_root']) {
-                throw new DebugException('储存路径无效');
+                throw new DebugException(DebugException::INVALID_STORAGE_PATH);
             }
             try {
                 $storage = match ($storage) {
@@ -99,7 +99,7 @@ final class Debug {
                     self::STORAGE_HTTP => new HttpStorage($root),
                 };
             } catch (Throwable) {
-                throw new DebugException("储存引擎名 {$storage} 无效");
+                throw (new DebugException(DebugException::INVALID_STORAGE_NAME))->format($storage);
             }
         }
         $this->logStorage = $storage;

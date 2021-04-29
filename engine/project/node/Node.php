@@ -158,7 +158,7 @@ class Node {
      */
     private function init(array $properties, string $projectName): array {
         if (! isset($properties['path'])) {
-            throw new NodeException('节点配置缺少path属性');
+            throw new NodeException(NodeException::NODE_PATH_MISSION);
         }
         $idGene = $properties['path_format'] = $properties['path'];
         if (0 !== stripos($idGene, $projectName)) {
@@ -171,7 +171,7 @@ class Node {
             }
             array_walk($properties['methods'], function (& $method) {
                 if (! is_string($method)) {
-                    throw new NodeException('Methods必须为字符串数组, 如["get", "post"]');
+                    throw new NodeException(NodeException::NODE_METHODS_NEED_ARRAY);
                 }
                 // 若有指定请求类型, 则小写处理, 否则为开放式(即url匹配到即可, 不对请求类型作路由匹配)
                 $method = strtolower($method);

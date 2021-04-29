@@ -96,11 +96,11 @@ final class IdgServer {
         if (! key_exists($tag, $configs)) {
             $configPath = $this->configDir . "/{$tag}.php";
             if (! is_file($configPath)) {
-                throw new IdgException("请先配置 {$configPath}");
+                throw (new IdgException(IdgException::CONFIG_ITEM_MISSING))->format($configPath);
             }
             $configs[$tag] = IdgBatch::new()->setProperties(include($configPath));
             if (! in_array($configs[$tag]->type ?? 0, ['increment', 'time'])) {
-                throw new IdgException("配置文件 {$configPath} 或 type 属性错误");
+                throw (new IdgException(IdgException::PROPERTY_MAY_TYPE_ERROR))->format($configPath);
             }
         }
         return $configs[$tag];

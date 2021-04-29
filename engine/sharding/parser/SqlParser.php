@@ -49,7 +49,7 @@ abstract class SqlParser extends StatementParser {
         }
         if (! $isClosed) {
             $string = mb_substr($string, 0, 10);
-            throw new StatementParserException("字符串'{$string}'未闭合");
+            throw (new StatementParserException(StatementParserException::STRING_UNCLOSE))->format($string);
         }
         $this->offset ++;
         return $string;

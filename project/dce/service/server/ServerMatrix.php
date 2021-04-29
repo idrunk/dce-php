@@ -8,9 +8,11 @@ namespace dce\service\server;
 
 use dce\config\DceConfig;
 use dce\Dce;
-use dce\project\request\Request as DceRequest;
-use dce\project\request\Session;
-use dce\project\request\SessionManager;
+use dce\i18n\Language;
+use dce\loader\StaticInstance;
+use dce\project\request\RequestManager;
+use dce\project\session\Session;
+use dce\project\session\SessionManager;
 use dce\rpc\RpcClient;
 use dce\rpc\RpcServer;
 use http\service\RawRequestHttpSwoole;
@@ -22,7 +24,9 @@ use tcp\service\RawRequestTcp;
 use tcp\service\RawRequestUdp;
 use Throwable;
 
-abstract class ServerMatrix {
+abstract class ServerMatrix implements StaticInstance {
+    protected static Language|array $langStarted = ["%s 服务器已启动于 %s:%s.\n", "%s server started with %s:%s.\n"];
+
     /** @var string SessionManager FdForm Tcp fd标记 */
     public const SM_EXTRA_TCP = 'tcp';
 
@@ -158,8 +162,7 @@ abstract class ServerMatrix {
     protected function takeoverRequest(Request $request, Response $response): void {
         $rawRequest = new static::$rawRequestHttpClass($this, $request, $response);
         $rawRequest->init();
-        $dceRequest = new DceRequest($rawRequest);
-        $dceRequest->route();
+        RequestManager::route($rawRequest);
     }
 
     /**
@@ -173,8 +176,7 @@ abstract class ServerMatrix {
     protected function takeoverReceive(Server $server, int $fd, int $reactorId, string $data): void {
         $rawRequest = new static::$rawRequestTcpClass($this, $data, $fd, $reactorId);
         $rawRequest->init();
-        $request = new DceRequest($rawRequest);
-        $request->route();
+        RequestManager::route($rawRequest);
     }
 
     /**
@@ -187,8 +189,7 @@ abstract class ServerMatrix {
     protected function takeoverPacket(Server $server, string $data, array $clientInfo): void {
         $rawRequest = new static::$rawRequestUdpClass($this, $data, $clientInfo);
         $rawRequest->init();
-        $request = new DceRequest($rawRequest);
-        $request->route();
+        RequestManager::route($rawRequest);
     }
 
     /**
@@ -201,6 +202,7 @@ abstract class ServerMatrix {
         $this->eventOnClose($server, $fd, $reactorId);
         SessionManager::inst()->disconnect($fd, $this->apiHost, $this->apiPort);
         Dce::$cache->var->del(['session', $fd]);
+        Dce::$cache->var->del(['cookie', $fd]);
     }
 
     /**

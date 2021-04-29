@@ -18,7 +18,7 @@ class HttpServerController extends Controller {
     public function __init(): void {
         $serverClass = $this->request->config->http['service'] ?? '';
         if (! is_a($serverClass, HttpServer::class, true)) {
-            throw new ConfigException('http.service配置非有效WebsocketService类');
+            throw new ConfigException(ConfigException::HTTP_SERVICE_INVALID);
         }
         // 在这里初始化是因为需要准备RpcClient
         $this->server = new $serverClass();

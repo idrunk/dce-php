@@ -6,12 +6,12 @@
 
 namespace dce\sharding\middleware;
 
-use Co;
 use dce\base\SwooleUtility;
 use dce\db\connector\DbConnector;
 use dce\db\connector\DbPool;
 use dce\db\proxy\Transaction;
 use dce\db\proxy\TransactionException;
+use dce\project\request\RequestManager;
 
 class ShardingTransaction extends Transaction {
     public const NO_SHARDING_ALIAS = 'no_sharding';
@@ -26,7 +26,7 @@ class ShardingTransaction extends Transaction {
         private string $shardingAlias,
     ) {
         parent::__construct();
-        $this->requestId = self::genRequestId();
+        $this->requestId = RequestManager::currentId();
         // mark 这玩意儿大概单独做成延时任务比较好
         $this->clearExpired();
     }
@@ -34,7 +34,7 @@ class ShardingTransaction extends Transaction {
     /** @inheritDoc */
     protected function envValid(): void {
         if (! SwooleUtility::inCoroutine()) {
-            throw new TransactionException('TransactionSharding仅支持协程环境');
+            throw new TransactionException(TransactionException::NEED_RUN_IN_COROUTINE);
         }
     }
 
@@ -53,24 +53,12 @@ class ShardingTransaction extends Transaction {
     }
 
     /**
-     * 取请求ID
-     * @return int
-     */
-    private static function genRequestId(): int {
-        $requestId = Co::getCid();
-        while (($pcid = Co::getPcid($requestId)) > 0) {
-            $requestId = $pcid;
-        }
-        return $requestId;
-    }
-
-    /**
      * 按请求ID与库名匹配事务实例
      * @param string $shardingAlias
      * @return static|null
      */
     private static function aliasMatch(string $shardingAlias): self|null {
-        $requestId = self::genRequestId();
+        $requestId = RequestManager::currentId();
         foreach (self::$pond as $transaction) {
             if ($transaction->requestId === $requestId && $transaction->shardingAlias === $shardingAlias) {
                 return $transaction;
@@ -92,7 +80,7 @@ class ShardingTransaction extends Transaction {
             if (isset($transaction->connector)) {
                 if ($transaction->dbAlias !== $dbAlias) {
                     $transaction->rollback();
-                    throw new TransactionException('不支持跨分库事务');
+                    throw new TransactionException(TransactionException::NOT_SUPPORT_SHARDING_TRANSACTION);
                 }
             } else {
                 $connector = $dbPool->fetch();

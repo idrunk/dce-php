@@ -91,7 +91,7 @@ class ActiveRelation {
      */
     public function getMapping(): array {
         if (null === $this->relationMapping) {
-            throw new ActiveException("未设置有效的映射关系");
+            throw new ActiveException(ActiveException::NO_RELATION_MAPPING);
         }
         return $this->relationMapping;
     }
@@ -143,7 +143,7 @@ class ActiveRelation {
         } else {
             foreach ($relationMapping as $slavePrimaryKey => $foreignKey) {
                 if (! $this->refActiveRecord->getProperty($foreignKey)) {
-                    throw new ActiveException("当前模型未包含 {$foreignKey} 属性");
+                    throw (new ActiveException(ActiveException::RELATION_MODEL_HAVE_NO_FOREIGN))->format($foreignKey);
                 }
                 $where[] = [$slavePrimaryKey, '=', $this->refActiveRecord->$foreignKey];
             }

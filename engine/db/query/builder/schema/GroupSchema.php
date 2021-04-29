@@ -26,7 +26,7 @@ class GroupSchema extends SchemaAbstract {
             } else if (is_string($column) && $column = self::tableWrap($column)) {
                 $this->pushCondition($column);
             } else {
-                throw new QueryException("分组字段\"".self::printable($column)."\"无效", 1);
+                throw (new QueryException(QueryException::GROUP_COLUMN_INVALID))->format(self::printable($column));
             }
         }
     }

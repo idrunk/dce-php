@@ -185,7 +185,7 @@ final class RpcUtility {
      */
     private static function getPackFormat(int $bitWidth): string {
         if ($bitWidth < 1 || $bitWidth > 64) {
-            throw new RpcException("无效包长");
+            throw new RpcException(RpcException::INVALID_PACKAGE_LENGTH);
         } else if ($bitWidth > 32) {
             return 'P';
         } else if ($bitWidth > 16) {
@@ -250,14 +250,14 @@ final class RpcUtility {
             $maxBitIndex = max(array_column($pack, 1));
             $byteLength = ceil($maxBitIndex / 8);
             if ($byteLength > 8) {
-                throw new RpcException('定义包过长');
+                throw new RpcException(RpcException::PACKAGE_TOO_LONG);
             }
             foreach ($pack as $k2 => $unit) {
                 if (is_int($unit)) {
                     $unit = [$unit, $unit, self::FORMATTER_DIRECT];
                 } else if (is_array($unit)) {
                     if (! isset($unit[0])) {
-                        throw new RpcException("formatter未定义");
+                        throw new RpcException(RpcException::FORMATTER_MISSING);
                     } else if (! isset($unit[1])) {
                         $unit[1] = $unit[0];
                     }
@@ -265,7 +265,7 @@ final class RpcUtility {
                         $unit[2] = self::FORMATTER_DIRECT;
                     }
                 } else {
-                    throw new RpcException("formatter类型非法");
+                    throw new RpcException(RpcException::FORMATTER_TYPE_INVALID);
                 }
                 $formatter[$k][$k2] = $unit;
             }
@@ -310,13 +310,13 @@ final class RpcUtility {
     public static function hostsFormat(array $hosts): array {
         $firstKey = array_key_first($hosts);
         if (null === $firstKey) {
-            throw new RpcException('RpcHosts为空');
+            throw new RpcException(RpcException::EMPTY_RPC_HOSTS);
         }
         if (0 !== $firstKey) {
             $hosts = [$hosts];
         }
         if (! isset($hosts[0]['host']) || ! isset($hosts[0]['port'])) {
-            throw new RpcException('无效RpcHosts配置');
+            throw new RpcException(RpcException::INVALID_RPC_HOSTS);
         }
         return $hosts;
     }

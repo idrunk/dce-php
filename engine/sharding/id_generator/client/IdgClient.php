@@ -154,7 +154,7 @@ abstract class IdgClient {
             $this->applyErrorCount ++;
             if ($this->applyErrorCount > self::MAX_ERROR_APPLY_COUNT) {
                 // 如果超出申请失败次数, 则抛出异常
-                throw new IdgException('申请ID种子失败');
+                throw new IdgException(IdgException::BASE_ID_GENERATE_FAILED);
             }
             return $this->applyBatch();
         }
@@ -179,10 +179,10 @@ abstract class IdgClient {
      */
     protected static function checkBatchIntegrity(IdgBatch $batch): void {
         if (! isset($batch->batchFrom)) {
-            throw new IdgException("从服务端申请的批次起始值异常");
+            throw new IdgException(IdgException::APPLIED_BATCH_FROM_INVALID);
         }
         if (! isset($batch->batchTo)) {
-            throw new IdgException("从服务端申请的批次截止值异常");
+            throw new IdgException(IdgException::APPLIED_BATCH_TO_INVALID);
         }
     }
 

@@ -31,10 +31,10 @@ class InsertSelectStatement extends StatementAbstract {
 
     protected function valid(): void {
         if ($this->tableSchema->isEmpty()) {
-            throw new QueryException('未配置插入表', 1);
+            throw new QueryException(QueryException::INSERT_TABLE_NOT_SPECIFIED);
         }
         if ($this->insertSelectSchema->isEmpty()) {
-            throw new QueryException('未配置select查询实体', 1);
+            throw new QueryException(QueryException::SELECT_TABLE_NOT_SPECIFIED);
         }
     }
 }

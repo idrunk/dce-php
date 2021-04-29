@@ -4,7 +4,7 @@
  * Date: 2019-1-21 21:40
  */
 
-namespace dce\project\request;
+namespace dce\project\session;
 
 class CookieCgi extends Cookie {
     /** @inheritDoc */

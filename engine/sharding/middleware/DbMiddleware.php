@@ -173,7 +173,7 @@ class DbMiddleware extends Middleware {
             return [];
         }
         if (! $this->shardingConfig->crossUpdate) {
-            throw new MiddlewareException('禁止更新分库依据字段，若允许请开启 cross_update 参数。该操作较危险，请谨慎。（建议自己实现跨库迁移功能）');
+            throw new MiddlewareException(MiddlewareException::OPEN_CROSS_UPDATE_TIP);
         }
         $insertDataMapping = $deleteIdsMapping = [];
         $dataToUpdate = (new Query($this->dbProxy))->table($statement->getTableSchema())->where($statement->getWhereSchema())->select();
@@ -239,7 +239,7 @@ class DbMiddleware extends Middleware {
                 // 如果有配置分库字段, 则其亦为ID基因, 以基因生成ID, 方便与主体数据存入同一个库
                 if ($shardingName) {
                     if (! isset($datum[$shardingName])) {
-                        throw new MiddlewareException("分库配置错误, 未在储存数据中找到作为ID基因的字段 '{$shardingName}'");
+                        throw (new MiddlewareException(MiddlewareException::GENE_COLUMN_NOT_FOUND))->format($shardingName);
                     }
                     // 先用生成器脱壳
                     $geneId = Dce::$config->idGenerator->getClient($shardingTag)->extractGene($shardingTag, $datum[$shardingName]);
@@ -281,7 +281,7 @@ class DbMiddleware extends Middleware {
      */
     private static function dataSorting(array & $dbStoreData, string|null $dbAlias, int $id, array $datum): void {
         if (! $dbAlias) {
-            throw new QueryException("ID\"{$id}\"无法匹配到对应的分库, 数据无法完成插入");
+            throw (new QueryException(QueryException::ID_CANNOT_MATCH_DB))->format($id);
         }
         $dbStoreData[$dbAlias][] = $datum;
     }

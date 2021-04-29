@@ -6,7 +6,7 @@
 
 namespace http\service;
 
-use dce\project\request\Cookie;
+use dce\project\session\Cookie;
 
 class CookieSwoole extends Cookie {
     private RawRequestHttpSwoole $rawRequest;

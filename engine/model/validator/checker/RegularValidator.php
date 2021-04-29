@@ -18,12 +18,12 @@ class RegularValidator extends TypeChecker {
      * @return ValidatorException|null
      */
     protected function check(string|int|float|null|false $value):ValidatorException|null {
-        $regexp = $this->getProperty('regexp', '{{label}}未配置表达式');
+        $regexp = $this->getProperty('regexp', lang(ValidatorException::REGEXP_REQUIRED));
         if ($regexp) {
             if (! Char::isRegexp($regexp)) {
-                $this->addError('{{regexp}} 不是有效正则表达式');
+                $this->addError(lang(ValidatorException::INVALID_REGEXP));
             } else if (! preg_match($regexp->value, $value)) {
-                $this->addError($this->getGeneralError($regexp->error, '{{label}}输入不正确'));
+                $this->addError($this->getGeneralError($regexp->error, lang(ValidatorException::INVALID_INPUT)));
             }
         }
 
