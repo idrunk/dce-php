@@ -9,7 +9,7 @@ namespace dce\service\server;
 use dce\config\DceConfig;
 use dce\Dce;
 use dce\i18n\Language;
-use dce\loader\StaticInstance;
+use dce\loader\ClassDecorator;
 use dce\project\request\RequestManager;
 use dce\project\session\Session;
 use dce\project\session\SessionManager;
@@ -24,7 +24,7 @@ use tcp\service\RawRequestTcp;
 use tcp\service\RawRequestUdp;
 use Throwable;
 
-abstract class ServerMatrix implements StaticInstance {
+abstract class ServerMatrix implements ClassDecorator {
     protected static Language|array $langStarted = ["%s 服务器已启动于 %s:%s.\n", "%s server started with %s:%s.\n"];
 
     /** @var string SessionManager FdForm Tcp fd标记 */

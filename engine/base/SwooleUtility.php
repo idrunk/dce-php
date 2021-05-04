@@ -56,6 +56,7 @@ final class SwooleUtility {
      * @throws Exception
      */
     private static function processLocker(string|null $identification, int $maximum = 1): bool|null {
+        /** @var Table $lockerMap */
         static $lockerMap;
         if (null === $lockerMap) {
             self::rootProcessConstraint();
@@ -82,7 +83,13 @@ final class SwooleUtility {
                     $data += ['counter' => 0, 'maximum' => $maximum];
                 }
                 $lockerMap->set($identification, $data);
+                // 这里不能合在set中一起操作, 因为在get后可能别的并行程序已经改变了储存值
                 $lockerMap->incr($identification, 'counter');
+                // 在并行程序中, 可能不同的程序同时取得相同key值, 该值小于锁定上限(即同时取到锁), 所以需要在取到锁后重新校验锁的有效性, 若无效则还原锁定值并返回false
+                if ($lockerMap->get($identification)['counter'] > $counter + 1) {
+                    $lockerMap->decr($identification, 'counter');
+                    return false;
+                }
                 // 锁定时返回true
                 return true;
             }

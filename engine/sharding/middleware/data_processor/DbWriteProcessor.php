@@ -6,9 +6,12 @@
 
 namespace dce\sharding\middleware\data_processor;
 
+use dce\sharding\middleware\MiddlewareException;
+
 class DbWriteProcessor extends DataProcessor {
     public function queryGetInsertId(): int|string {
-        return $this->sourceData[0] ?? 0;
+        ! isset($this->sourceData[0]) && throw new MiddlewareException(MiddlewareException::INSERT_FAILED_NO_ID);
+        return $this->sourceData[0];
     }
 
     public function queryGetAffectedCount(): int {

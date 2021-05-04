@@ -20,6 +20,7 @@ use dce\sharding\middleware\data_processor\DbReadProcessor;
 use dce\sharding\middleware\data_processor\DbWriteProcessor;
 use Iterator;
 use Swoole\Coroutine\Barrier;
+use Throwable;
 
 class DbMiddleware extends Middleware {
     private ShardingConfig $shardingConfig;
@@ -52,15 +53,21 @@ class DbMiddleware extends Middleware {
             if (SwooleUtility::inSwoole()) {
                 // Swoole环境则并发查询分库 (不做什么分离设计了, 直接放这直观方便)
                 $barrier = Barrier::make();
+                $throw = null;
                 foreach ($dbMapping as $dbAlias => $statementSet) {
-                    go(function () use ($statementSet, $dbAlias, $isWrite, $barrier) {
-                        // 同库不并发 (除了跨库更新的情况外, 当前查询不会拆为多条, 可以避免可能出现的并发问题)
-                        foreach ($statementSet as $statement) {
-                            $this->directDistribute($statement, $dbAlias, $isWrite);
+                    go(function () use ($statementSet, $dbAlias, $isWrite, $barrier, & $throw) {
+                        try {
+                            // 同库不并发 (除了跨库更新的情况外, 当前查询不会拆为多条, 可以避免可能出现的并发问题)
+                            foreach ($statementSet as $statement) {
+                                $this->directDistribute($statement, $dbAlias, $isWrite);
+                            }
+                        } catch (Throwable $throwable) {
+                            ! $throw && $throw = $throwable;
                         }
                     });
                 }
                 Barrier::wait($barrier);
+                $throw && throw $throw;
             } else {
                 foreach ($dbMapping as $dbAlias => $statementSet) {
                     foreach ($statementSet as $statement) {

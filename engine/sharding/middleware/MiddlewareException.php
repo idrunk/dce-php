@@ -36,4 +36,7 @@ class MiddlewareException extends Exception {
 
     #[Language(['禁止更新分库依据字段，若允许请开启 cross_update 参数。该操作较危险，请谨慎。（建议自己实现跨库迁移功能）'])]
     public const OPEN_CROSS_UPDATE_TIP = 1423;
+
+    #[Language(['记录插入失败，获取新ID失败'])]
+    public const INSERT_FAILED_NO_ID = 1424;
 }

@@ -46,10 +46,8 @@ final class NodeManager {
             // 如果缓存有效且开启了节点缓存, 则直接返回
             return;
         }
-        // 取全部项目节点配置文件
-        $projects = ProjectManager::getAll();
         $nodesFiles = $nodesFileList = [];
-        foreach ($projects as $k => $project) {
+        foreach (ProjectManager::getAll() as $project) {
             if (is_file($nodesFile = "{$project->path}config/nodes.php")) {
                 $nodesFileList[] = $nodesFiles[$project->name] = $nodesFile;
             } else {
