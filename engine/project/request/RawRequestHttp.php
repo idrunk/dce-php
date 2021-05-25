@@ -6,6 +6,7 @@
 
 namespace dce\project\request;
 
+use dce\base\Exception;
 use dce\Dce;
 use dce\project\node\Node;
 use dce\project\node\NodeManager;
@@ -121,6 +122,7 @@ abstract class RawRequestHttp extends RawRequest {
             $node = NodeManager::getNode(end($nodeIdFamily));
         } catch (Throwable $throwable) {
             if (! in_array($this->path, ['', '/'])) {
+                Exception::isHttp($throwable) && $this->status($throwable->getCode(), $throwable->getMessage());
                 throw $throwable;
             }
             if ($this->isAjax()) {

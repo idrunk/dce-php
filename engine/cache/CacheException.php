@@ -9,8 +9,8 @@ namespace dce\cache;
 use dce\base\Exception;
 use dce\i18n\Language;
 
-// 750-769
+// 1150-1169
 class CacheException extends Exception {
     #[Language(['%s 不支持 exists 方法', '%s not support exists method'])]
-    public const NOT_SUPPORT_EXISTS = 750;
+    public const NOT_SUPPORT_EXISTS = 1150;
 }

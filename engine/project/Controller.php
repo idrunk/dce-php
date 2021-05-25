@@ -6,7 +6,6 @@
 
 namespace dce\project;
 
-use dce\base\QuietException;
 use dce\project\render\Renderer;
 use dce\project\request\RawRequest;
 use dce\project\request\RawRequestHttp;
@@ -170,17 +169,20 @@ class Controller {
      * 快捷响应Http异常
      * @param int $code
      * @param string $reason
-     * @throws QuietException
      */
     public function httpException(int $code, string $reason = ''): void {
         static $statusMessageMapping = [
             '400' => 'Bad Request',
             '401' => 'Unauthorized',
             '403' => 'Forbidden',
-            '404' => '404 Not Found',
+            '404' => 'Not Found',
+            '500' => 'Internal Server Error',
+            '501' => 'Not Implemented',
+            '502' => 'Bad Gateway',
+            '503' => 'Service Unavailable',
         ];
-        $this->rawRequest->status($code, $reason ?: ($statusMessageMapping[$code] ?? ''));
-        throw new QuietException($statusMessageMapping[$code] ?? '', $code);
+        $this->rawRequest instanceof RawRequestHttp && $this->rawRequest->status($code, $reason ?: ($statusMessageMapping[$code] ?? ''));
+        $this->fail($reason, $code);
     }
 
     /**

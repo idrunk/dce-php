@@ -11,17 +11,14 @@ use dce\service\server\RawRequestConnection;
 use dce\service\server\ServerMatrix;
 
 class RawRequestUdp extends RawRequestConnection {
-    private ServerMatrix $server;
+    public string $method = 'udp';
 
-    private string $packet;
-
-    private array $clientInfo;
-
-    public function __construct(ServerMatrix $server, string $data, array $clientInfo) {
-        $this->server = $server;
-        $this->packet = $data;
-        $clientInfo['ip'] = $clientInfo['address'];
-        $this->clientInfo = $clientInfo;
+    public function __construct(
+        private ServerMatrix $server,
+        private string $packet,
+        private array $clientInfo,
+    ) {
+        $this->clientInfo['ip'] = $this->clientInfo['address'];
     }
 
     /** @inheritDoc */
@@ -36,7 +33,6 @@ class RawRequestUdp extends RawRequestConnection {
 
     /** @inheritDoc */
     public function init(): void {
-        $this->method = 'udp';
         ['path' => $path, 'data' => $rawData, 'dataParsed' => $dataParsed] = $this->unPack($this->packet);
         $this->path = $path;
         $this->rawData = $rawData;

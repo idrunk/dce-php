@@ -6,6 +6,7 @@
 
 namespace dce\project\request;
 
+use dce\base\Exception;
 use dce\base\QuietException;
 use dce\base\SwooleUtility;
 use dce\config\DceConfig;
@@ -20,6 +21,7 @@ use dce\project\session\Cookie;
 use dce\project\session\Session;
 use dce\rpc\DceRpcClient;
 use Swoole\Coroutine;
+use Throwable;
 
 class Request {
     /** @var RawRequest 原始请求对象, (用于全部类型请求) */
@@ -116,6 +118,7 @@ class Request {
     /**
      * 路由定位并执行控制器
      * @throws RequestException
+     * @throws Throwable
      */
     public function route(): void {
         Event::trigger(Event::BEFORE_REQUEST, $this->rawRequest);
@@ -143,10 +146,8 @@ class Request {
 
     /**
      * 项目引导预处理, (每个项目仅在第一次进入时执行)
-     * @throws RequestException
      */
     private function prepare(): void {
-        // 准备配置的Rpc服务
         DceRpcClient::prepare($this->project);
         if ($this->config->prepare) {
             call_user_func_array($this->config->prepare, [$this]);
@@ -156,6 +157,7 @@ class Request {
     /**
      * 解析并执行控制器方法
      * @throws RequestException
+     * @throws Throwable
      */
     private function controller(): void {
         // 解析控制器
@@ -190,14 +192,29 @@ class Request {
      * 执行控制器方法
      * @param string $class
      * @param string $method
+     * @throws Throwable
      */
     private function runController(string $class, string $method): void {
         try {
             Event::trigger(Event::BEFORE_CONTROLLER, $this);
+            /** @var Controller $controller */
             $controller = new $class($this);
             Event::trigger(Event::ENTERING_CONTROLLER, $controller);
             $controller->call($method);
             Event::trigger(Event::AFTER_CONTROLLER, $controller);
-        } catch (QuietException) {} // 拦截安静异常不抛出, 用于事件回调中抛出异常截停程序并且不抛出异常
+        } catch (QuietException) {
+            // 拦截安静异常不抛出, 用于事件回调中抛出异常截停程序并且不抛出异常（貌似没必要了？？）
+        } catch (Throwable $throwable) {
+            // 若非自动捕获异常，则直接抛出
+            ! $this->node->autoCatch && throw $throwable;
+            if (Exception::isHttp($throwable)) {
+                $controller->httpException($throwable->getCode(), $throwable->getMessage()); // 自动抛出Http状态码
+            } else {
+                // 如果是公开异常，则自动抛出到用户端，否则响应状态码为http500（或许该以日志记录500的，是否可写入PHP错误日志，或者自立Dce日志？？？）
+                Exception::isOpenly($throwable) ? $controller->exception($throwable) : $controller->httpException(500);
+            }
+            // 如果是cli模式，则打印异常到命令行
+            DCE_CLI_MODE && testPoint("Auto caught exception: {$throwable->getCode()}", $throwable->getMessage());
+        }
     }
 }

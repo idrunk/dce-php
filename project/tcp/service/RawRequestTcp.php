@@ -12,12 +12,14 @@ use dce\service\server\RawRequestConnection;
 use dce\service\server\ServerMatrix;
 
 class RawRequestTcp extends RawRequestConnection {
-    private ServerMatrix $server;
+    public string $method = 'tcp';
 
     private array $raw;
 
-    public function __construct(ServerMatrix $server, string $data, int $fd, int $reactor_id) {
-        $this->server = $server;
+    public function __construct(
+        private ServerMatrix $server,
+        string $data, int $fd, int $reactor_id,
+    ) {
         $this->raw = [
             'fd' => $fd,
             'reactor_id' => $reactor_id,
@@ -37,11 +39,7 @@ class RawRequestTcp extends RawRequestConnection {
 
     /** @inheritDoc */
     public function init(): void {
-        $this->method = 'tcp';
-        ['path' => $path, 'data' => $rawData, 'dataParsed' => $dataParsed] = $this->unPack($this->raw['data']);
-        $this->path = $path;
-        $this->rawData = $rawData;
-        $this->dataParsed = $dataParsed;
+        ['path' => $this->path, 'data' => $this->rawData, 'dataParsed' => $this->dataParsed] = $this->unPack($this->raw['data']);
     }
 
     /** @inheritDoc */

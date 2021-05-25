@@ -251,6 +251,10 @@ final class NodeManager {
                     // 继承hookCoroutine属性, 或根据enableCoroutine初始化
                     $node->hookCoroutine = $node->enableCoroutine;
                 }
+                if (! isset($node->autoCatch)) {
+                    // 继承autoCatch属性, 或初始化为true, 即自动捕获异常
+                    $node->autoCatch = $parentNode->autoCatch ?? true;
+                }
                 $node->isDir = $isDir;
             }
         });
@@ -293,7 +297,7 @@ final class NodeManager {
     /**
      * 根据节点ID取节点对象
      * @param string $id
-     * @return Node
+     * @return Node|null
      */
     public static function getNode(string $id): Node|null {
         $nodeTree = self::getTreeById($id);
@@ -336,7 +340,6 @@ final class NodeManager {
         static $hostTreeMapping;
         if (null === $hostTreeMapping) {
             $hostTreeMapping = [];
-            /** @var NodeTree $child */
             foreach (self::getRootTree()->children as $child) {
                 foreach ($child->nodes as $node) {
                     foreach ($node->projectHosts ?? [] as $nodeHost) {

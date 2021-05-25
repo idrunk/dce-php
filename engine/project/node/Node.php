@@ -82,6 +82,9 @@ class Node {
     /** @var bool 是否惰性匹配, (匹配到此及命中, 不再继续匹配剩余路径) */
     public bool $lazyMatch = false;
 
+    /** @var bool 是否自动捕获抛出异常 */
+    public bool $autoCatch = true;
+
     /** @var array 允许跨域的主机, 若配置了, 则自动允许所配的主机访问 {会被继承} */
     public array $corsOrigins;
 
@@ -96,32 +99,11 @@ class Node {
 
     /**
      * 节点类. 本类同时作为节点实体类与注解类, 仅作为实体类时才会被实例化, 作为注解类时仅用来提供IDE智能提示
-     * @param array|string|null $path 作为实体类时为节点属性表的数组
-     * @param string|array|null $methods 作为实体类时为项目名的字符串
-     * @param string|null $id
-     * @param string|null $name
-     * @param bool|null $enableCoroutine
-     * @param bool|null $hookCoroutine
-     * @param string|null $render
-     * @param string|null $templateLayout
-     * @param array|null $corsOrigins
-     * @param array|null $projectHosts
-     * @param int|null $apiCache
-     * @param bool|null $omissiblePath
-     * @param array|null $urlArguments
-     * @param bool|null $urlPlaceholder
-     * @param array|null $urlSuffix
-     * @param bool|null $lazyMatch
-     * @param string|null $http301
-     * @param string|null $http302
-     * @param string|null $jsonpCallback
-     * @param array|null $extra
-     * @param bool $controllerPath 是否为控制器根路径
      * @throws NodeException
      */
     public function __construct(
-        array|string|null $path = null,
-        string|array|null $methods = null,
+        array|string|null $path = null, // 作为实体类时为节点属性表的数组
+        string|array|null $methods = null, // 作为实体类时为项目名的字符串
         string|null $id = null,
         string|null $name = null,
         bool|null $enableCoroutine = null,
@@ -139,8 +121,9 @@ class Node {
         string|null $http301 = null,
         string|null $http302 = null,
         string|null $jsonpCallback = null,
+        bool|null $autoCatch = null,
         array|null $extra = null,
-        bool $controllerPath = false,
+        bool $controllerPath = false, // 是否为控制器根路径
     ) {
         if (is_array($path) && is_string($methods)) {
             $this->setProperties($this->init($path, $methods));

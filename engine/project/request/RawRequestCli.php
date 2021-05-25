@@ -10,6 +10,8 @@ use dce\project\node\Node;
 use dce\project\node\NodeManager;
 
 class RawRequestCli extends RawRequest {
+    public string $method = 'cli';
+
     private array $pureCli = [];
 
     private array $cli = [];
@@ -22,7 +24,6 @@ class RawRequestCli extends RawRequest {
 
     /** @inheritDoc */
     public function init(): void {
-        $this->method = 'cli';
         $this->path = $this->makeQueryPath();
     }
 

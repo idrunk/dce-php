@@ -8,5 +8,5 @@ namespace dce\service\server;
 
 use dce\base\Exception;
 
-// 670-699
+// 1070-1099
 class ConnectionException extends Exception {}

@@ -9,8 +9,8 @@ namespace websocket\service;
 use dce\base\Exception;
 use dce\i18n\Language;
 
-// 650-669
+// 1050-1069
 class WebsocketException extends Exception {
     #[Language(['$rawRequestWebsocketClass属性值非RawRequestConnection族类'])]
-    public const RAW_REQUEST_WEBSOCKET_CLASS_ERROR = 650;
+    public const RAW_REQUEST_WEBSOCKET_CLASS_ERROR = 1050;
 }

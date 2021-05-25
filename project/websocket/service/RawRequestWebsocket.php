@@ -12,24 +12,22 @@ use dce\service\server\RawRequestConnection;
 use Swoole\WebSocket\Frame;
 
 class RawRequestWebsocket extends RawRequestConnection {
-    private WebsocketServer $websocketServer;
-
-    private Frame $frame;
+    public string $method = 'websocket';
 
     /** @var array Websocket的cookie是在open时缓存的, 在请求中是只读的 */
     public array $cookie;
 
-    public function __construct(WebsocketServer $server, Frame $frame) {
-        $this->websocketServer = $server;
-        $this->frame = $frame;
-    }
+    public function __construct(
+        private WebsocketServer $server,
+        private Frame $frame,
+    ) {}
 
     /**
      * 取Websocket Service
      * @return WebsocketServer
      */
     public function getServer(): WebsocketServer {
-        return $this->websocketServer;
+        return $this->server;
     }
 
     /** @inheritDoc */
@@ -39,11 +37,7 @@ class RawRequestWebsocket extends RawRequestConnection {
 
     /** @inheritDoc */
     public function init(): void {
-        $this->method = 'websocket';
-        ['path' => $path, 'data' => $rawData, 'dataParsed' => $dataParsed] = $this->unPack($this->frame->data);
-        $this->path = $path;
-        $this->rawData = $rawData;
-        $this->dataParsed = $dataParsed;
+        ['path' => $this->path, 'data' => $this->rawData, 'dataParsed' => $this->dataParsed] = $this->unPack($this->frame->data);
     }
 
     /** @inheritDoc */
@@ -59,6 +53,6 @@ class RawRequestWebsocket extends RawRequestConnection {
 
     /** @inheritDoc */
     public function response(mixed $data, string|false $path): bool {
-        return $this->websocketServer->push($this->frame->fd, $data, $path);
+        return $this->server->push($this->frame->fd, $data, $path);
     }
 }
