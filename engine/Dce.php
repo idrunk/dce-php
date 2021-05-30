@@ -117,10 +117,7 @@ final class Dce {
         Event::trigger(Event::AFTER_DCE_INIT);
     }
 
-    /**
-     * 引导路由
-     * @throws project\request\RequestException
-     */
+    /** 引导路由 */
     public static function boot(): void {
         self::scan();
         if (2 !== self::$initState) {
@@ -128,8 +125,6 @@ final class Dce {
         }
         self::$initState = 3;
 
-        $rawRequest = DCE_CLI_MODE ? new RawRequestCli() : new RawRequestHttpCgi();
-        $rawRequest->init();
-        RequestManager::route($rawRequest);
+        Exception::callCatch([RequestManager::class, 'route'], DCE_CLI_MODE ? RawRequestCli::class : RawRequestHttpCgi::class);
     }
 }

@@ -8,6 +8,7 @@ namespace dce\project\request;
 
 use dce\base\SwooleUtility;
 use Swoole\Coroutine;
+use Throwable;
 use WeakReference;
 
 class RequestManager {
@@ -19,11 +20,15 @@ class RequestManager {
 
     /**
      * 实例化请求器并路由
-     * @param RawRequest $rawRequest
+     * @param string $rawRequestClass
+     * @param mixed ...$rawRequestParams
      * @return Request
      * @throws RequestException
+     * @throws Throwable
      */
-    public static function route(RawRequest $rawRequest): Request {
+    public static function route(string $rawRequestClass, mixed ... $rawRequestParams): Request {
+        $rawRequest = new $rawRequestClass(... $rawRequestParams);
+        $rawRequest->init();
         $request = new Request($rawRequest);
         self::logMapping($request);
         $request->route();

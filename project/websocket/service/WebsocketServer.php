@@ -6,6 +6,7 @@
 
 namespace websocket\service;
 
+use dce\base\Exception;
 use dce\Dce;
 use dce\project\ProjectManager;
 use dce\project\request\RequestManager;
@@ -17,7 +18,6 @@ use Swoole\Http\Request;
 use Swoole\Http\Response;
 use Swoole\WebSocket\Frame;
 use Swoole\WebSocket\Server;
-use Throwable;
 
 class WebsocketServer extends ServerMatrix {
     protected static string $localRpcHost = '/var/run/dce_websocket_api.sock';
@@ -66,39 +66,14 @@ class WebsocketServer extends ServerMatrix {
         }
         $this->eventBeforeStart($this->server);
 
-        $this->server->on('open', function (Server $server, Request $request) {
-            try {
-                $this->takeoverOpen($server, $request);
-            } catch (Throwable $throwable) {
-                $this->handleException($throwable);
-            }
-        });
+        $this->server->on('open', fn(Server $server, Request $request) => Exception::callCatch(fn() => $this->takeoverOpen($server, $request)));
 
-        $this->server->on('message', function (Server $server, Frame $frame) {
-            try {
-                $this->takeoverMessage($server, $frame);
-            } catch (Throwable $throwable) {
-                $this->handleException($throwable);
-            }
-        });
+        $this->server->on('message', fn(Server $server, Frame $frame) => Exception::callCatch(fn() => $this->takeoverMessage($server, $frame)));
 
-        $this->server->on('close', function (Server $server, int $fd, int $reactorId) {
-            // 不仅websocket的close会进到这里, http以及一个疑似ws握手的连接close也会进来.
-            try {
-                $this->takeoverClose($server, $fd, $reactorId);
-            } catch (Throwable $throwable) {
-                $this->handleException($throwable);
-            }
-        });
+        $this->server->on('close', fn(Server $server, int $fd, int $reactorId) => Exception::callCatch(fn() => $this->takeoverClose($server, $fd, $reactorId)));
 
         if ($websocketConfig['enable_http'] ?? false) {
-            $this->server->on('request', function (Request $request, Response $response) {
-                try {
-                    $this->takeoverRequest($request, $response);
-                } catch (Throwable $throwable) {
-                    $this->handleException($throwable);
-                }
-            });
+            $this->server->on('request', fn(Request $request, Response $response) => Exception::callCatch(fn() => $this->takeoverRequest($request, $response)));
         }
 
         // 扩展自定义的Swoole Server事件回调
@@ -133,12 +108,9 @@ class WebsocketServer extends ServerMatrix {
      * 让DCE接管Websocket消息
      * @param Server $server
      * @param Frame $frame
-     * @throws \dce\project\request\RequestException
      */
     private function takeoverMessage(Server $server, Frame $frame): void {
-        $rawRequest = new static::$rawRequestWebsocketClass($this, $frame);
-        $rawRequest->init();
-        RequestManager::route($rawRequest);
+        Exception::callCatch([RequestManager::class, 'route'], static::$rawRequestWebsocketClass, $this, $frame);
     }
 
     /**

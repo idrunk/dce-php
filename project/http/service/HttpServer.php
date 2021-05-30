@@ -6,13 +6,13 @@
 
 namespace http\service;
 
+use dce\base\Exception;
 use dce\project\ProjectManager;
 use dce\project\request\RawRequestHttp;
 use dce\service\server\ServerMatrix;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
 use Swoole\Http\Server;
-use Throwable;
 
 class HttpServer extends ServerMatrix {
     protected static string $localRpcHost = '/var/run/dce_http_api.sock';
@@ -51,13 +51,7 @@ class HttpServer extends ServerMatrix {
         }
         $this->eventBeforeStart($this->server);
 
-        $this->server->on('request', function (Request $request, Response $response) {
-            try {
-                $this->takeoverRequest($request, $response);
-            } catch (Throwable $throwable) {
-                $this->handleException($throwable);
-            }
-        });
+        $this->server->on('request', fn(Request $request, Response $response) => Exception::callCatch(fn() => $this->takeoverRequest($request, $response)));
 
         // 扩展自定义的Swoole Server事件回调
         foreach ($swooleHttpEvents as $eventName => $eventCallback) {

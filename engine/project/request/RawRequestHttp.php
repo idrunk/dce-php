@@ -6,8 +6,6 @@
 
 namespace dce\project\request;
 
-use dce\base\Exception;
-use dce\Dce;
 use dce\project\node\Node;
 use dce\project\node\NodeManager;
 use Throwable;
@@ -88,10 +86,6 @@ abstract class RawRequestHttp extends RawRequest {
     final public function init(): void {
         $this->initProperties();
         $this->path = $this->getPath();
-        if (in_array($this->requestUri, Dce::$config->blockPaths)) {
-            $this->status(404, 'Not Found');
-            throw (new RequestException(RequestException::PATH_WAS_BLOCKED))->format($this->requestUri);
-        }
     }
 
     /**
@@ -121,10 +115,8 @@ abstract class RawRequestHttp extends RawRequest {
             // 当前节点赋值
             $node = NodeManager::getNode(end($nodeIdFamily));
         } catch (Throwable $throwable) {
-            if (! in_array($this->path, ['', '/'])) {
-                Exception::isHttp($throwable) && $this->status($throwable->getCode(), $throwable->getMessage());
-                throw $throwable;
-            }
+            ! in_array($this->path, ['', '/']) && throw $throwable;
+
             if ($this->isAjax()) {
                 $node = NodeManager::getTreeByPath('dce/empty/http/ajax')->getFirstNode();
             } else {
@@ -193,7 +185,7 @@ abstract class RawRequestHttp extends RawRequest {
 
     /**
      * 解析原始数据为参数表, (子类可覆盖此方法自定义解析方法)
-     * @return array
+     * @return array|null
      */
     protected function parseRawData(): array|null {
         $rawData = $this->getRawData();

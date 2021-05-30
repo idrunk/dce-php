@@ -7,6 +7,7 @@
 namespace dce\project;
 
 use dce\project\render\Renderer;
+use dce\project\render\TemplateRenderer;
 use dce\project\request\RawRequest;
 use dce\project\request\RawRequestHttp;
 use dce\project\request\Request;
@@ -24,6 +25,8 @@ class Controller {
     private Renderer $rendererInstance;
 
     private array $statusData = [];
+
+    private bool $isHttpException = false;
 
     /**
      * 控制器构造函数, 为了防止用户在子类重写了构造函数却未调用父构造函数破坏控制器, 所以将其设为了final禁止子类重写, 子类若需构造函数可定义__init方法实现
@@ -162,7 +165,8 @@ class Controller {
         if (null !== $code) {
             $this->assignStatus('code', $code);
         }
-        $this->render();
+        ! $this->rendererInstance instanceof TemplateRenderer ? $this->render()
+            : $this->response(TemplateRenderer::renderPhp($this->request->project->config->template[$this->isHttpException ? 'exception' : 'status'], $this->statusData));
     }
 
     /**
@@ -182,6 +186,7 @@ class Controller {
             '503' => 'Service Unavailable',
         ];
         $this->rawRequest instanceof RawRequestHttp && $this->rawRequest->status($code, $reason ?: ($statusMessageMapping[$code] ?? ''));
+        $this->isHttpException = true;
         $this->fail($reason, $code);
     }
 

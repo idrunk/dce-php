@@ -58,6 +58,16 @@ class DceConfig extends Config {
         'deep' => 4, // 默认最深扫描4层控制器注解式节点
     ];
 
+    /** @var array 模板相关配置 */
+    #[ArrayShape([
+        'status' => 'string', // 结果页模板（成功失败反馈页）
+        'exception' => 'string', // 异常页模板（如HTTP500）
+    ])]
+    public array $template = [
+        'status' => DCE_ROOT . 'engine/project/render/template/status.php',
+        'exception' => DCE_ROOT . 'engine/project/render/template/exception.php',
+    ];
+
     /** @var bool 是否重写模式, 用于生成伪静态Url */
     public bool $rewriteMode = false;
 
@@ -119,11 +129,6 @@ class DceConfig extends Config {
         'index' => 0, // RedisSession处理器库号
         'manager_class' => '', // 留空表示Dce执行选择SessionManager类
         'manager_index' => 0,
-    ];
-
-    /** @var array|string[] 需内置Http服务忽略的请求路径 */
-    public array $blockPaths = [
-        '/favicon.ico',
     ];
 
     /** @var array Redis配置 */
@@ -328,9 +333,23 @@ class DceConfig extends Config {
     ];
 
     /** @var array 日志记录器配置 */
+    #[ArrayShape([
+        'db' => [
+            'console' => 'bool',
+        ],
+        'exception' => [
+            'console' => 'bool',
+            'file_power' => 'bool',
+        ],
+    ])]
     public array $log = [
         'db' => [ // 数据库日志
             'console' => false, // 是否在控制台输出日志
+        ],
+        'exception' => [
+            'console' => true,
+            'log_file' => APP_RUNTIME . 'log/exception/%s.log',
+            'log_name_format' => 'Y-m',
         ],
     ];
 

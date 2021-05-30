@@ -38,7 +38,7 @@ class RpcServer {
      * @param RpcHost $rpcHost
      * @return RpcServer
      */
-    public static function new(RpcHost $rpcHost) {
+    public static function new(RpcHost $rpcHost): self {
         return (new self)->addHost($rpcHost);
     }
 
@@ -135,7 +135,7 @@ class RpcServer {
     /**
      * 预加载Rpc命名空间或者类文件
      */
-    private function prepareService() {
+    private function prepareService(): void {
         foreach ($this->preloadFiles as $file) {
             Loader::once($file);
         }
@@ -163,7 +163,7 @@ class RpcServer {
     /**
      * 异步版RpcServer
      */
-    private function runAsyncServer() {
+    private function runAsyncServer(): void {
         $rpcHosts = array_slice($this->rpcHosts, 0);
         $rpcHost = array_shift($rpcHosts);
         $this->servers[] = $server = new aServer($rpcHost->host, $rpcHost->port, SWOOLE_PROCESS, $rpcHost->isUnixSock ? SWOOLE_SOCK_UNIX_STREAM : SWOOLE_SOCK_TCP);
@@ -214,7 +214,7 @@ class RpcServer {
     /**
      * 协程版RpcServer
      */
-    private function runCoroutineServer() {
+    private function runCoroutineServer(): void {
         foreach ($this->rpcHosts as $rpcHost) {
             go(function () use($rpcHost) {
                 $this->servers[] = $server = new Server(($rpcHost->isUnixSock ? 'unix:' : '') . $rpcHost->host, $rpcHost->port);
@@ -310,7 +310,7 @@ class RpcServer {
      * @return mixed
      * @throws RpcException
      */
-    private static function execute(string $className, string $methodName, array $arguments) {
+    private static function execute(string $className, string $methodName, array $arguments): mixed {
         if (! is_subclass_of($className, RpcMatrix::class)) {
             throw (new RpcException(RpcException::NOT_RPC_CLASS))->format($className);
         }
@@ -325,11 +325,11 @@ class RpcServer {
 
     /**
      * 打包服务结果
-     * @param $result
+     * @param mixed $result
      * @return string
      * @throws RpcException
      */
-    private static function package($result): string {
+    private static function package(mixed $result): string {
         if (is_object($result)) {
             $response = [RpcUtility::RESULT_TYPE_OBJECT, serialize($result)];
         } else {

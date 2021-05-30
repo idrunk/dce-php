@@ -251,10 +251,6 @@ final class NodeManager {
                     // 继承hookCoroutine属性, 或根据enableCoroutine初始化
                     $node->hookCoroutine = $node->enableCoroutine;
                 }
-                if (! isset($node->autoCatch)) {
-                    // 继承autoCatch属性, 或初始化为true, 即自动捕获异常
-                    $node->autoCatch = $parentNode->autoCatch ?? true;
-                }
                 $node->isDir = $isDir;
             }
         });

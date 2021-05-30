@@ -6,11 +6,11 @@
 
 namespace tcp\service;
 
+use dce\base\Exception;
 use dce\project\ProjectManager;
 use dce\service\server\RawRequestConnection;
 use dce\service\server\ServerMatrix;
 use Swoole\Server;
-use Throwable;
 
 class TcpServer extends ServerMatrix {
     protected static string $localRpcHost = '/var/run/dce_tcp_api.sock';
@@ -51,37 +51,13 @@ class TcpServer extends ServerMatrix {
         }
         $this->eventBeforeStart($this->server);
 
-        $this->server->on('connect', function (Server $server, int $fd, int $reactorId) {
-            try {
-                $this->takeoverConnect($server, $fd, $reactorId);
-            } catch (Throwable $throwable) {
-                $this->handleException($throwable);
-            }
-        });
+        $this->server->on('connect', fn(Server $server, int $fd, int $reactorId) => Exception::callCatch(fn() => $this->takeoverConnect($server, $fd, $reactorId)));
 
-        $this->server->on('receive', function (Server $server, int $fd, int $reactorId, string $data) {
-            try {
-                $this->takeoverReceive($server, $fd, $reactorId, $data);
-            } catch (Throwable $throwable) {
-                $this->handleException($throwable);
-            }
-        });
+        $this->server->on('receive', fn(Server $server, int $fd, int $reactorId, string $data) => Exception::callCatch(fn() => $this->takeoverReceive($server, $fd, $reactorId, $data)));
 
-        $this->server->on('packet', function(Server $server, string $data, array $clientInfo) {
-            try {
-                $this->takeoverPacket($server, $data, $clientInfo);
-            } catch (Throwable $throwable) {
-                $this->handleException($throwable);
-            }
-        });
+        $this->server->on('packet', fn(Server $server, string $data, array $clientInfo) => Exception::callCatch(fn() => $this->takeoverPacket($server, $data, $clientInfo)));
 
-        $this->server->on('close', function (Server $server, int $fd, int $reactorId) {
-            try {
-                $this->takeoverClose($server, $fd, $reactorId);
-            } catch (Throwable $throwable) {
-                $this->handleException($throwable);
-            }
-        });
+        $this->server->on('close', fn(Server $server, int $fd, int $reactorId) => Exception::callCatch(fn() => $this->takeoverClose($server, $fd, $reactorId)));
 
         // 扩展自定义的Swoole Server事件回调
         foreach ($swooleTcpEvents as $eventName => $eventCallback) {

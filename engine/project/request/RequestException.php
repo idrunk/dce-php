@@ -11,6 +11,12 @@ use dce\i18n\Language;
 
 // 1230-1259
 class RequestException extends Exception {
+    #[Language(['节点定位失败，请检查url是否正确'])]
+    public const NODE_LOCATION_FAILED = 404;
+
+    #[Language(['内部服务器错误'])]
+    public const INTERNAL_SERVER_ERROR = 500;
+
     // 运行时错误
     #[Language(['节点 %s 未配置控制器或配置错误'])]
     public const NODE_NO_CONTROLLER = 1230;
@@ -23,12 +29,6 @@ class RequestException extends Exception {
 
     #[Language(['未安装Swoole扩展, 无法开启协程'])]
     public const COROUTINE_NEED_SWOOLE = 1233;
-
-    #[Language(['%s 页面不存在'])]
-    public const PATH_WAS_BLOCKED = 1234;
-
-    #[Language(['%s 节点不存在'])]
-    public const NODE_LOCATION_FAILED = 1235;
 
     #[Language(['Url不合法'])]
     public const INVALID_URL = 1240;

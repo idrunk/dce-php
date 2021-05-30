@@ -116,7 +116,7 @@ class Router {
         }
         if ($isLocated !== true) {
             // 如果在根级别定位失败, 则最终定位失败
-            throw new RouterException(RouterException::NODE_LOCATION_FAILED);
+            throw new RequestException(RequestException::NODE_LOCATION_FAILED);
         } else {
             return true;
         }

@@ -6,6 +6,7 @@
 
 namespace dce\service\server;
 
+use dce\base\Exception;
 use dce\config\DceConfig;
 use dce\Dce;
 use dce\i18n\Language;
@@ -107,35 +108,11 @@ abstract class ServerMatrix implements ClassDecorator {
             $portInstance = $this->getServer()->listen($host, $port, $sockType);
             $portInstance->set($swooleTcpConfig);
             if (in_array($sockType, [SWOOLE_SOCK_TCP, SWOOLE_SOCK_TCP6, SWOOLE_UNIX_STREAM])) {
-                $portInstance->on('connect', function (Server $server, int $fd, int $reactorId) {
-                    try {
-                        $this->takeoverConnect($server, $fd, $reactorId);
-                    } catch (Throwable $throwable) {
-                        $this->handleException($throwable);
-                    }
-                });
-                $portInstance->on('receive', function (Server $server, int $fd, int $reactorId, string $data) {
-                    try {
-                        $this->takeoverReceive($server, $fd, $reactorId, $data);
-                    } catch (Throwable $throwable) {
-                        $this->handleException($throwable);
-                    }
-                });
-                $portInstance->on('close', function (Server $server, int $fd, int $reactorId) {
-                    try {
-                        $this->takeoverClose($server, $fd, $reactorId);
-                    } catch (Throwable $throwable) {
-                        $this->handleException($throwable);
-                    }
-                });
+                $portInstance->on('connect', fn(Server $server, int $fd, int $reactorId) => Exception::callCatch(fn() => $this->takeoverConnect($server, $fd, $reactorId)));
+                $portInstance->on('receive', fn(Server $server, int $fd, int $reactorId, string $data) => Exception::callCatch(fn() => $this->takeoverReceive($server, $fd, $reactorId, $data)));
+                $portInstance->on('close', fn(Server $server, int $fd, int $reactorId) => Exception::callCatch(fn() => $this->takeoverClose($server, $fd, $reactorId)));
             } else {
-                $portInstance->on('packet', function (Server $server, string $data, array $clientInfo) {
-                    try {
-                        $this->takeoverPacket($server, $data, $clientInfo);
-                    } catch (Throwable $throwable) {
-                        $this->handleException($throwable);
-                    }
-                });
+                $portInstance->on('packet', fn(Server $server, string $data, array $clientInfo) => Exception::callCatch(fn() => $this->takeoverPacket($server, $data, $clientInfo)));
             }
         }
     }
@@ -160,9 +137,7 @@ abstract class ServerMatrix implements ClassDecorator {
      * @throws Throwable
      */
     protected function takeoverRequest(Request $request, Response $response): void {
-        $rawRequest = new static::$rawRequestHttpClass($this, $request, $response);
-        $rawRequest->init();
-        RequestManager::route($rawRequest);
+        Exception::callCatch([RequestManager::class, 'route'], static::$rawRequestHttpClass, $this, $request, $response);
     }
 
     /**
@@ -171,12 +146,9 @@ abstract class ServerMatrix implements ClassDecorator {
      * @param int $fd
      * @param int $reactorId
      * @param string $data
-     * @throws \dce\project\request\RequestException
      */
     protected function takeoverReceive(Server $server, int $fd, int $reactorId, string $data): void {
-        $rawRequest = new static::$rawRequestTcpClass($this, $data, $fd, $reactorId);
-        $rawRequest->init();
-        RequestManager::route($rawRequest);
+        Exception::callCatch([RequestManager::class, 'route'], static::$rawRequestTcpClass, $this, $data, $fd, $reactorId);
     }
 
     /**
@@ -184,12 +156,9 @@ abstract class ServerMatrix implements ClassDecorator {
      * @param Server $server
      * @param string $data
      * @param array $clientInfo
-     * @throws \dce\project\request\RequestException
      */
     protected function takeoverPacket(Server $server, string $data, array $clientInfo): void {
-        $rawRequest = new static::$rawRequestUdpClass($this, $data, $clientInfo);
-        $rawRequest->init();
-        RequestManager::route($rawRequest);
+        Exception::callCatch([RequestManager::class, 'route'], static::$rawRequestUdpClass, $this, $data, $clientInfo);
     }
 
     /**
@@ -203,14 +172,6 @@ abstract class ServerMatrix implements ClassDecorator {
         SessionManager::inst()->disconnect($fd, $this->apiHost, $this->apiPort);
         Dce::$cache->var->del(['session', $fd]);
         Dce::$cache->var->del(['cookie', $fd]);
-    }
-
-    /**
-     * 处理请求接口异常
-     * @param Throwable $throwable
-     */
-    protected function handleException(Throwable $throwable): void {
-        testPoint("code:" . $throwable->getCode(), "file:" . $throwable->getFile() .":". $throwable->getLine(), $throwable->getMessage());
     }
 
     /**

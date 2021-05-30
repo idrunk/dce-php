@@ -253,13 +253,11 @@ class Validator {
                 foreach ($validator->orValidators as $orValidator) {
                     try {
                         $newValue = $orValidator->validator->checkGetValue($value, $validator->property->name, $validator->property->alias, $model);
-                        $passed = 1;
+                        $throwable = null;
                         break;
                     } catch (Throwable) {}
                 }
-                if (! isset($passed)) {
-                    throw $throwable;
-                }
+                $throwable && throw $throwable;
             }
             if ($value !== $newValue) {
                 $model->{$validator->property->name} = $newValue;

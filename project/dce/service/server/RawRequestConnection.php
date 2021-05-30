@@ -22,9 +22,8 @@ abstract class RawRequestConnection extends RawRequest {
     public function routeGetNode(): Node {
         $nodeTree = NodeManager::getTreeByPath($this->path);
         if (! $nodeTree) {
-            if (! in_array($this->path, ['', '/'])) {
-                throw (new RequestException(RequestException::NODE_LOCATION_FAILED))->format($this->path);
-            }
+            ! in_array($this->path, ['', '/']) && throw (new RequestException(RequestException::NODE_LOCATION_FAILED))->format($this->path);
+
             // 如果未匹配到节点，且请求路径为空，则重定向到空的长连接节点
             $nodeTree = NodeManager::getTreeByPath('dce/empty/connection');
         }

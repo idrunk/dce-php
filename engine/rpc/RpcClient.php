@@ -229,8 +229,7 @@ class RpcClient {
      * @throws RpcException
      */
     private static function authPack(string $token, string $className, string $methodName, array $arguments): string {
-        $data = RpcUtility::encode(RpcUtility::REQUEST_FORMATTER, $token, $className, $methodName, serialize($arguments));
-        return $data;
+        return RpcUtility::encode(RpcUtility::REQUEST_FORMATTER, $token, $className, $methodName, serialize($arguments));
     }
 
     /**
@@ -244,10 +243,7 @@ class RpcClient {
         [$resultType, $result] = RpcUtility::decode(RpcUtility::RESPONSE_FORMATTER, $response);
         if ($resultType === RpcUtility::RESULT_TYPE_OBJECT) {
             $result = unserialize($result); // 如果结果类型为对象, 则反序列化
-            if ($result instanceof Throwable) {
-                // 抛出服务端的异常
-                throw $result;
-            }
+            $result instanceof Throwable && throw $result; // 抛出服务端的异常
         } else {
             $result = json_decode($result, true);
         }

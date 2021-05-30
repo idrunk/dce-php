@@ -55,9 +55,19 @@ class TemplateRenderer extends Renderer {
 
     /** @inheritDoc */
     protected function rendering(Controller $controller, mixed $data): string {
-        extract(false === $data ? $controller->getAllAssigned() : $data);
+        return self::renderPhp($this->template($controller), false === $data ? $controller->getAllAssigned() : $data);
+    }
+
+    /**
+     * 渲染PHP模板
+     * @param string $filepath
+     * @param array $data
+     * @return string
+     */
+    public static function renderPhp(string $filepath, array $data = []): string {
+        extract($data);
         ob_start();
-        require $this->template($controller);
+        require $filepath;
         return ob_get_clean();
     }
 
@@ -93,12 +103,12 @@ class TemplateRenderer extends Renderer {
             $rootDir = dirname($this->layoutPath);
             $rootContent = file_get_contents($this->layoutPath);
             // 使用布局时, 内容模板文件若有PHP脚本, 则脚本必须闭合
-            $rootContent = preg_replace('/(\blayout_content\b[\s\S]+?\?>)/', "\$1\n".'<?php require \''.$this->templatePath.'\'; ?>', $rootContent);
+            $rootContent = preg_replace('/(\blayout_content\b[\s\S]+?\?>)/', "$1\n<?php require '$this->templatePath'; ?>", $rootContent);
         } else {
             $rootDir = dirname($this->templatePath);
             $rootContent = file_get_contents($this->templatePath);
         }
-        return $this->loadAllContent($rootContent, $rootDir);
+        return self::loadAllContent($rootContent, $rootDir);
     }
 
     /**
@@ -107,7 +117,7 @@ class TemplateRenderer extends Renderer {
      * @param string $rootDir
      * @return string
      */
-    protected function loadAllContent(string $rootContent, string $rootDir): string {
+    protected static function loadAllContent(string $rootContent, string $rootDir): string {
         $fragments = token_get_all($rootContent);
         $fragmentCount = count($fragments);
         $rootContent = '';
@@ -128,10 +138,9 @@ class TemplateRenderer extends Renderer {
                     if ($type === T_CONSTANT_ENCAPSED_STRING) {
                         // 如果处于引用语句, 且当前部分为字符串, 则表示为引用文件地址, 则递归载入内容
                         $childPath = trim($content, '"\'');
-                        $childPath = $childPath === $this->templatePath ? $childPath : $rootDir . '/' . $childPath;
+                        ! file_exists($childPath) && $childPath = "$rootDir/$childPath";
                         $subContent = file_get_contents($childPath);
-                        $subRootDir = dirname($childPath);
-                        $rootContent .= $this->loadAllContent($subContent, $subRootDir);
+                        $rootContent .= self::loadAllContent($subContent, dirname($childPath));
                     }
                 } else if (in_array($type, [T_INCLUDE, T_INCLUDE_ONCE, T_REQUIRE, T_REQUIRE_ONCE])) {
                     // 如果进到引用语句, 则关掉前面的PHP语句, 如果前面部分是赋值等运算符, 则会报错fatal_error, 因此禁止在模板中将引用参与计算

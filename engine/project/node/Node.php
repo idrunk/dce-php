@@ -82,9 +82,6 @@ class Node {
     /** @var bool 是否惰性匹配, (匹配到此及命中, 不再继续匹配剩余路径) */
     public bool $lazyMatch = false;
 
-    /** @var bool 是否自动捕获抛出异常 */
-    public bool $autoCatch = true;
-
     /** @var array 允许跨域的主机, 若配置了, 则自动允许所配的主机访问 {会被继承} */
     public array $corsOrigins;
 
@@ -121,7 +118,6 @@ class Node {
         string|null $http301 = null,
         string|null $http302 = null,
         string|null $jsonpCallback = null,
-        bool|null $autoCatch = null,
         array|null $extra = null,
         bool $controllerPath = false, // 是否为控制器根路径
     ) {

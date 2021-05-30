@@ -6,8 +6,13 @@
 
 namespace dce\base;
 
+use dce\Dce;
 use dce\i18n\Language;
 use dce\loader\ClassDecorator;
+use dce\project\request\RawRequestHttp;
+use dce\project\request\Request;
+use dce\project\request\RequestException;
+use dce\project\request\RequestManager;
 use Stringable;
 use Throwable;
 
@@ -27,9 +32,11 @@ class Exception extends \Exception implements ClassDecorator {
     protected static array $closed = [];
 
     /** @var string[] Http状态码，匹配的状态码在自动抛出时会使用httpException方法抛出  */
-    protected static array $http = [];
+    protected static array $http = ['100-600'];
 
     private Language $langMessage;
+
+    private Request|null $request;
 
     /**
      * 异常构造方法
@@ -38,6 +45,7 @@ class Exception extends \Exception implements ClassDecorator {
      * @param Throwable|null $previous
      */
     public function __construct(int|string|Stringable $message = '', int $code = 0, Throwable $previous = null) {
+        $this->request = RequestManager::current();
         if (! $code && is_int($message)) {
             $code = $message;
             $message = '';
@@ -128,17 +136,69 @@ class Exception extends \Exception implements ClassDecorator {
         return false;
     }
 
+    public static function callCatch(callable $callable, mixed ... $params): void {
+        try {
+            call_user_func($callable, ... $params);
+        } catch (QuietException) {
+            // 拦截安静异常不抛出, 用于如事件回调中抛出异常截停程序并且不抛出异常
+        } catch (Throwable $throwable) {
+            $isHttp = Exception::isHttp($throwable);
+            $isOpenly = ! $isHttp && Exception::isOpenly($throwable);
+            $isSimple = $isHttp || $isOpenly;
+            $pureContent = self::render($throwable, $isSimple, false);
+
+            // 对closed异常记录日志
+            ! $isSimple && Dce::$config->log['exception']['log_file'] && self::log($pureContent);
+
+            if ($throwable?->request instanceof Request && ($request = $throwable->request) && $request?->rawRequest instanceof RawRequestHttp) {
+                if ($isHttp) { // 如果是http异常，则响应状态码
+                    if ($request->controller ?? 0) {
+                        $request->controller->httpException($throwable->getCode(), $throwable->getMessage());
+                    } else {
+                        $request->rawRequest->status($throwable->getCode(), $throwable->getMessage());
+                        $request->rawRequest->response(self::render($throwable, true));
+                    }
+                } else if ($isOpenly) { // 如果是公开异常，则响应异常消息
+                    ($request->controller ?? 0) ? $request->controller->exception($throwable) : $request->rawRequest->response(self::render($throwable, html: false));
+                } else { // 否则如果是开发模式，则响应异常内容，否则响应http500
+                    $message = Language::find(RequestException::INTERNAL_SERVER_ERROR);
+                    if (! Dce::isDevEnv() && ($request->controller ?? 0)) {
+                        $request?->controller->httpException(RequestException::INTERNAL_SERVER_ERROR, $message);
+                    } else {
+                        $request->rawRequest->status(RequestException::INTERNAL_SERVER_ERROR, $message);
+                        Dce::isDevEnv() ? $request->rawRequest->response(self::render($throwable, false)) : $request->rawRequest->response($message);
+                    }
+                }
+            }
+
+            // 打印异常
+            DCE_CLI_MODE && Dce::$config->log['exception']['console'] && print_r($pureContent);
+        }
+    }
+
+    public static function render(Throwable $throwable, bool|null $simple = null, bool $html = true): string {
+        $now = date('Y-m-d H:i:s');
+        if ($simple === null) {
+            $data = ['status' => false];
+            $throwable->getCode() && $data['code'] = $throwable->getCode();
+            $throwable->getMessage() && $data['message'] = $throwable->getMessage();
+            $content = json_encode($data, JSON_UNESCAPED_UNICODE);
+        } else if ($simple) {
+            $content = sprintf("[%s] (%s) %s\n\n\n", $now, $throwable->getCode(), $throwable->getMessage());
+        } else {
+            $content = sprintf("[%s] (%s) %s\n\n%s\n\n\n", $now, $throwable->getCode(), $throwable->getMessage(), $throwable);
+        }
+        $html && $content = sprintf('<!doctype html><html lang="zh"><head><meta charset="UTF-8"><title>%s</title></head><body><pre>%s</pre></body></html>', $throwable->getMessage(), $content);
+        return $content;
+    }
+
+    private static function log(string $exception): void {
+        $filename = sprintf(Dce::$config->log['exception']['log_file'], date(Dce::$config->log['exception']['log_name_format']));
+        ! file_exists(dirname($filename)) && mkdir(dirname($filename), 0755, true);
+        file_put_contents($filename, $exception, FILE_APPEND | LOCK_EX);
+    }
+
     public static function init() {
-        set_exception_handler(function(Throwable $e) {
-            // header("HTTP/1.1 500 Internal Server Error");
-            test(
-                get_class($e),
-                'Code:' . $e->getCode() . ' ' . $e->getMessage(),
-                $e->getFile(),
-                'Line:' . $e->getLine(),
-                $e->getTrace(),
-                $e->getMessage()
-            );
-        });
+        set_exception_handler(fn (Throwable $throwable) => die(self::render($throwable, false)));
     }
 }
