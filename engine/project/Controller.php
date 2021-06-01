@@ -20,7 +20,7 @@ class Controller {
 
     protected RawRequest $rawRequest;
 
-    private bool $isHttpRequest;
+    private bool $isResponseMode;
 
     private Renderer $rendererInstance;
 
@@ -36,8 +36,8 @@ class Controller {
         public Request $request,
     ) {
         $this->rawRequest = $this->request->rawRequest;
-        $this->isHttpRequest = $this->rawRequest instanceof RawRequestHttp;
-        $this->rendererInstance = Renderer::inst($this, $this->isHttpRequest);
+        $this->isResponseMode = $this->rawRequest instanceof RawRequestHttp || ($this->rawRequest instanceof RawRequestConnection && $this->rawRequest->isResponseMode());
+        $this->rendererInstance = Renderer::inst($this, $this->isResponseMode);
         $this->__init();
     }
 
@@ -49,17 +49,9 @@ class Controller {
      * @param string $method
      */
     public function call(string $method): void {
-        if ($this->rendered) {
-            // 如果构造函数中已经渲染过缓存了, 则不再继续
-            return;
-        }
-        if (! $this->isHttpRequest) {
-            // 无需给非HTTP实现渲染缓存器, 因为他们不能自动渲染, 反正需要手动, 即使需要缓存也得自行实现
+        if (! $this->rendered) {
             $this->$method();
-        } else {
-            // HTTP的请求如果未渲染过, 则执行控制器并渲染 (支持缓存逻辑)
-            $this->$method();
-            $this->render(); // 自动渲染
+            $this->isResponseMode && $this->render(); // 无需给非请求响应模型实现渲染缓存器, 因为他们不能自动渲染, 反正需要手动, 即使需要缓存也得自行实现
         }
     }
 
@@ -69,7 +61,7 @@ class Controller {
      * @param string|false|null $path
      */
     public function render(mixed $data = false, string|false|null $path = null): void {
-        $this->rendererInstance->render($this, $this->isHttpRequest, $data, $path);
+        $this->rendererInstance->render($this, $this->isResponseMode, $data, $path);
     }
 
     /**
@@ -82,7 +74,7 @@ class Controller {
         if (false === $data) {
             $data = $this->getAllAssignedStatus();
         }
-        if ($this->isHttpRequest) {
+        if ($this->rawRequest instanceof RawRequestHttp) {
             $this->rawRequest->response(is_string($data) ? $data : json_encode($this->getAllAssignedStatus(), JSON_UNESCAPED_UNICODE));
         } else if ($this->rawRequest instanceof RawRequestConnection) {
             $this->rawRequest->response($data, $path ?? $this->rawRequest->path);

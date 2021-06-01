@@ -51,8 +51,7 @@ ws.onopen = () => ws.send('');
 ws.onmessage = msg => console.log(msg.data);
 // 若连接成功，将在控制台打印出下述消息
 /*
-
-{"data":{"info":"恭喜！服务端收到了你的消息并给你作出了回应"}}
+;{"data":{"info":"恭喜！服务端收到了你的消息并给你作出了回应"}}
 */
 ```
 

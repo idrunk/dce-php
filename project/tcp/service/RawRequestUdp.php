@@ -15,10 +15,11 @@ class RawRequestUdp extends RawRequestConnection {
 
     public function __construct(
         private ServerMatrix $server,
-        private string $packet,
+        string $packet,
         private array $clientInfo,
     ) {
         $this->clientInfo['ip'] = $this->clientInfo['address'];
+        $this->clientInfo['packet'] = $packet;
     }
 
     /** @inheritDoc */
@@ -33,10 +34,7 @@ class RawRequestUdp extends RawRequestConnection {
 
     /** @inheritDoc */
     public function init(): void {
-        ['path' => $path, 'data' => $rawData, 'dataParsed' => $dataParsed] = $this->unPack($this->packet);
-        $this->path = $path;
-        $this->rawData = $rawData;
-        $this->dataParsed = $dataParsed;
+        ['path' => $this->path, 'requestId' => $this->requestId, 'data' => $this->rawData, 'dataParsed' => $this->dataParsed] = $this->unPack($this->clientInfo['packet']);
     }
 
     /** @inheritDoc */
@@ -49,7 +47,7 @@ class RawRequestUdp extends RawRequestConnection {
 
     /** @inheritDoc */
     public function response(mixed $data, string|false $path): bool {
-        return $this->server->sendTo($this->clientInfo['address'], $this->clientInfo['port'], $data, $path);
+        return $this->server->sendTo($this->clientInfo['address'], $this->clientInfo['port'], $data, $path . (isset($this->requestId) ? self::REQUEST_SEPARATOR . $this->requestId : ''));
     }
 
     /** @inheritDoc */

@@ -23,9 +23,7 @@ class Loader {
     /** @var array 自动加载类映射表 */
     private static array $classMapping = [];
 
-    /**
-     * 注册自动加载, 核心类预加载初始化
-     */
+    /** 注册自动加载, 核心类预加载初始化 */
     public static function init(): void {
         spl_autoload_register(['self', 'autoload'], true, true);
         self::prepare('\drunk\*', DCE_ROOT . 'drunk/');
@@ -183,9 +181,7 @@ class Loader {
         return true;
     }
 
-    /**
-     * 预加载公共模块
-     */
+    /** 预加载公共模块 */
     public static function prepareCommon(): void {
         // 公共模型预加载准备
         self::prepare('\controller\*', APP_COMMON . 'controller/');

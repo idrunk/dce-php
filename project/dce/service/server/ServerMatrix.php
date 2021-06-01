@@ -26,7 +26,7 @@ use tcp\service\RawRequestUdp;
 use Throwable;
 
 abstract class ServerMatrix implements ClassDecorator {
-    protected static Language|array $langStarted = ["%s 服务器已启动于 %s:%s.\n", "%s server started with %s:%s.\n"];
+    protected static Language|array $langStarted = ["%s 服务器已启动于 %s:%s.\n\n", "%s server started with %s:%s.\n\n"];
 
     /** @var string SessionManager FdForm Tcp fd标记 */
     public const SM_EXTRA_TCP = 'tcp';

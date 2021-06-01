@@ -220,37 +220,22 @@ final class NodeManager {
             foreach ($child->nodes as $i => $node) {
                 // 记录ID索引
                 self::$idTreeMapping[$node->id] = $familyPaths;
-                if ($node->omissiblePath && ! $parent->hasHiddenChild($child->pathFormat)) {
-                    // 如果节点为隐藏路径节点, 且父树中未记录该节点, 则添加到父树隐藏路径节点集中
-                    $parent->addHiddenChild($child, $child->pathFormat);
-                }
-                if (! isset($node->corsOrigins)) {
-                    // 继承allowedOrigins属性, 或初始化为[]
-                    $node->corsOrigins = $parentNode->corsOrigins ?? [];
-                }
-                if (! isset($node->methods)) {
-                    // 继承method属性, 或初始化为get
-                    $node->methods = $parentNode->methods ?? ['get', 'head'];
-                }
+                // 如果节点为隐藏路径节点, 且父树中未记录该节点, 则添加到父树隐藏路径节点集中
+                $node->omissiblePath && ! $parent->hasHiddenChild($child->pathFormat) && $parent->addHiddenChild($child, $child->pathFormat);
+                ! isset($node->corsOrigins) && $node->corsOrigins = $parentNode->corsOrigins ?? [];
+                ! isset($node->methods) && $node->methods = $parentNode->methods ?? ['get', 'head'];
                 if (! isset($node->render)) {
-                    // 继承方式型(非模板文件)render属性, 或初始化为'json', 输出json
                     $node->render = isset($parentNode->render) && ! str_contains($parentNode->render, '.') ? $parentNode->render : Renderer::TYPE_JSON;
                 } else if (! str_contains($node->render, '.')) {
                     // 对含有后缀名的大概非模板的自动转为小写
                     $node->render = strtolower($node->render);
                 }
-                if (! isset($node->templateLayout)) {
-                    // 继承templateLayout属性, 或初始化为'', 即不使用布局
-                    $node->templateLayout = $parentNode->templateLayout ?? '';
-                }
-                if (! isset($node->enableCoroutine)) {
-                    // 继承enableCoroutine属性, 或初始化为false, 即不自动开启协程容器
-                    $node->enableCoroutine = $parentNode->enableCoroutine ?? false;
-                }
-                if (! isset($node->hookCoroutine)) {
-                    // 继承hookCoroutine属性, 或根据enableCoroutine初始化
-                    $node->hookCoroutine = $node->enableCoroutine;
-                }
+                ! isset($node->templateLayout) && $node->templateLayout = $parentNode->templateLayout ?? '';
+                // 继承enableCoroutine属性, 或初始化为false, 即不自动开启协程容器
+                ! isset($node->enableCoroutine) && $node->enableCoroutine = $parentNode->enableCoroutine ?? false;
+                // 继承hookCoroutine属性, 或根据enableCoroutine初始化
+                ! isset($node->hookCoroutine) && $node->hookCoroutine = $node->enableCoroutine;
+                ! isset($node->extra) && $node->extra = $parentNode->extra ?? [];
                 $node->isDir = $isDir;
             }
         });

@@ -45,34 +45,34 @@ abstract class Renderer {
     /**
      * 取个单例实例并赋值相关属性
      * @param Controller $controller
-     * @param bool $isHttpRequest
+     * @param bool $isResponseMode
      * @return static
      */
-    final public static function inst(Controller $controller, bool $isHttpRequest): static {
+    final public static function inst(Controller $controller, bool $isResponseMode): static {
         $render = key_exists($controller->request->node->render, self::$renderMapping) ? $controller->request->node->render : self::TYPE_TEMPLATE;
         if (! key_exists($render, self::$instanceMapping)) {
             self::$instanceMapping[$render] = new self::$renderMapping[$render];
         }
-        self::$instanceMapping[$render]->prepare($controller, $isHttpRequest);
+        self::$instanceMapping[$render]->prepare($controller, $isResponseMode);
         return self::$instanceMapping[$render];
     }
 
     /**
      * Renderer constructor.
      * @param Controller $controller
-     * @param bool $isHttpRequest
+     * @param bool $isResponseMode
      */
-    protected function prepare(Controller $controller, bool $isHttpRequest): void {
-        $this->renderCache($controller, $isHttpRequest);
+    protected function prepare(Controller $controller, bool $isResponseMode): void {
+        $this->renderCache($controller, $isResponseMode);
     }
 
     /**
      * 渲染缓存页面
      * @param Controller $controller
-     * @param bool $isHttpRequest
+     * @param bool $isResponseMode
      */
-    private function renderCache(Controller $controller, bool $isHttpRequest): void {
-        if ($isHttpRequest && $controller->request->node->renderCache & 1) {
+    private function renderCache(Controller $controller, bool $isResponseMode): void {
+        if ($isResponseMode && $controller->request->node->renderCache & 1) {
             $cacheData = Dce::$cache->shmDefault->get(['api_data', $controller->request->node->pathFormat]);
             if (is_array($cacheData)) {
                 if ($controller->request->node->renderCache & 4) {
@@ -92,12 +92,12 @@ abstract class Renderer {
     /**
      * 渲染响应内容
      * @param Controller $controller
-     * @param bool $isHttpRequest
+     * @param bool $isResponseMode
      * @param mixed|false $data
      * @param string|false|null $path
      */
-    final public function render(Controller $controller, bool $isHttpRequest, mixed $data = false, string|false|null $path = null): void {
-        if ($isHttpRequest) {
+    final public function render(Controller $controller, bool $isResponseMode, mixed $data = false, string|false|null $path = null): void {
+        if ($isResponseMode) {
             if ($controller->rendered) {
                 return;
             }

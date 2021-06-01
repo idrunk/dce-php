@@ -13,6 +13,7 @@ use dce\project\request\RawRequestHttp;
 use dce\project\request\Request;
 use dce\project\request\RequestException;
 use dce\project\request\RequestManager;
+use dce\service\server\RawRequestConnection;
 use Stringable;
 use Throwable;
 
@@ -145,50 +146,47 @@ class Exception extends \Exception implements ClassDecorator {
             $isHttp = Exception::isHttp($throwable);
             $isOpenly = ! $isHttp && Exception::isOpenly($throwable);
             $isSimple = $isHttp || $isOpenly;
-            $pureContent = self::render($throwable, $isSimple, false);
+            $pureContent = self::render($throwable, $isSimple);
 
             // 对closed异常记录日志
             ! $isSimple && Dce::$config->log['exception']['log_file'] && self::log($pureContent);
 
-            if ($throwable?->request instanceof Request && ($request = $throwable->request) && $request?->rawRequest instanceof RawRequestHttp) {
-                if ($isHttp) { // 如果是http异常，则响应状态码
-                    if ($request->controller ?? 0) {
-                        $request->controller->httpException($throwable->getCode(), $throwable->getMessage());
-                    } else {
-                        $request->rawRequest->status($throwable->getCode(), $throwable->getMessage());
-                        $request->rawRequest->response(self::render($throwable, true));
+            if (($request = $throwable->request ?? null) && $request instanceof Request) {
+                $exception = $isSimple || Dce::isDevEnv() ? $throwable : new RequestException(RequestException::INTERNAL_SERVER_ERROR);
+                if ($request->rawRequest instanceof RawRequestHttp) {
+                    if ($isOpenly) { // 如果是公开异常，则响应异常消息
+                        ($request->controller ?? 0) ? $request->controller->exception($exception) : $request->rawRequest->response(self::render($exception, null));
+                    } else { // 否则如果是http异常或开发模式，则响应异常内容，否则响应http500
+                        if ($request->controller ?? 0) {
+                            $request->controller->httpException($exception->getCode(), $exception->getMessage());
+                        } else {
+                            $request->rawRequest->status($exception->getCode(), $exception->getMessage());
+                            $request->rawRequest->response(self::render($exception, $isHttp || ! Dce::isDevEnv(), true));
+                        }
                     }
-                } else if ($isOpenly) { // 如果是公开异常，则响应异常消息
-                    ($request->controller ?? 0) ? $request->controller->exception($throwable) : $request->rawRequest->response(self::render($throwable, html: false));
-                } else { // 否则如果是开发模式，则响应异常内容，否则响应http500
-                    $message = Language::find(RequestException::INTERNAL_SERVER_ERROR);
-                    if (! Dce::isDevEnv() && ($request->controller ?? 0)) {
-                        $request?->controller->httpException(RequestException::INTERNAL_SERVER_ERROR, $message);
-                    } else {
-                        $request->rawRequest->status(RequestException::INTERNAL_SERVER_ERROR, $message);
-                        Dce::isDevEnv() ? $request->rawRequest->response(self::render($throwable, false)) : $request->rawRequest->response($message);
-                    }
+                } else if ($request->rawRequest instanceof RawRequestConnection && $request->rawRequest->isResponseMode()) {
+                    // 如果是公开异常或开发模式，则响应异常消息，否则响应http500
+                    ($request->controller ?? 0) ? $request->controller->exception($exception) : $request->rawRequest->response(self::render($exception, null), $request->rawRequest->path);
                 }
             }
 
             // 打印异常
-            DCE_CLI_MODE && Dce::$config->log['exception']['console'] && print_r($pureContent);
+            DCE_CLI_MODE && Dce::$config->log['exception']['console'] && print($pureContent);
         }
     }
 
-    public static function render(Throwable $throwable, bool|null $simple = null, bool $html = true): string {
+    public static function render(Throwable $throwable, bool|null $simple = false, bool $html = false): string {
         $now = date('Y-m-d H:i:s');
         if ($simple === null) {
             $data = ['status' => false];
             $throwable->getCode() && $data['code'] = $throwable->getCode();
             $throwable->getMessage() && $data['message'] = $throwable->getMessage();
             $content = json_encode($data, JSON_UNESCAPED_UNICODE);
-        } else if ($simple) {
-            $content = sprintf("[%s] (%s) %s\n\n\n", $now, $throwable->getCode(), $throwable->getMessage());
         } else {
-            $content = sprintf("[%s] (%s) %s\n\n%s\n\n\n", $now, $throwable->getCode(), $throwable->getMessage(), $throwable);
+            $content = $simple ? sprintf("[%s] (%s: %s) %s\n\n\n", $now, get_class($throwable), $throwable->getCode(), $throwable->getMessage())
+                : sprintf("[%s] (%s: %s) %s\n\n%s\n\n\n", $now, get_class($throwable),$throwable->getCode(), $throwable->getMessage(), $throwable);
+            $html && $content = sprintf('<!doctype html><html lang="zh"><head><meta charset="UTF-8"><title>%s</title></head><body><pre>%s</pre></body></html>', $throwable->getMessage(), $content);
         }
-        $html && $content = sprintf('<!doctype html><html lang="zh"><head><meta charset="UTF-8"><title>%s</title></head><body><pre>%s</pre></body></html>', $throwable->getMessage(), $content);
         return $content;
     }
 
@@ -199,6 +197,6 @@ class Exception extends \Exception implements ClassDecorator {
     }
 
     public static function init() {
-        set_exception_handler(fn (Throwable $throwable) => die(self::render($throwable, false)));
+        set_exception_handler(fn(Throwable $throwable) => die(self::render($throwable)));
     }
 }

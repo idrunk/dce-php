@@ -37,7 +37,7 @@ class RawRequestWebsocket extends RawRequestConnection {
 
     /** @inheritDoc */
     public function init(): void {
-        ['path' => $this->path, 'data' => $this->rawData, 'dataParsed' => $this->dataParsed] = $this->unPack($this->frame->data);
+        ['path' => $this->path, 'requestId' => $this->requestId, 'data' => $this->rawData, 'dataParsed' => $this->dataParsed] = $this->unPack($this->frame->data);
     }
 
     /** @inheritDoc */
@@ -53,6 +53,6 @@ class RawRequestWebsocket extends RawRequestConnection {
 
     /** @inheritDoc */
     public function response(mixed $data, string|false $path): bool {
-        return $this->server->push($this->frame->fd, $data, $path);
+        return $this->server->push($this->frame->fd, $data, $path . (isset($this->requestId) ? self::REQUEST_SEPARATOR . $this->requestId : ''));
     }
 }

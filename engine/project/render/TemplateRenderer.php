@@ -9,6 +9,7 @@ namespace dce\project\render;
 use dce\Dce;
 use dce\project\Controller;
 use dce\project\request\RawRequest;
+use dce\project\request\RawRequestHttp;
 use dce\project\request\Request;
 
 class TemplateRenderer extends Renderer {
@@ -22,10 +23,10 @@ class TemplateRenderer extends Renderer {
     protected string $templateCacheDir;
 
     /** @inheritDoc */
-    protected function prepare(Controller $controller, bool $isHttpRequest): void {
+    protected function prepare(Controller $controller, bool $isResponseMode): void {
         // 需先预热, 因为父构造函数可能会直接从缓存渲染, 渲染时需要模板文件
         $this->warmUp($controller->request);
-        parent::prepare($controller, $isHttpRequest);
+        parent::prepare($controller, $isResponseMode);
         $controller->assign('request', $controller->request);
     }
 
@@ -50,7 +51,7 @@ class TemplateRenderer extends Renderer {
     /** @inheritDoc */
     protected function setContentType(RawRequest $rawRequest): void {
         // 不一定是html, 可能是xml/text等一切其他的内容, 所以不自动header
-        // @$rawRequest->header('Content-Type', 'text/html; charset=utf-8');
+        // $rawRequest instanceof RawRequestHttp && $rawRequest->header('Content-Type', 'text/html; charset=utf-8');
     }
 
     /** @inheritDoc */

@@ -18,8 +18,8 @@ abstract class RawRequest {
     /** @var array 惰性路由匹配时剩余未被匹配的路径组件集 */
     public array $remainingPaths = [];
 
-    /** @var mixed 原始请求提交的数据 */
-    protected mixed $rawData;
+    /** @var string|string[] 原始请求提交的数据 */
+    protected string|array $rawData;
 
     /**
      * 取原始请求信息
@@ -52,9 +52,9 @@ abstract class RawRequest {
 
     /**
      * 取原始请求提交数据
-     * @return mixed
+     * @return string|string[]
      */
-    public function getRawData(): mixed {
+    public function getRawData(): string|array {
         return $this->rawData;
     }
 }

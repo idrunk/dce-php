@@ -186,7 +186,7 @@ class RpcServer {
                 $response = self::package($result);
                 $aServer->send($fd, $response);
             } catch (RpcException $exception) {
-                echo "RpcException {$exception->getMessage()}\n";
+                echo RpcException::render($exception);
             }
         });
         $server->start();
@@ -242,7 +242,7 @@ class RpcServer {
                             $response = self::package($result);
                             $connection->send($response);
                         } catch (RpcException $exception) {
-                            echo "RpcException {$exception->getMessage()}\n";
+                            echo RpcException::render($exception);
                         }
                     }
                 });

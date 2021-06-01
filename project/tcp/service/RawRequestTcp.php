@@ -39,7 +39,7 @@ class RawRequestTcp extends RawRequestConnection {
 
     /** @inheritDoc */
     public function init(): void {
-        ['path' => $this->path, 'data' => $this->rawData, 'dataParsed' => $this->dataParsed] = $this->unPack($this->raw['data']);
+        ['path' => $this->path, 'requestId' => $this->requestId, 'data' => $this->rawData, 'dataParsed' => $this->dataParsed] = $this->unPack($this->raw['data']);
     }
 
     /** @inheritDoc */
@@ -55,6 +55,6 @@ class RawRequestTcp extends RawRequestConnection {
 
     /** @inheritDoc */
     public function response(mixed $data, string|false $path): bool {
-        return $this->server->send($this->raw['fd'], $data, $path);
+        return $this->server->send($this->raw['fd'], $data, $path . (isset($this->requestId) ? self::REQUEST_SEPARATOR . $this->requestId : ''));
     }
 }

@@ -12,8 +12,17 @@ use dce\project\request\RawRequest;
 use dce\project\request\RequestException;
 
 abstract class RawRequestConnection extends RawRequest {
+    /** @var string 路径内容分隔符 */
+    protected const PATH_SEPARATOR = ';';
+
+    /** @var string 路径与请求ID分隔符 */
+    protected const REQUEST_SEPARATOR = ':';
+
     /** @var int 连接描述符 */
     protected int $fd;
+
+    /** @var int|null 请求响应模式的请求ID */
+    protected int|null $requestId;
 
     /** @var array|null 解析出的数据 */
     protected array|null $dataParsed;
@@ -23,11 +32,11 @@ abstract class RawRequestConnection extends RawRequest {
         $nodeTree = NodeManager::getTreeByPath($this->path);
         if (! $nodeTree) {
             ! in_array($this->path, ['', '/']) && throw (new RequestException(RequestException::NODE_LOCATION_FAILED))->format($this->path);
-
             // 如果未匹配到节点，且请求路径为空，则重定向到空的长连接节点
             $nodeTree = NodeManager::getTreeByPath('dce/empty/connection');
         }
         $node = $nodeTree->getFirstNode();
+        ! in_array($this->method, $node->methods) && throw new RequestException(RequestException::NODE_LOCATION_FAILED);
         return $node;
     }
 
@@ -46,7 +55,8 @@ abstract class RawRequestConnection extends RawRequest {
      * @return string
      */
     public static function pack(string|false $path, mixed $data): string {
-        return sprintf('%s%s', false === $path ? '' : $path . "\n", json_encode($data, JSON_UNESCAPED_UNICODE));
+        // 此方法会在各个外部方法中被调用，所以需定义为静态方法，而请求响应式不会在外部调用，所以没必要在外部增加请求id参数，而是在子类实现response方法时直接在path上追加requestId
+        return sprintf('%s%s', false === $path ? '' : $path . self::PATH_SEPARATOR, is_string($data) ? $data : json_encode($data, JSON_UNESCAPED_UNICODE));
     }
 
     /**
@@ -55,9 +65,12 @@ abstract class RawRequestConnection extends RawRequest {
      * @return array
      */
     public static function unPack(string $data): array {
-        $data = explode("\n", $data, 2);
+        $requestId = null;
+        $data = explode(self::PATH_SEPARATOR, $data, 2);
         if (count($data) > 1) {
-            $path = $data[0];
+            $path = explode(self::REQUEST_SEPARATOR, $data[0], 2);
+            count($path) > 1 && $requestId = $path[1];
+            $path = $path[0];
             $data = $data[1];
         } else {
             $path = '';
@@ -66,9 +79,15 @@ abstract class RawRequestConnection extends RawRequest {
         $dataParsed = json_decode($data, true) ?: null;
         return [
             'path' => $path,
+            'requestId' => $requestId,
             'data' => $data,
             'dataParsed' => $dataParsed,
         ];
+    }
+
+    /** 是否请求响应模式 */
+    public function isResponseMode(): bool {
+        return isset($this->requestId);
     }
 
     /**
