@@ -223,7 +223,7 @@ final class NodeManager {
                 // 如果节点为隐藏路径节点, 且父树中未记录该节点, 则添加到父树隐藏路径节点集中
                 $node->omissiblePath && ! $parent->hasHiddenChild($child->pathFormat) && $parent->addHiddenChild($child, $child->pathFormat);
                 ! isset($node->corsOrigins) && $node->corsOrigins = $parentNode->corsOrigins ?? [];
-                ! isset($node->methods) && $node->methods = $parentNode->methods ?? ['get', 'head'];
+                ! isset($node->methods) && $node->methods = $parentNode->methods ?? ['get' => null, 'head' => null];
                 if (! isset($node->render)) {
                     $node->render = isset($parentNode->render) && ! str_contains($parentNode->render, '.') ? $parentNode->render : Renderer::TYPE_JSON;
                 } else if (! str_contains($node->render, '.')) {

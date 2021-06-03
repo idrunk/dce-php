@@ -28,7 +28,7 @@ class Node {
     /** @var string 节点路径名 */
     public string $pathName;
 
-    /** @var string[] 请求类型, [get, post, put, delete, cli], {会被继承} */
+    /** @var string[] 请求类型, (支持按 "类型 => 渲染器" 的配对形式配置) [get, post, put, delete, cli, websocket => raw], {会被继承} */
     public array $methods;
 
     /** @var string 节点路径, 如news */
@@ -145,16 +145,11 @@ class Node {
             $idGene = $properties['path_format'] = "{$projectName}/{$idGene}";
         }
         if (isset($properties['methods'])) {
-            if (! is_array($properties['methods'])) {
-                $properties['methods'] = [$properties['methods']];
+            ! is_array($properties['methods']) && $properties['methods'] = [$properties['methods']];
+            foreach ($properties['methods'] as $method => $render) {
+                unset($properties['methods'][$method]);
+                is_int($method) ? $properties['methods'][strtolower($render)] = null : $properties['methods'][strtolower($method)] = $render;
             }
-            array_walk($properties['methods'], function (& $method) {
-                if (! is_string($method)) {
-                    throw new NodeException(NodeException::NODE_METHODS_NEED_ARRAY);
-                }
-                // 若有指定请求类型, 则小写处理, 否则为开放式(即url匹配到即可, 不对请求类型作路由匹配)
-                $method = strtolower($method);
-            });
         }
         if (isset($properties['url_arguments'])) {
             // 初始化参数

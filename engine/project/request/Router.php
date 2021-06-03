@@ -116,7 +116,7 @@ class Router {
         }
         if ($isLocated !== true) {
             // 如果在根级别定位失败, 则最终定位失败
-            throw new RequestException(RequestException::NODE_LOCATION_FAILED);
+            throw (new RequestException(RequestException::NODE_LOCATION_FAILED))->format($this->rawRequest->getClientInfo()['request']);
         } else {
             return true;
         }
@@ -172,7 +172,7 @@ class Router {
                 $componentsRemaining = $components;
                 // 若未指定请求类型, 则不对请求类型做限制, 只要url匹配到即可
                 // 若非目录型节点, 则当前的请求类型必须符合节点配置
-                $methodMatched = in_array($this->rawRequest->method, $node->methods);
+                $methodMatched = key_exists($this->rawRequest->method, $node->methods);
                 if (! $methodMatched && ! $node->isDir) {
                     continue;
                 }

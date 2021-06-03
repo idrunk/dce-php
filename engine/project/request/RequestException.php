@@ -11,7 +11,7 @@ use dce\i18n\Language;
 
 // 1230-1259
 class RequestException extends Exception {
-    #[Language(['节点定位失败，请检查url是否正确'])]
+    #[Language(['节点定位失败，请检查路径（%s）是否正确'])]
     public const NODE_LOCATION_FAILED = 404;
 
     #[Language(['内部服务器错误'])]

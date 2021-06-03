@@ -48,8 +48,9 @@ class RawRequestHttpSwoole extends RawRequestHttp {
     /** @inheritDoc */
     public function getClientInfo(): array {
         return [
-            'ip' => $this->requestSwoole['remote_addr'],
-            'port' => $this->requestSwoole['remote_port'],
+            'request' => "$this->method $this->requestUri?$this->queryString",
+            'ip' => $this->requestSwoole->server['remote_addr'],
+            'port' => $this->requestSwoole->server['remote_port'],
         ];
     }
 
@@ -80,6 +81,7 @@ class RawRequestHttpSwoole extends RawRequestHttp {
 
     /** @inheritDoc */
     public function response(string $content): void {
+        $this->logResponse($content);
         $this->responseSwoole->end($content);
     }
 

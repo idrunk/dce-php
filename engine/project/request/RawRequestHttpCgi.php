@@ -26,6 +26,7 @@ class RawRequestHttpCgi extends RawRequestHttp {
     /** @inheritDoc */
     public function getClientInfo(): array {
         return [
+            'request' => "$this->method $this->requestUri?$this->queryString",
             'ip' => $_SERVER['REMOTE_ADDR'],
             'port' => $_SERVER['REMOTE_PORT'],
         ];
@@ -55,6 +56,7 @@ class RawRequestHttpCgi extends RawRequestHttp {
 
     /** @inheritDoc */
     public function response (string $content): void {
+        $this->logResponse($content);
         echo $content;
     }
 

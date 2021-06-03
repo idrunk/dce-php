@@ -334,22 +334,31 @@ class DceConfig extends Config {
 
     /** @var array 日志记录器配置 */
     #[ArrayShape([
-        'db' => [
-            'console' => 'bool',
+        'access' => [
+            'request' => 'bool', // console
+            'response' => 'bool', // console
         ],
         'exception' => [
             'console' => 'bool',
-            'file_power' => 'bool',
+            'log_file' => 'string',
+            'log_name_format' => 'string',
+        ],
+        'db' => [
+            'console' => 'bool',
         ],
     ])]
     public array $log = [
-        'db' => [ // 数据库日志
-            'console' => false, // 是否在控制台输出日志
+        'access' => [
+            'request' => true,
+            'response' => true,
         ],
         'exception' => [
             'console' => true,
             'log_file' => APP_RUNTIME . 'log/exception/%s.log',
             'log_name_format' => 'Y-m',
+        ],
+        'db' => [ // 数据库日志
+            'console' => false, // 是否在控制台输出日志
         ],
     ];
 

@@ -20,7 +20,9 @@ class RawRequestWebsocket extends RawRequestConnection {
     public function __construct(
         private WebsocketServer $server,
         private Frame $frame,
-    ) {}
+    ) {
+        $this->fd = $this->frame->fd;
+    }
 
     /**
      * 取Websocket Service
@@ -42,7 +44,7 @@ class RawRequestWebsocket extends RawRequestConnection {
 
     /** @inheritDoc */
     public function supplementRequest(Request $request): void {
-        $request->fd = $this->fd = $this->frame->fd;
+        $request->fd = $this->fd;
         $request->rawData = $this->rawData;
         if (is_array($this->dataParsed)) {
             $request->request = $this->dataParsed;
@@ -53,6 +55,7 @@ class RawRequestWebsocket extends RawRequestConnection {
 
     /** @inheritDoc */
     public function response(mixed $data, string|false $path): bool {
+        $this->logResponse($data);
         return $this->server->push($this->frame->fd, $data, $path . (isset($this->requestId) ? self::REQUEST_SEPARATOR . $this->requestId : ''));
     }
 }

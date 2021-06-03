@@ -9,8 +9,11 @@ namespace dce\project\render;
 use dce\Dce;
 use dce\project\Controller;
 use dce\project\request\RawRequest;
+use dce\project\request\Request;
 
 abstract class Renderer {
+    private const TYPE_RAW = 'raw';
+
     public const TYPE_JSON = 'json';
 
     public const TYPE_JSONP = 'jsonp';
@@ -21,6 +24,7 @@ abstract class Renderer {
 
     // 后续若需要可通过动态维护这个映射表来使用用户自定义渲染器
     private static array $renderMapping = [
+        self::TYPE_RAW => RawRenderer::class,
         self::TYPE_JSON => JsonRenderer::class,
         self::TYPE_JSONP => JsonpRenderer::class,
         self::TYPE_XML => XmlRenderer::class,
@@ -49,12 +53,16 @@ abstract class Renderer {
      * @return static
      */
     final public static function inst(Controller $controller, bool $isResponseMode): static {
-        $render = key_exists($controller->request->node->render, self::$renderMapping) ? $controller->request->node->render : self::TYPE_TEMPLATE;
+        ! key_exists($render = self::getRender($controller->request), self::$renderMapping) && $render = self::TYPE_TEMPLATE;
         if (! key_exists($render, self::$instanceMapping)) {
             self::$instanceMapping[$render] = new self::$renderMapping[$render];
         }
         self::$instanceMapping[$render]->prepare($controller, $isResponseMode);
         return self::$instanceMapping[$render];
+    }
+
+    protected static function getRender(Request $request): string {
+        return $request->node->methods[$request->rawRequest->method] ?? $request->node->render;
     }
 
     /**
@@ -159,5 +167,5 @@ abstract class Renderer {
      * @param mixed $data
      * @return string
      */
-    abstract protected function rendering(Controller $controller, mixed $data): string;
+    abstract protected function rendering(Controller $controller, mixed $data): mixed;
 }

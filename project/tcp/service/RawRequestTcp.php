@@ -20,6 +20,7 @@ class RawRequestTcp extends RawRequestConnection {
         private ServerMatrix $server,
         string $data, int $fd, int $reactor_id,
     ) {
+        $this->fd = $fd;
         $this->raw = [
             'fd' => $fd,
             'reactor_id' => $reactor_id,
@@ -44,7 +45,7 @@ class RawRequestTcp extends RawRequestConnection {
 
     /** @inheritDoc */
     public function supplementRequest(Request $request): void {
-        $request->fd = $this->fd = $this->raw['fd'];
+        $request->fd = $this->fd;
         $request->rawData = $this->rawData;
         if (is_array($this->dataParsed)) {
             $request->request = $this->dataParsed;
@@ -55,6 +56,7 @@ class RawRequestTcp extends RawRequestConnection {
 
     /** @inheritDoc */
     public function response(mixed $data, string|false $path): bool {
+        $this->logResponse($data);
         return $this->server->send($this->raw['fd'], $data, $path . (isset($this->requestId) ? self::REQUEST_SEPARATOR . $this->requestId : ''));
     }
 }

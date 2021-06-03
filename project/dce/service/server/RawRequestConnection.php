@@ -30,19 +30,17 @@ abstract class RawRequestConnection extends RawRequest {
     /** @inheritDoc */
     public function routeGetNode(): Node {
         $nodeTree = NodeManager::getTreeByPath($this->path);
-        if (! $nodeTree) {
-            ! in_array($this->path, ['', '/']) && throw (new RequestException(RequestException::NODE_LOCATION_FAILED))->format($this->path);
-            // 如果未匹配到节点，且请求路径为空，则重定向到空的长连接节点
-            $nodeTree = NodeManager::getTreeByPath('dce/empty/connection');
-        }
-        $node = $nodeTree->getFirstNode();
-        ! in_array($this->method, $node->methods) && throw new RequestException(RequestException::NODE_LOCATION_FAILED);
+        ! $nodeTree && in_array($this->path, ['', '/']) && $nodeTree = NodeManager::getTreeByPath('dce/empty/connection');
+        $node = $nodeTree ? $nodeTree->getFirstNode() : null;
+        ! key_exists($this->method, $node->methods ?? []) && throw (new RequestException(RequestException::NODE_LOCATION_FAILED))->format($this->getClientInfo()['request']);
+        $this->logRequest($node);
         return $node;
     }
 
     /** @inheritDoc */
     public function getClientInfo(): array {
         $clientInfo = $this->getServer()->getServer()->getClientInfo($this->fd);
+        $clientInfo['request'] = "$this->method $this->path:" . ($this->requestId ?? '');
         $clientInfo['ip'] = $clientInfo['remote_ip'];
         $clientInfo['port'] = $clientInfo['remote_port'];
         return $clientInfo;

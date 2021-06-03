@@ -37,7 +37,7 @@ class TemplateRenderer extends Renderer {
      */
     protected function warmUp(Request $request): void {
         $templateRoot = "{$request->project->path}template/";
-        $this->templatePath = $templateRoot . $request->node->render;
+        $this->templatePath = $templateRoot . self::getRender($request);
         if (! is_file($this->templatePath) ) {
             throw (new RenderException(RenderException::TEMPLATE_NOTFOUND))->format($this->templatePath);
         }
