@@ -27,21 +27,23 @@ final class Utility {
         if (is_object($value)) {
             $value = get_class($value);
         } else if (is_array($value)) {
-            $value = mb_substr(json_encode($value, JSON_UNESCAPED_UNICODE), 0, 32);
+            $value = json_encode($value, JSON_UNESCAPED_UNICODE);
         }
-        return (string) $value;
+        $len = mb_strlen($value = (string) $value);
+        static $maxCut = 1024;
+        return mb_substr($value, 0, $len > $maxCut ? $maxCut : $len) . ($len > $maxCut ? '...' : '');
     }
 
-    public static function buildInstance(string $className, array $arguments = []) {
+    public static function buildInstance(string $className, array $arguments = []): object|false {
         if (class_exists($className)) {
             return new $className(... $arguments);
         }
         return false;
     }
 
-    public static function noop() {
+    public static function noop(): callable {
         static $noop;
-        $noop ??= function () {};
+        $noop ??= fn() => null;
         return $noop;
     }
 }

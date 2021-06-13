@@ -30,6 +30,13 @@ abstract class RawRequestHttp extends RawRequest {
     private array $locatedArguments = [];
 
     /**
+     * 取请求头信息
+     * @param string|null $key {string: 某个头, null: 全部头信息}
+     * @return string|array|null
+     */
+    abstract public function getHeader(string|null $key = null): string|array|null;
+
+    /**
      * 设置响应头
      * @param string $key
      * @param string $value
@@ -202,7 +209,7 @@ abstract class RawRequestHttp extends RawRequest {
             $this->header('Access-Control-Allow-Origin', implode(',', $request->node->corsOrigins));
             $this->header('Access-Control-Allow-Credentials', 'true');
             $this->header('Access-Control-Allow-Methods', 'GET,PUT,DELETE,POST,OPTIONS');
-            $this->header('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, Accept, Cookie, Origin, Referer, UserToken, ReferToken');
+            $this->header('Access-Control-Allow-Headers', 'X-Requested-With, X-Session-Id, Content-Type, Authorization, Accept, Cookie, Origin, Referer, UserToken, ReferToken');
             $this->header('Access-Control-Max-Age', '7200');
             if($this->method === 'options') {
                 die('*_^');

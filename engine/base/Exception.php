@@ -152,11 +152,12 @@ class Exception extends \Exception implements ClassDecorator {
             ! $isSimple && Dce::$config->log['exception']['log_file'] && self::log($pureContent);
 
             if (($request = $throwable->request ?? null) && $request instanceof Request) {
+                // 否则如果是http异常或开发模式，则响应异常内容，否则响应http500
                 $exception = $isSimple || Dce::isDevEnv() ? $throwable : new RequestException(RequestException::INTERNAL_SERVER_ERROR);
                 if ($request->rawRequest instanceof RawRequestHttp) {
                     if ($isOpenly) { // 如果是公开异常，则响应异常消息
                         ($request->controller ?? 0) ? $request->controller->exception($exception) : $request->rawRequest->response(self::render($exception, null));
-                    } else { // 否则如果是http异常或开发模式，则响应异常内容，否则响应http500
+                    } else {
                         if ($request->controller ?? 0) {
                             $request->controller->httpException($exception->getCode(), $exception->getMessage());
                         } else {

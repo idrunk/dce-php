@@ -43,7 +43,7 @@ class SessionFile extends Session {
         $this->tryTouch();
         $cacheValue = self::$cache->get($this->getArrayId()) ?: [];
         $cacheValue[$key] = $value;
-        self::$cache->set($this->getArrayId(), $cacheValue, $request->config->session['ttl'] ?? 3600);
+        self::$cache->set($this->getArrayId(), $cacheValue, self::$config['ttl'] ?: 3600);
     }
 
     /** @inheritDoc */
@@ -72,5 +72,22 @@ class SessionFile extends Session {
     /** @inheritDoc */
     public function destroy(): void {
         self::$cache->del($this->getArrayId());
+    }
+
+    /** @inheritDoc */
+    public function renew(bool $longLive = false): static {
+        $data = $this->getAll();
+        $this->destroy();
+        $this->setId(self::genId());
+        // 如果是长存session，则设置较长的过期时间，否则取原过期时间或短过期时间
+        $ttl = $longLive && self::$config['long_ttl'] ? self::$config['long_ttl'] : (self::$config['ttl'] ?: 3600);
+        self::$cache->set($this->getArrayId(), $data, $ttl);
+        return $this;
+    }
+
+    /** @inheritDoc */
+    public function getMeta(): array {
+        $meta = self::$cache->getMeta($this->getArrayId());
+        return ['create_time' => $meta['create_time'], 'expiry' => $meta['expiry'], 'ttl' => $meta['expiry'] + $meta['create_time'] - time(), 'long_live' => $meta['expiry'] > self::$config['ttl']];
     }
 }

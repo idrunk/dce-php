@@ -12,6 +12,7 @@ use dce\i18n\Language;
 use dce\i18n\Locale;
 use dce\sharding\id_generator\DceIdGenerator;
 use dce\sharding\middleware\ShardingConfig;
+use drunk\Utility;
 use JetBrains\PhpStorm\ArrayShape;
 
 /**
@@ -114,21 +115,25 @@ class DceConfig extends Config {
         'name' => 'string',
         'auto_open' => 'bool',
         'ttl' => 'int',
+        'long_ttl' => 'int',
         'class' => 'string',
         'root' => 'string',
         'index' => 'int',
         'manager_class' => 'string',
         'manager_index' => 'int',
+        'valid' => 'callable',
     ])]
     public array $session = [
         'name' => 'dcesid', // Sid名
         'auto_open' => 0, // 是否自动启动
         'ttl' => 3600, // Session存活时间
+        'long_ttl' => 0, // 较长的Session存活时间
         'class' => '', // 未指定Session类则Dce自行选择
         'root' => APP_RUNTIME . 'session/', // 文件型Session处理器根目录
         'index' => 0, // RedisSession处理器库号
         'manager_class' => '', // 留空表示Dce执行选择SessionManager类
         'manager_index' => 0,
+        'valid' => [Utility::class, 'noop'], // session有效性校验方法，若返回false，则表示该session异常（如非法异地登录），Dce将自动清除这个session
     ];
 
     /** @var array Redis配置 */

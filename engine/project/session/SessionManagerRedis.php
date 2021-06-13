@@ -17,9 +17,7 @@ class SessionManagerRedis extends SessionManager {
 
     private const MID_PREFIX = 'sm-mid:';
 
-    /**
-     * @inheritDoc
-     */
+    /** @inheritDoc */
     protected function setFdForm(string $sid, int $fd, string $host, int $port, string $extra): string {
         $fdid = self::genFdid($fd, $host, $port);
         $redis = DceRedis::get(self::$config['manager_index']);
@@ -35,9 +33,7 @@ class SessionManagerRedis extends SessionManager {
         return $fdid;
     }
 
-    /**
-     * @inheritDoc
-     */
+    /** @inheritDoc */
     public function getFdForm(int|string $fd, string $host = '', int $port = 0): array|false {
         $fdid = self::genFdid($fd, $host, $port);
         $redis = DceRedis::get(self::$config['manager_index']);
@@ -46,9 +42,7 @@ class SessionManagerRedis extends SessionManager {
         return $fdForm ?: false;
     }
 
-    /**
-     * @inheritDoc
-     */
+    /** @inheritDoc */
     protected function delFdForm(int|string $fd, string $host = '', int $port = 0): bool {
         $fdid = self::genFdid($fd, $host, $port);
         $redis = DceRedis::get(self::$config['manager_index']);
@@ -57,9 +51,7 @@ class SessionManagerRedis extends SessionManager {
         return !! $affected;
     }
 
-    /**
-     * @inheritDoc
-     */
+    /** @inheritDoc */
     public function listFdForm(int $offset = 0, int|null $limit = 100, string $pattern = '*'): array {
         $redis = DceRedis::get(self::$config['manager_index']);
         $limit ??= 65535;
@@ -87,9 +79,7 @@ class SessionManagerRedis extends SessionManager {
         return $list;
     }
 
-    /**
-     * @inheritDoc
-     */
+    /** @inheritDoc */
     protected function setSessionForm(string $sid , string|array|null $fdids = null , int|null $mid = null): void {
         $redis = DceRedis::get(self::$config['manager_index']);
         $form = $redis->hGetAll(self::SID_PREFIX . $sid) ?: [];
@@ -106,9 +96,7 @@ class SessionManagerRedis extends SessionManager {
         DceRedis::put($redis);
     }
 
-    /**
-     * @inheritDoc
-     */
+    /** @inheritDoc */
     public function getSessionForm(string $sid , bool|null $fdidOrMid = false): array|int|false {
         $redis = DceRedis::get(self::$config['manager_index']);
         $data = $redis->hGetAll(self::SID_PREFIX . $sid);
@@ -117,9 +105,7 @@ class SessionManagerRedis extends SessionManager {
         return $property ? $data[$property] ?? false : $data ?? false;
     }
 
-    /**
-     * @inheritDoc
-     */
+    /** @inheritDoc */
     protected function delSessionForm(string $sid , string|array|false|null $fdidOrMid): bool {
         $result = true;
         $redis = DceRedis::get(self::$config['manager_index']);
@@ -146,9 +132,7 @@ class SessionManagerRedis extends SessionManager {
         return $result;
     }
 
-    /**
-     * @inheritDoc
-     */
+    /** @inheritDoc */
     protected function setMemberForm(int $mid , string|array|null $fdids = null , string|null $sid = null): void {
         if (! $sid && ! $fdids) {
             throw (new SessionException(SessionException::EMPTY_FORM_PARAMETERS))->format($mid);
@@ -168,9 +152,7 @@ class SessionManagerRedis extends SessionManager {
         DceRedis::put($redis);
     }
 
-    /**
-     * @inheritDoc
-     */
+    /** @inheritDoc */
     public function getMemberForm(int $mid , bool|null $fdidOrSid = true): array|false {
         $redis = DceRedis::get(self::$config['manager_index']);
         $form = $redis->hGetAll(self::MID_PREFIX . $mid);
@@ -179,9 +161,7 @@ class SessionManagerRedis extends SessionManager {
         return $property ? $form[$property] ?? [] : $form ?? false;
     }
 
-    /**
-     * @inheritDoc
-     */
+    /** @inheritDoc */
     protected function delMemberForm(int $mid , string|array|null $fdids = null , string|null $sid = null): bool {
         $result = true;
         $redis = DceRedis::get(self::$config['manager_index']);

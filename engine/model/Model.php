@@ -42,7 +42,7 @@ abstract class Model implements ArrayAccess, ClassDecorator {
      * @param bool $unsetDefault 是否清空待赋值属性键之外的属性值
      * @return $this
      */
-    protected function applyProperties(array|ArrayAccess $properties, bool $unsetDefault = true): static {
+    public function applyProperties(array|ArrayAccess $properties, bool $unsetDefault = true): static {
         foreach ($properties as $name => $property) {
             $passedKeys[] = $key = static::toModelKey($name);
             $this->$key = $property;

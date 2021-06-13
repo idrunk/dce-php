@@ -204,6 +204,27 @@ abstract class SessionManager {
     }
 
     /**
+     * 更新Session（将原fd与mid绑定的sid更新为新的）
+     * @param Session $session
+     * @param bool $longLive
+     * @return Session
+     */
+    public function renewSession(Session $session, bool $longLive = false): Session {
+        $originalSid = $session->getId();
+        $session->renew($longLive);
+        $sessionForm = $this->getSessionForm($originalSid, null);
+        if ($sessionForm) {
+            if ($sessionForm['mid'] ?? 0) {
+                $this->setMemberForm($sessionForm['mid'], sid: $session->getId());
+                $this->delMemberForm($sessionForm['mid'], sid: $originalSid);
+            }
+            $this->setSessionForm($session->getId(), $sessionForm['fdid'] ?? null, $sessionForm['mid'] ?? null);
+            $this->delSessionForm($originalSid, null);
+        }
+        return $session;
+    }
+
+    /**
      * 向已连接的指定登录用户发送可跨服务器消息
      * @param int $mid
      * @param mixed $message
@@ -347,10 +368,10 @@ abstract class SessionManager {
     /**
      * 绑定mid对应的sid/fdid
      * @param int $mid
-     * @param string|null $fdids
+     * @param string|array|null $fdids
      * @param string|null $sid
      */
-    abstract protected function setMemberForm(int $mid, string|null $fdids = null, string|null $sid = null): void;
+    abstract protected function setMemberForm(int $mid, string|array|null $fdids = null, string|null $sid = null): void;
 
     /**
      * 取mid对应的sid/fdid集
@@ -363,9 +384,9 @@ abstract class SessionManager {
     /**
      * 删除mid对应的sid/fdid (不做清除功能, 因为没有这样的场景, 应该在取数据发现无效时回调删除, 全删完时自动清除)
      * @param int $mid
-     * @param string|null $fdids
+     * @param string|array|null $fdids
      * @param string|null $sid
      * @return bool
      */
-    abstract protected function delMemberForm(int $mid, string|null $fdids = null, string|null $sid = null): bool;
+    abstract protected function delMemberForm(int $mid, string|array|null $fdids = null, string|null $sid = null): bool;
 }

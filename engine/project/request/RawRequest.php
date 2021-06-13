@@ -65,18 +65,16 @@ abstract class RawRequest {
     }
 
     protected function logRequest(Node $node): void {
-        $power = ConfigManager::getProjectConfig(ProjectManager::get($node->projectName))->log['access'];
-        if ($power['request'] && DCE_CLI_MODE) {
+        if (DCE_CLI_MODE && ConfigManager::getProjectConfig(ProjectManager::get($node->projectName))->log['access']['request']) {
             $requestData = is_string($this->getRawData()) ? $this->getRawData() : json_encode($this->getRawData(), JSON_UNESCAPED_UNICODE);
             echo sprintf("[%s] (%s) %s\n\n\n", date('Y-m-d H:i:s'), $this->getClientInfo()['request'], $requestData ? "\n\n$requestData" : '');
         }
     }
 
     protected function logResponse(mixed $data): void {
-        $power = RequestManager::current()->project->getConfig()->log['access'];
-        if ($power['response'] && DCE_CLI_MODE) {
+        if (DCE_CLI_MODE && RequestManager::current()->project->getConfig()->log['access']['response']) {
             $responseData = is_string($data) ? $data : json_encode($data, JSON_UNESCAPED_UNICODE);
-            echo sprintf("[%s] (response %s) %s\n\n\n", date('Y-m-d H:i:s'), $this->getClientInfo()['request'], $responseData ? "\n\n$responseData" : '');
+            echo sprintf("[%s] (响应 %s) %s\n\n\n", date('Y-m-d H:i:s'), $this->getClientInfo()['request'], $responseData ? "\n\n$responseData" : '');
         }
     }
 }

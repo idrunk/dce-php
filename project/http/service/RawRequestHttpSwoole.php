@@ -67,11 +67,14 @@ class RawRequestHttpSwoole extends RawRequestHttp {
         return $this->requestSwoole;
     }
 
-    /**
-     * @return ResponseSwoole
-     */
+    /** @return ResponseSwoole */
     public function getResponse(): ResponseSwoole {
         return $this->responseSwoole;
+    }
+
+    /** @inheritDoc */
+    public function getHeader(string|null $key = null): string|array|null {
+        return $key ? $this->requestSwoole->header : $this->requestSwoole->header[$key] ?? null;
     }
 
     /** @inheritDoc */
@@ -92,14 +95,14 @@ class RawRequestHttpSwoole extends RawRequestHttp {
 
     /** @inheritDoc */
     protected function supplementHttpRequest(Request $request): array {
-        $request->cookie = new CookieSwoole($this);
-        $request->session = Session::newByRequest($request);
-        $request->url = new Url($this); // 补充相关请求参数
-
         // 补充相关请求参数
         $request->files = $this->requestSwoole->files ?? [];
         $request->get = $this->requestSwoole->get ?? [];
-        return $this->setPostProperties($request, $this->requestSwoole->post ?? []);
+        $post = $this->setPostProperties($request, $this->requestSwoole->post ?? []);
+        $request->cookie = new CookieSwoole($this);
+        $request->session = Session::newByRequest($request);
+        $request->url = new Url($this); // 补充相关请求参数
+        return $post;
     }
 
     /** @inheritDoc */

@@ -109,7 +109,8 @@ final class NodeManager {
             $fileNodesOffset = count($nodes);
             [$className, $projectName] = $className;
             $className = '\\' . str_replace('/', '\\', $className);
-            foreach ((new ReflectionClass($className))->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+            $refClass = new ReflectionClass($className);
+            foreach (array_filter($refClass->getMethods(ReflectionMethod::IS_PUBLIC), fn($m) => $m->class === $refClass->name) as $method) {
                 foreach ($method->getAttributes(Node::class) as $attribute) {
                     $nodes[] = $node = Node::refToNodeArguments($method, $attribute);
                     if ($node['controllerPath'] ?? false) {

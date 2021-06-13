@@ -36,7 +36,6 @@ class DbField extends Field {
         int $precision = 0,
     ) {
         if (false !== $default) {
-            $default = new RawBuilder($default, false);
             $this->setDefault($default);
         }
         if ('' !== $comment) {

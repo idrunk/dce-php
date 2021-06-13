@@ -97,7 +97,7 @@ class WebsocketServer extends ServerMatrix {
      * @param Request $request
      */
     protected function takeoverOpen(Server $server, Request $request): void {
-        $session = Session::newBySid($request->cookie[Session::getSidName()] ?? true);
+        $session = Session::newBySid(Session::getSid($request) ?: true);
         Dce::$cache->var->set(['session', $request->fd], $session);
         Dce::$cache->var->set(['cookie', $request->fd], $request->cookie);
         SessionManager::inst()->connect($session->getId(), $request->fd, $this->apiHost, $this->apiPort, self::SM_EXTRA_WS);

@@ -9,9 +9,13 @@ namespace dce\project\session;
 use dce\Dce;
 use dce\project\request\Request;
 use dce\storage\redis\DceRedis;
+use JetBrains\PhpStorm\ArrayShape;
+use Swoole\Http\Request as SwooleRequest;
 
 abstract class Session {
     private const DEFAULT_ID_NAME = 'dcesid';
+
+    private const HEADER_SID_KEY = 'x-session-id';
 
     protected static string $sidName;
 
@@ -25,7 +29,6 @@ abstract class Session {
      * 根据Request开启Session
      * @param Request $request
      * @return static
-     * @throws SessionException
      */
     public static function newByRequest(Request $request): static {
         self::initConfig();
@@ -59,6 +62,19 @@ abstract class Session {
     }
 
     /**
+     * 从Dce Request或者Swoole Http Request对象取session id（支持从header/cookie/url参数获取，客户端分别以'x-session-id/dcesid/(dcesid)'的形式为键传递参数）
+     * @param Request|SwooleRequest $request
+     * @return string|null
+     */
+    public static function getSid(Request|SwooleRequest $request): string|null {
+        ($sid = ($request instanceof Request
+            ? ($request->rawRequest->getHeader(self::HEADER_SID_KEY) ?: $request->cookie->get(self::getSidName()))
+            : $request->cookie[self::getSidName()] ?? null
+        ) ?: $request->get['(' .self::getSidName(). ')'] ?? null) && $sid = trim($sid);
+        return $sid;
+    }
+
+    /**
      * 取Session Id键名
      * @return string
      */
@@ -75,9 +91,6 @@ abstract class Session {
      * @return $this
      */
     final protected function setId(string $sid): static {
-        if (isset($this->sid)) {
-            throw new SessionException(SessionException::SID_CAN_BIND_ONCE);
-        }
         $this->sid = $sid;
         return $this;
     }
@@ -88,20 +101,17 @@ abstract class Session {
      * @return string|null
      */
     public function getId(bool $withPrefix = false): string|null {
-        if (! isset($this->sid)) {
-            return null;
-        }
+        if (! ($this->sid ?? 0)) return null;
         return ($withPrefix ? self::getSidName() . ':' : '') . $this->sid;
     }
 
     /**
      * 开启Session并初始化
      * @param Request $request
-     * @throws SessionException
      */
     protected function open(Request $request): void {
         if (! $this->getId()) {
-            $id = $request->cookie->get(self::getSidName());
+            $id = self::getSid($request);
             if (! $id) {
                 $id = self::genId();
                 $request->cookie->set(self::getSidName(), $id);
@@ -126,7 +136,11 @@ abstract class Session {
         if ($this->touched) {
             return;
         }
-        $this->touch($param1);
+        if (false === (self::$config['valid'])($this)) {
+            $this->destroy(); // 如果session非法校验失败（可能非法异地登录等），则将其删掉
+        } else {
+            $this->touch($param1);
+        }
         $this->touched = true;
     }
 
@@ -170,4 +184,18 @@ abstract class Session {
      * @param mixed|null $param1 附加参数, 供子类传参
      */
     abstract protected function touch(mixed $param1 = null): void;
+
+    /**
+     * 重建一个session实体并删除旧实体，更新当前对象
+     * @param bool $longLive 是否长存session
+     * @return $this
+     */
+    abstract public function renew(bool $longLive = false): static;
+
+    /**
+     * 取源信息
+     * @return array
+     */
+    #[ArrayShape(['create_time' => 'int', 'long_live' => 'bool', 'ttl' => 'int', 'expiry' => 'int'])]
+    abstract public function getMeta(): array;
 }

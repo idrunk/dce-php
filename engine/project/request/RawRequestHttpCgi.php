@@ -26,7 +26,7 @@ class RawRequestHttpCgi extends RawRequestHttp {
     /** @inheritDoc */
     public function getClientInfo(): array {
         return [
-            'request' => "$this->method $this->requestUri?$this->queryString",
+            'request' => "$this->method $this->requestUri",
             'ip' => $_SERVER['REMOTE_ADDR'],
             'port' => $_SERVER['REMOTE_PORT'],
         ];
@@ -48,6 +48,14 @@ class RawRequestHttpCgi extends RawRequestHttp {
         return $this->rawData;
     }
 
+    /** @inheritDoc */
+    public function getHeader(string|null $key = null): string|array|null {
+        static $headers;
+        null === $headers && array_map(function($k) use(& $headers) {
+            $headers[strtolower(str_ireplace('HTTP_', '', $k))] = $_SERVER[$k];
+        }, array_filter(array_keys($_SERVER), fn($k) => preg_match('/^http_/ui', $k)));
+        return ! $key ? $headers : $headers[$key] ?? null;
+    }
 
     /** @inheritDoc */
     public function header(string $key, string $value): void {
@@ -55,7 +63,7 @@ class RawRequestHttpCgi extends RawRequestHttp {
     }
 
     /** @inheritDoc */
-    public function response (string $content): void {
+    public function response(string $content): void {
         $this->logResponse($content);
         echo $content;
     }
@@ -69,16 +77,14 @@ class RawRequestHttpCgi extends RawRequestHttp {
 
     /** @inheritDoc */
     public function supplementHttpRequest(Request $request): array {
+        // 补充相关请求参数
+        $request->files = $_FILES ?? [];
+        $request->get = $_GET ?? [];
+        $post = $this->setPostProperties($request, $_POST ?? []);
         // 实例化Session
         $request->cookie = new CookieCgi();
         $request->session = Session::newByRequest($request);
         $request->url = new Url($this);
-
-        // 补充相关请求参数
-        $request->files = $_FILES ?? [];
-        $request->get = $_GET ?? [];
-        $post = $_POST ?? [];
-        $post = $this->setPostProperties($request, $post);
         return $post;
     }
 
