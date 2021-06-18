@@ -121,7 +121,6 @@ abstract class RawRequestHttp extends RawRequest {
             $this->remainingPaths = $router->getComponentsRemaining();
             // 当前节点赋值
             $node = NodeManager::getNode(end($nodeIdFamily));
-            $this->logRequest($node);
         } catch (Throwable $throwable) {
             ! in_array($this->path, ['', '/']) && throw $throwable;
 

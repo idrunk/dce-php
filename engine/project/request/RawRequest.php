@@ -6,11 +6,7 @@
 
 namespace dce\project\request;
 
-use dce\config\ConfigManager;
-use dce\Dce;
 use dce\project\node\Node;
-use dce\project\ProjectManager;
-use dce\service\server\RawRequestConnection;
 use JetBrains\PhpStorm\ArrayShape;
 
 abstract class RawRequest {
@@ -62,19 +58,5 @@ abstract class RawRequest {
      */
     public function getRawData(): string|array {
         return $this->rawData;
-    }
-
-    protected function logRequest(Node $node): void {
-        if (DCE_CLI_MODE && ConfigManager::getProjectConfig(ProjectManager::get($node->projectName))->log['access']['request']) {
-            $requestData = is_string($this->getRawData()) ? $this->getRawData() : json_encode($this->getRawData(), JSON_UNESCAPED_UNICODE);
-            echo sprintf("[%s] (%s) %s\n\n\n", date('Y-m-d H:i:s'), $this->getClientInfo()['request'], $requestData ? "\n\n$requestData" : '');
-        }
-    }
-
-    protected function logResponse(mixed $data): void {
-        if (DCE_CLI_MODE && RequestManager::current()->project->getConfig()->log['access']['response']) {
-            $responseData = is_string($data) ? $data : json_encode($data, JSON_UNESCAPED_UNICODE);
-            echo sprintf("[%s] (响应 %s) %s\n\n\n", date('Y-m-d H:i:s'), $this->getClientInfo()['request'], $responseData ? "\n\n$responseData" : '');
-        }
     }
 }

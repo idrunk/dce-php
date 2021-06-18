@@ -6,6 +6,7 @@
 
 namespace http\service;
 
+use dce\log\LogManager;
 use dce\project\request\RawRequestHttp;
 use dce\project\request\Request;
 use dce\project\session\Session;
@@ -48,7 +49,7 @@ class RawRequestHttpSwoole extends RawRequestHttp {
     /** @inheritDoc */
     public function getClientInfo(): array {
         return [
-            'request' => "$this->method $this->requestUri?$this->queryString",
+            'request' => "$this->method {$this->requestSwoole->server['remote_addr']}$this->requestUri?$this->queryString",
             'ip' => $this->requestSwoole->server['remote_addr'],
             'port' => $this->requestSwoole->server['remote_port'],
         ];
@@ -74,7 +75,7 @@ class RawRequestHttpSwoole extends RawRequestHttp {
 
     /** @inheritDoc */
     public function getHeader(string|null $key = null): string|array|null {
-        return $key ? $this->requestSwoole->header : $this->requestSwoole->header[$key] ?? null;
+        return ! $key ? $this->requestSwoole->header : $this->requestSwoole->header[$key] ?? null;
     }
 
     /** @inheritDoc */
@@ -84,7 +85,7 @@ class RawRequestHttpSwoole extends RawRequestHttp {
 
     /** @inheritDoc */
     public function response(string $content): void {
-        $this->logResponse($content);
+        LogManager::response($this, $content);
         $this->responseSwoole->end($content);
     }
 

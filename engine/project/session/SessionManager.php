@@ -9,12 +9,17 @@ namespace dce\project\session;
 use dce\Dce;
 use dce\rpc\RpcClient;
 use dce\service\server\ConnectionException;
-use dce\service\server\ServerMatrix;
 use dce\storage\redis\DceRedis;
 use rpc\dce\service\RpcServerApi;
 use Throwable;
 
 abstract class SessionManager {
+    /** @var string SessionManager FdForm Tcp fd标记 */
+    public const EXTRA_TCP = 'tcp';
+
+    /** @var string SessionManager FdForm Websocket fd标记 */
+    public const EXTRA_WS = 'ws';
+
     protected static array $config;
 
     /** 单例 */
@@ -275,8 +280,8 @@ abstract class SessionManager {
             }
             try {
                 match ($extra) {
-                    ServerMatrix::SM_EXTRA_TCP => RpcClient::with($host, $port, fn() => RpcServerApi::send($fd, $message, $path)),
-                    ServerMatrix::SM_EXTRA_WS => RpcClient::with($host, $port, fn() => RpcServerApi::push($fd, $message, $path)),
+                    self::EXTRA_TCP => RpcClient::with($host, $port, fn() => RpcServerApi::send($fd, $message, $path)),
+                    self::EXTRA_WS => RpcClient::with($host, $port, fn() => RpcServerApi::push($fd, $message, $path)),
                 };
                 return true;
             } catch (ConnectionException $exception) {

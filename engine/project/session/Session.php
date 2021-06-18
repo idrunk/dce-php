@@ -21,9 +21,9 @@ abstract class Session {
 
     protected static array $config;
 
-    private string $sid;
+    protected bool $touched = false;
 
-    private bool $touched = false;
+    private string $sid;
 
     /**
      * 根据Request开启Session

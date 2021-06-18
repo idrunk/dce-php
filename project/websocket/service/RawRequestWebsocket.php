@@ -7,6 +7,7 @@
 namespace websocket\service;
 
 use dce\Dce;
+use dce\log\LogManager;
 use dce\project\request\Request;
 use dce\service\server\RawRequestConnection;
 use Swoole\WebSocket\Frame;
@@ -55,7 +56,7 @@ class RawRequestWebsocket extends RawRequestConnection {
 
     /** @inheritDoc */
     public function response(mixed $data, string|false $path): bool {
-        $this->logResponse($data);
-        return $this->server->push($this->frame->fd, $data, $path . (isset($this->requestId) ? self::REQUEST_SEPARATOR . $this->requestId : ''));
+        LogManager::response($this, $data);
+        return $this->getServer()->push($this->fd, $data, $path . (isset($this->requestId) ? self::REQUEST_SEPARATOR . $this->requestId : ''));
     }
 }

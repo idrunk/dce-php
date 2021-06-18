@@ -6,6 +6,7 @@
 
 namespace tcp\service;
 
+use dce\log\LogManager;
 use dce\project\request\Request;
 use dce\service\server\RawRequestConnection;
 use dce\service\server\ServerMatrix;
@@ -47,13 +48,13 @@ class RawRequestUdp extends RawRequestConnection {
 
     /** @inheritDoc */
     public function response(mixed $data, string|false $path): bool {
-        $this->logResponse($data);
+        LogManager::response($this, $data);
         return $this->server->sendTo($this->clientInfo['address'], $this->clientInfo['port'], $data, $path . (isset($this->requestId) ? self::REQUEST_SEPARATOR . $this->requestId : ''));
     }
 
     /** @inheritDoc */
     public function getClientInfo(): array {
-        $this->clientInfo['request'] = "$this->method $this->path:" . ($this->requestId ?? '');
+        $this->clientInfo['request'] = "$this->method {$this->clientInfo['ip']}/$this->path:" . ($this->requestId ?? '');
         return $this->clientInfo;
     }
 }

@@ -40,7 +40,6 @@ class SessionFile extends Session {
 
     /** @inheritDoc */
     public function set(string $key, mixed $value): void {
-        $this->tryTouch();
         $cacheValue = self::$cache->get($this->getArrayId()) ?: [];
         $cacheValue[$key] = $value;
         self::$cache->set($this->getArrayId(), $cacheValue, self::$config['ttl'] ?: 3600);
@@ -61,7 +60,6 @@ class SessionFile extends Session {
 
     /** @inheritDoc */
     public function delete(string $key): void {
-        $this->tryTouch();
         $cacheValue = self::$cache->get($this->getArrayId()) ?: [];
         if (key_exists($key, $cacheValue)) {
             unset($cacheValue[$key]);

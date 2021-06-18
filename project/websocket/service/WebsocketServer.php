@@ -8,6 +8,7 @@ namespace websocket\service;
 
 use dce\base\Exception;
 use dce\Dce;
+use dce\log\LogManager;
 use dce\project\ProjectManager;
 use dce\project\request\RequestManager;
 use dce\project\session\Session;
@@ -98,9 +99,10 @@ class WebsocketServer extends ServerMatrix {
      */
     protected function takeoverOpen(Server $server, Request $request): void {
         $session = Session::newBySid(Session::getSid($request) ?: true);
+        LogManager::connect($this, $request->fd, $session->getId());
         Dce::$cache->var->set(['session', $request->fd], $session);
         Dce::$cache->var->set(['cookie', $request->fd], $request->cookie);
-        SessionManager::inst()->connect($session->getId(), $request->fd, $this->apiHost, $this->apiPort, self::SM_EXTRA_WS);
+        SessionManager::inst()->connect($session->getId(), $request->fd, $this->apiHost, $this->apiPort, SessionManager::EXTRA_WS);
         $this->eventOnOpen($server, $request);
     }
 
@@ -122,6 +124,7 @@ class WebsocketServer extends ServerMatrix {
      */
     public function push(int $fd, mixed $value, string|false $path): bool {
         $data = call_user_func([static::$rawRequestWebsocketClass, 'pack'], $path, $value);
+        LogManager::send($this, $fd, $data, $path);
         return $this->server->push($fd, $data);
     }
 

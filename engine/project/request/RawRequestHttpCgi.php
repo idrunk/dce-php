@@ -6,6 +6,7 @@
 
 namespace dce\project\request;
 
+use dce\log\LogManager;
 use dce\project\session\CookieCgi;
 use dce\project\session\Session;
 
@@ -26,8 +27,8 @@ class RawRequestHttpCgi extends RawRequestHttp {
     /** @inheritDoc */
     public function getClientInfo(): array {
         return [
-            'request' => "$this->method $this->requestUri",
-            'ip' => $_SERVER['REMOTE_ADDR'],
+            'request' => "$this->method $this->remoteAddr$this->requestUri",
+            'ip' => $this->remoteAddr,
             'port' => $_SERVER['REMOTE_PORT'],
         ];
     }
@@ -64,7 +65,7 @@ class RawRequestHttpCgi extends RawRequestHttp {
 
     /** @inheritDoc */
     public function response(string $content): void {
-        $this->logResponse($content);
+        LogManager::response($this, $content);
         echo $content;
     }
 

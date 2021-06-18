@@ -10,6 +10,7 @@ use dce\base\SwooleUtility;
 use dce\config\DceConfig;
 use dce\event\Event;
 use dce\i18n\Locale;
+use dce\log\LogManager;
 use dce\project\Controller;
 use dce\project\node\Node;
 use dce\project\node\NodeManager;
@@ -141,6 +142,7 @@ class Request {
         // 补充请求对象相关属性
         $this->rawRequest->supplementRequest($this);
         $this->locale = new Locale($this);
+        LogManager::request($this);
         // 执行控制器方法
         $this->controller();
     }

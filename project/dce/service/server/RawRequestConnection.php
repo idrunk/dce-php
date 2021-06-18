@@ -33,14 +33,13 @@ abstract class RawRequestConnection extends RawRequest {
         ! $nodeTree && in_array($this->path, ['', '/']) && $nodeTree = NodeManager::getTreeByPath('dce/empty/connection');
         $node = $nodeTree ? $nodeTree->getFirstNode() : null;
         ! key_exists($this->method, $node->methods ?? []) && throw (new RequestException(RequestException::NODE_LOCATION_FAILED))->format($this->getClientInfo()['request']);
-        $this->logRequest($node);
         return $node;
     }
 
     /** @inheritDoc */
     public function getClientInfo(): array {
         $clientInfo = $this->getServer()->getServer()->getClientInfo($this->fd);
-        $clientInfo['request'] = "$this->method $this->path:" . ($this->requestId ?? '');
+        $clientInfo['request'] = "$this->method {$clientInfo['remote_ip']}/$this->path:" . ($this->requestId ?? '');
         $clientInfo['ip'] = $clientInfo['remote_ip'];
         $clientInfo['port'] = $clientInfo['remote_port'];
         return $clientInfo;

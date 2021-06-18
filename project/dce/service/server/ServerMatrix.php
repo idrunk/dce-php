@@ -11,6 +11,7 @@ use dce\config\DceConfig;
 use dce\Dce;
 use dce\i18n\Language;
 use dce\loader\ClassDecorator;
+use dce\log\LogManager;
 use dce\project\request\RequestManager;
 use dce\project\session\Session;
 use dce\project\session\SessionManager;
@@ -27,12 +28,6 @@ use Throwable;
 
 abstract class ServerMatrix implements ClassDecorator {
     protected static Language|array $langStarted = ["%s 服务器已启动于 %s:%s.\n\n", "%s server started with %s:%s.\n\n"];
-
-    /** @var string SessionManager FdForm Tcp fd标记 */
-    public const SM_EXTRA_TCP = 'tcp';
-
-    /** @var string SessionManager FdForm Websocket fd标记 */
-    public const SM_EXTRA_WS = 'ws';
 
     /** @var string 定义RawRequestHttp类名, (可在子类覆盖此属性使用自定义RawRequest类) */
     protected static string $rawRequestHttpClass = RawRequestHttpSwoole::class;
@@ -125,8 +120,9 @@ abstract class ServerMatrix implements ClassDecorator {
      */
     protected function takeoverConnect(Server $server, int $fd, int $reactorId): void {
         $session = Session::newBySid(true); // 生成一个Session对象并var缓存
+        LogManager::connect($this, $fd, $session->getId());
         Dce::$cache->var->set(['session', $fd], $session);
-        SessionManager::inst()->connect($session->getId(), $fd, $this->apiHost, $this->apiPort, self::SM_EXTRA_TCP);
+        SessionManager::inst()->connect($session->getId(), $fd, $this->apiHost, $this->apiPort, SessionManager::EXTRA_TCP);
         $this->eventOnConnect($server, $fd, $reactorId);
     }
 
@@ -168,6 +164,7 @@ abstract class ServerMatrix implements ClassDecorator {
      * @param int $reactorId
      */
     protected function takeoverClose(Server $server, int $fd, int $reactorId): void {
+        LogManager::disconnect($this, $fd);
         $this->eventOnClose($server, $fd, $reactorId);
         SessionManager::inst()->disconnect($fd, $this->apiHost, $this->apiPort);
         Dce::$cache->var->del(['session', $fd]);
@@ -183,6 +180,7 @@ abstract class ServerMatrix implements ClassDecorator {
      */
     public function send(int $fd, mixed $value, string|false $path): bool {
         $data = call_user_func([static::$rawRequestTcpClass, 'pack'], $path, $value);
+        LogManager::send($this, $fd, $data, $path);
         return $this->getServer()->send($fd, $data);
     }
 
@@ -196,6 +194,7 @@ abstract class ServerMatrix implements ClassDecorator {
      */
     public function sendTo(string $host, int $port, mixed $value, string|false $path): bool {
         $data = call_user_func([static::$rawRequestUdpClass, 'pack'], $path, $value);
+        LogManager::send($this, $host, $data, $path);
         return $this->getServer()->sendto($host, $port, $data);
     }
 

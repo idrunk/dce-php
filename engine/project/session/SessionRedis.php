@@ -34,16 +34,16 @@ class SessionRedis extends Session {
     /** @inheritDoc */
     public function set(string $key, mixed $value): void {
         $redis = DceRedis::get(self::$config['index']);
-        $this->tryTouch($redis);
         $redis->hSet($this->getId(true), $key, $value);
+        $this->tryTouch($redis); // 得放在后面touch，否则初始化后就没操作过的session将无法自动过期
         DceRedis::put($redis);
     }
 
     /** @inheritDoc */
     public function get(string $key): mixed {
         $redis = DceRedis::get(self::$config['index']);
-        $this->tryTouch($redis);
         $value = $redis->hGet($this->getId(true), $key);
+        $this->tryTouch($redis);
         DceRedis::put($redis);
         return $value;
     }
@@ -51,8 +51,8 @@ class SessionRedis extends Session {
     /** @inheritDoc */
     public function getAll(): array {
         $redis = DceRedis::get(self::$config['index']);
-        $this->tryTouch($redis);
         $value = $redis->hGetAll($this->getId(true));
+        $this->tryTouch($redis);
         DceRedis::put($redis);
         return $value;
     }
@@ -60,8 +60,8 @@ class SessionRedis extends Session {
     /** @inheritDoc */
     public function delete(string $key): void {
         $redis = DceRedis::get(self::$config['index']);
-        $this->tryTouch($redis);
         $redis->hDel($this->getId(true), $key);
+        $this->tryTouch($redis);
         DceRedis::put($redis);
     }
 
@@ -80,6 +80,8 @@ class SessionRedis extends Session {
         $this->setId(self::genId());
         $redis = DceRedis::get(self::$config['index']);
         $redis->hMSet($this->getId(true), $data);
+        $this->touched = false;
+        $this->tryTouch($redis);
         DceRedis::put($redis);
         return $this;
     }

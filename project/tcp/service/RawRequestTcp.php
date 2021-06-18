@@ -7,6 +7,7 @@
 namespace tcp\service;
 
 use dce\Dce;
+use dce\log\LogManager;
 use dce\project\request\Request;
 use dce\service\server\RawRequestConnection;
 use dce\service\server\ServerMatrix;
@@ -56,7 +57,7 @@ class RawRequestTcp extends RawRequestConnection {
 
     /** @inheritDoc */
     public function response(mixed $data, string|false $path): bool {
-        $this->logResponse($data);
+        LogManager::response($this, $data);
         return $this->server->send($this->raw['fd'], $data, $path . (isset($this->requestId) ? self::REQUEST_SEPARATOR . $this->requestId : ''));
     }
 }

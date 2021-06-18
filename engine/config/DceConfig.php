@@ -342,6 +342,8 @@ class DceConfig extends Config {
         'access' => [
             'request' => 'bool', // console
             'response' => 'bool', // console
+            'connect' => 'bool', // 包括disconnect等
+            'send' => 'bool', // 包括sentTo与push
         ],
         'exception' => [
             'console' => 'bool',
@@ -356,6 +358,8 @@ class DceConfig extends Config {
         'access' => [
             'request' => true,
             'response' => true,
+            'connect' => true,
+            'send' => false,
         ],
         'exception' => [
             'console' => true,

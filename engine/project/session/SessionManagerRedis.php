@@ -116,7 +116,7 @@ class SessionManagerRedis extends SessionManager {
                         array_splice($form['fdid'], $index, 1);
                     }
                 }
-                if (! $form['fdid']) {
+                if (! key_exists('fdid', $form)) {
                     // 如果集删完了, 则整个直接干掉
                     $result = $redis->hDel(self::SID_PREFIX . $sid, 'fdid');
                 } else {

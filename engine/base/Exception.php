@@ -9,6 +9,7 @@ namespace dce\base;
 use dce\Dce;
 use dce\i18n\Language;
 use dce\loader\ClassDecorator;
+use dce\log\LogManager;
 use dce\project\request\RawRequestHttp;
 use dce\project\request\Request;
 use dce\project\request\RequestException;
@@ -143,13 +144,11 @@ class Exception extends \Exception implements ClassDecorator {
         } catch (QuietException) {
             // 拦截安静异常不抛出, 用于如事件回调中抛出异常截停程序并且不抛出异常
         } catch (Throwable $throwable) {
-            $isHttp = Exception::isHttp($throwable);
-            $isOpenly = ! $isHttp && Exception::isOpenly($throwable);
+            $isHttp = self::isHttp($throwable);
+            $isOpenly = ! $isHttp && self::isOpenly($throwable);
             $isSimple = $isHttp || $isOpenly;
-            $pureContent = self::render($throwable, $isSimple);
 
-            // 对closed异常记录日志
-            ! $isSimple && Dce::$config->log['exception']['log_file'] && self::log($pureContent);
+            LogManager::exception($throwable, $isSimple); // 打印及记录日志
 
             if (($request = $throwable->request ?? null) && $request instanceof Request) {
                 // 否则如果是http异常或开发模式，则响应异常内容，否则响应http500
@@ -170,31 +169,11 @@ class Exception extends \Exception implements ClassDecorator {
                     ($request->controller ?? 0) ? $request->controller->exception($exception) : $request->rawRequest->response(self::render($exception, null), $request->rawRequest->path);
                 }
             }
-
-            // 打印异常
-            DCE_CLI_MODE && Dce::$config->log['exception']['console'] && print($pureContent);
         }
     }
 
     public static function render(Throwable $throwable, bool|null $simple = false, bool $html = false): string {
-        $now = date('Y-m-d H:i:s');
-        if ($simple === null) {
-            $data = ['status' => false];
-            $throwable->getCode() && $data['code'] = $throwable->getCode();
-            $throwable->getMessage() && $data['message'] = $throwable->getMessage();
-            $content = json_encode($data, JSON_UNESCAPED_UNICODE);
-        } else {
-            $content = $simple ? sprintf("[%s] (%s: %s) %s\n\n\n", $now, get_class($throwable), $throwable->getCode(), $throwable->getMessage())
-                : sprintf("[%s] (%s: %s) %s\n\n%s\n\n\n", $now, get_class($throwable),$throwable->getCode(), $throwable->getMessage(), $throwable);
-            $html && $content = sprintf('<!doctype html><html lang="zh"><head><meta charset="UTF-8"><title>%s</title></head><body><pre>%s</pre></body></html>', $throwable->getMessage(), $content);
-        }
-        return $content;
-    }
-
-    private static function log(string $exception): void {
-        $filename = sprintf(Dce::$config->log['exception']['log_file'], date(Dce::$config->log['exception']['log_name_format']));
-        ! file_exists(dirname($filename)) && mkdir(dirname($filename), 0755, true);
-        file_put_contents($filename, $exception, FILE_APPEND | LOCK_EX);
+        return LogManager::exceptionRender($throwable, $simple, $html);
     }
 
     public static function init() {
