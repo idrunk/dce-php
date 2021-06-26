@@ -51,6 +51,9 @@ class Validator {
     /** @var string 集合校验器 */
     public const RULE_SET = 'set';
 
+    /** @var string 位集校验器 */
+    public const RULE_BITSET = 'bitset';
+
     /** @var string 字符串校验器 */
     public const RULE_STRING = 'string';
 
@@ -88,6 +91,7 @@ class Validator {
         ],
         self::RULE_REGULAR => 'dce\model\validator\checker\RegularValidator',
         self::RULE_SET => 'dce\model\validator\checker\SetValidator',
+        self::RULE_BITSET => 'dce\model\validator\checker\BitsetValidator',
         self::RULE_STRING => 'dce\model\validator\checker\StringValidator',
         self::RULE_URL => 'dce\model\validator\checker\UrlValidator',
         self::RULE_REQUIRED => 'dce\model\validator\ending\RequiredValidator',

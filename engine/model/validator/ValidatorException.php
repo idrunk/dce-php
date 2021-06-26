@@ -101,4 +101,7 @@ class ValidatorException extends Exception {
 
     #[Language(['{{label}} 不能重复'])]
     public const CANNOT_REPEAT = 1550;
+
+    #[Language(['{{label}} "{{value}}" 必须为 {{set}} 中的一个或组合'])]
+    public const VALUE_NOT_IN_BITSET = 1551;
 }

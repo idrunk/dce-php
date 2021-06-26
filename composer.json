@@ -18,6 +18,12 @@
     "require-dev": {
         "fakerphp/faker": "^1.13"
     },
+    "suggest": {
+        "ext-curl": "*",
+        "ext-redis": "*",
+        "ext-memcache": "*",
+        "ext-memcached": "*"
+    },
     "autoload": {
         "files": ["engine/run.php"]
     }

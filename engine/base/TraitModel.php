@@ -18,7 +18,7 @@ trait TraitModel {
      * @param mixed $value
      * @return $this
      */
-    public function setProperty (string $name, mixed $value): static {
+    public function setProperty(string $name, mixed $value): static {
         $propertyName = Char::camelize($name);
         if (property_exists($this, $propertyName)) {
             $this->$propertyName = $value;
@@ -26,14 +26,14 @@ trait TraitModel {
         return $this;
     }
 
-    public function setProperties (array $properties): static {
+    public function setProperties(array $properties): static {
         foreach ($properties as $name => $property) {
             $this->setProperty($name, $property);
         }
         return $this;
     }
 
-    public function arrayify (): array {
+    public function arrayify(): array {
         $properties = get_object_vars($this);
         foreach ($properties as $k => $property) {
             if (! is_scalar($property)) {

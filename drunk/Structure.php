@@ -12,34 +12,6 @@ use SplFixedArray;
 
 final class Structure {
     /**
-     * 将结构队列树形化
-     * @param array $items
-     * @param mixed $pid
-     * @param int $deep
-     * @param string $primaryKey
-     * @param string $parentKey
-     * @param bool $isKeepKey
-     * @param int $currentDeep
-     * @return array
-     */
-    public static function tree(array $items, mixed $pid, int $deep = 0, string $primaryKey = 'id', string $parentKey = 'pid', bool $isKeepKey = false, int $currentDeep = 1): array {
-        $itemsPeer = [];
-        foreach ($items as $k => $v) {
-            if ($v[$parentKey] != $pid) {
-                continue;
-            }
-            unset($items[$k]);
-            if (! $deep || $currentDeep < $deep) {
-                $v['children'] = self::tree($items, $v[$primaryKey], $deep, $primaryKey, $parentKey, $isKeepKey, $currentDeep + 1);
-            }
-            $isKeepKey
-                ? $itemsPeer[$k] = $v
-                : $itemsPeer[] = $v;
-        }
-        return $itemsPeer;
-    }
-
-    /**
      * 递归合并数组
      * @example arrayMerge([1, 'a'=>[2]], [2], ['a'=>[2]], ['b'=>[3]], ['b'=>4]); // [0=>1, 'a'=>[2, 2], 1=>2, 'b'=>4]
      * @param array $array
@@ -189,5 +161,22 @@ final class Structure {
         $keys = array_keys($array);
         $keysShouldBe = range(0, count($keys) - 1);
         return $keys === $keysShouldBe;
+    }
+
+    /**
+     * 按照矩阵列值集为参考，将矩阵按该参考值列表排序（常用语in查询时，查询结果与in元素顺序不一致，此时可以用此方法方便的排序）
+     * @param array[]|ArrayAccess[] $matrix 待排序的矩阵
+     * @param string $column 排序参考列
+     * @param array $refValues 排序参考值集
+     * @return array
+     */
+    public static function sortByColumnRef(array $matrix, string $column, array $refValues): array {
+        $valueOrderMapping = array_flip($refValues);
+        $refOrderValues = [];
+        foreach ($matrix as $array) {
+            $refOrderValues[] = $valueOrderMapping[$array[$column]] ?? 65535; // 没取到则往后排
+        }
+        array_multisort($matrix, SORT_ASC, SORT_NUMERIC, $refOrderValues);
+        return $matrix;
     }
 }

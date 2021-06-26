@@ -6,6 +6,8 @@
 
 namespace drunk;
 
+use ArrayAccess;
+
 abstract class Tree {
     /**
      * 树ID
@@ -22,37 +24,56 @@ abstract class Tree {
     /**
      * 添加子节点
      * @param static $child
-     * @param string|null $key
+     * @param string|array|null $keys
      */
-    public function addChild (self $child, string|null $key = null): void {
-        $child->id = $key;
-        $child->parent = $this;
-        null === $key
-            ? $this->children[] = $child
-            : $this->children[$key] = $child;
+    public function setChild(self $child, string|array|null $keys = null): void {
+        null !== $keys && ! is_array($keys) && $keys = [$keys];
+        $key = $keys ? array_pop($keys) : null;
+        $child->id ??= $key;
+        $parent = $keys ? $this->getChild($keys) : $this;
+        $child->parent = $parent;
+        null === $key ? $parent->children[] = $child : $parent->children[$key] = $child;
     }
 
     /**
      * 根据子节点下标取该节点
-     * @param string $key
-     * @return self|null
+     * @param string|array $keys
+     * @return static|null
      */
-    public function getChild (string $key): self|null {
-        return $this->children[$key] ?? null;
+    public function getChild(string|array $keys): static|null {
+        $keys && ! is_array($keys) && $keys = [$keys];
+        $child = $this;
+        foreach ($keys as $key) {
+            if (! $child = $child->children[$key] ?? null) {
+                break;
+            }
+        }
+        return $child;
     }
 
     /**
-     * 取父族关系树ID集
+     * 取父族树集
+     * @param Tree|null $until 直到取到某个父级
+     * @param bool $elderFirst
+     * @return static[]
+     */
+    public function getParents(self|null $until = null, bool $elderFirst = true): array {
+        $elements = [$this];
+        $parent = $this;
+        while ((! $until || $until !== $parent) && $parent = $parent->parent) {
+            $elements[] = $parent;
+        }
+        return $elderFirst ? array_reverse($elements) : $elements;
+    }
+
+    /**
+     * 取父族树ID集
+     * @param Tree|null $until
+     * @param bool $elderFirst
      * @return string[]
      */
-    public function getFamilyIds(): array {
-        $ids = [$this->id];
-        $parent = $this;
-        while (($parent = $parent->parent) && ($id = $parent->id)) {
-            $ids[] = $id;
-        }
-        $ids = array_reverse($ids);
-        return $ids;
+    public function getParentIds(self|null $until = null, bool $elderFirst = true): array {
+        return array_reduce($this->getParents($until, $elderFirst), fn($ids, $element) => [... $ids, ... (null === $element->id ? [] : [$element->id])], []);
     }
 
     /**
@@ -60,7 +81,7 @@ abstract class Tree {
      * @param string $key
      * @return bool
      */
-    public function has (string $key): bool {
+    public function has(string $key): bool {
         return key_exists($key, $this->children);
     }
 
@@ -68,21 +89,25 @@ abstract class Tree {
      * 是否空树
      * @return bool
      */
-    public function isEmpty (): bool {
+    public function isEmpty(): bool {
         return ! $this->children;
     }
 
     /**
      * 遍历全树执行回调函数
-     * @param callable $callback(Tree $child, Tree $parent)
+     * @param callable $callback(static $child) @return {false: 跳出兄弟级遍历, 0: 不遍历子级}
      */
-    public function traversal (callable $callback) {
+    public function traversal(callable $callback): void {
         $parents = [$this];
         while ($parent = array_pop($parents)) {
             $children = $parent->children;
             foreach ($children as $child) {
-                $parents[] = $child;
-                call_user_func_array($callback, [$child, $parent]);
+                $result = call_user_func_array($callback, [$child]);
+                if (false === $result) {
+                    break;
+                } else if ($result !== 0) {
+                    $parents[] = $child;
+                }
             }
         }
     }
@@ -91,11 +116,51 @@ abstract class Tree {
      * 子节点数组化
      * @return array
      */
-    protected function childrenArrayify (): array {
+    protected function childrenArrayify(): array {
         $children = [];
-        foreach ($this->children as $child) {
-            $children[] = $child->arrayify();
-        };
+        foreach ($this->children as $k => $child) {
+            $children[$k] = $child->arrayify();
+        }
         return $children;
     }
+
+    /**
+     * 从数组组装对象树
+     * @param array $arrays
+     * @param static|string|int $pid
+     * @param int $deep
+     * @param string $primaryKey
+     * @param string $parentKey
+     * @param bool $pkAsIndex
+     * @param int $currentDeep
+     * @return static
+     */
+    public static function from(array $arrays, self|string|int $pid, int $deep = 0, string $primaryKey = 'id', string $parentKey = 'pid', bool $pkAsIndex = false, int $currentDeep = 1): static {
+        $parent = $pid;
+        if (! $pid instanceof static) {
+            $parent = new static([$primaryKey => $pid]);
+            $parent->id = $pid;
+        }
+        foreach ($arrays as $k => $v) {
+            if ($v[$parentKey] != $parent->id) {
+                continue;
+            }
+            unset($arrays[$k]);
+            $child = new static($v);
+            $child->id = $v[$primaryKey];
+            if (! $deep || $currentDeep < $deep) {
+                $child->children = self::from($arrays, $child, $deep, $primaryKey, $parentKey, $pkAsIndex, $currentDeep + 1)->children;
+            }
+            $parent->setChild($child, $pkAsIndex ? $child->id : null);
+        }
+        return $parent;
+    }
+
+    abstract public function __construct(array|ArrayAccess $properties);
+
+    /**
+     * 树形数组化
+     * @return array
+     */
+    abstract public function arrayify(): array;
 }

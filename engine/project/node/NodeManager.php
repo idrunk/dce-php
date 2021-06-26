@@ -185,7 +185,7 @@ final class NodeManager {
             foreach ($nodeTrees as $path => $nodeTree) {
                 if ($nodeTree->pathParent === $parentTree->pathFormat) {
                     // 拼装树形结构
-                    $parentTree->addChild($nodeTree, $path);
+                    $parentTree->setChild($nodeTree, $path);
                     $rootTrees[] = $nodeTree;
                     unset($nodes[$path]);
                 }
@@ -212,17 +212,17 @@ final class NodeManager {
      * @param NodeTree $nodeTree
      */
     private static function initTreeItem(NodeTree $nodeTree): void {
-        $nodeTree->traversal(function (NodeTree $child, NodeTree $parent) {
+        $nodeTree->traversal(function(NodeTree $child) {
             $isDir = !! $child->children;
-            $familyPaths = $child->getFamilyIds();
+            $familyPaths = $child->getParentIds();
             // 记录路径索引
             self::$pathTreeMapping[$child->pathFormat] = $familyPaths;
-            $parentNode = $parent->nodes[key($parent->nodes)] ?? null;
-            foreach ($child->nodes as $i => $node) {
+            $parentNode = $child->parent->nodes[key($child->parent->nodes)] ?? null;
+            foreach($child->nodes as $node) {
                 // 记录ID索引
                 self::$idTreeMapping[$node->id] = $familyPaths;
                 // 如果节点为隐藏路径节点, 且父树中未记录该节点, 则添加到父树隐藏路径节点集中
-                $node->omissiblePath && ! $parent->hasHiddenChild($child->pathFormat) && $parent->addHiddenChild($child, $child->pathFormat);
+                $node->omissiblePath && ! $child->parent->hasHiddenChild($child->pathFormat) && $child->parent->addHiddenChild($child, $child->pathFormat);
                 ! isset($node->corsOrigins) && $node->corsOrigins = $parentNode->corsOrigins ?? [];
                 ! isset($node->methods) && $node->methods = $parentNode->methods ?? ['get' => null, 'head' => null];
                 if (! isset($node->render)) {
@@ -310,7 +310,7 @@ final class NodeManager {
      */
     public static function isSubOf(string $needlePath, string $elderPath): bool {
         $elderNodeTree = self::getTreeByPath($elderPath);
-        return $elderNodeTree && in_array($needlePath, $elderNodeTree->getFamilyIds());
+        return $elderNodeTree && in_array($needlePath, $elderNodeTree->getParentIds());
     }
 
     /**

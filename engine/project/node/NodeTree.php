@@ -6,6 +6,7 @@
 
 namespace dce\project\node;
 
+use ArrayAccess;
 use dce\base\TraitModel;
 use drunk\Tree;
 
@@ -28,7 +29,7 @@ class NodeTree extends Tree {
     /** @var NodeTree[] 隐藏路径子树集 */
     public array $hiddenChildren = [];
 
-    public function __construct(array $properties) {
+    public function __construct(array|ArrayAccess $properties) {
         $this->setProperties($properties);
     }
 

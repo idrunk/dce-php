@@ -18,7 +18,7 @@ class Network {
      * request constructor.
      * @param array $options curl请求配置
      */
-    function __construct (array|null $options = null) {
+    function __construct(array|null $options = null) {
         $this->curl = curl_init();
         $this->options = [
             CURLOPT_RETURNTRANSFER => true,
@@ -36,7 +36,7 @@ class Network {
      * @param mixed $value
      * @return $this
      */
-    public function setOption (int|array $key, mixed $value = null): self {
+    public function setOption(int|array $key, mixed $value = null): self {
         $options = is_array($key) ? $key : [$key => $value];
         curl_setopt_array($this->curl, $options);
         return $this;
@@ -48,7 +48,7 @@ class Network {
      * @param array|string|null $postData 若非假, 则发送post请求, 若为数组或字符串, 则作为post数据发送
      * @return bool|string
      */
-    public function send (string $url, array|string|null $postData = null): bool|string {
+    public function send(string $url, array|string|null $postData = null): bool|string {
         curl_setopt($this->curl, CURLOPT_URL, $url);
         if ($postData) {
             curl_setopt($this->curl, CURLOPT_POST, true);
@@ -72,7 +72,7 @@ class Network {
      * @param array|string|null $postData
      * @return bool
      */
-    public function sendAndSave (string|null $path, string $url, array|string|null $postData = null): bool {
+    public function sendAndSave(string|null $path, string $url, array|string|null $postData = null): bool {
         if (is_dir($path)) {
             $path = $path . '/' . uniqid('', true);
         }
@@ -88,7 +88,7 @@ class Network {
      * @param string|null $option
      * @return mixed
      */
-    public function response (string|null $option = null): mixed {
+    public function response(string|null $option = null): mixed {
         return empty($option) ? $this->response : $this->response[$option];
     }
 
@@ -104,7 +104,7 @@ class Network {
      * @param string $url
      * @return bool|string
      */
-    public static function sendGet (string $url): bool|string {
+    public static function sendGet(string $url): bool|string {
         return (new Network)->send($url);
     }
 
@@ -114,38 +114,8 @@ class Network {
      * @param string|array|bool $postData
      * @return bool|string
      */
-    public static function sendPost (string $url, string|array|bool $postData = true): bool|string {
+    public static function sendPost(string $url, string|array|bool $postData = true): bool|string {
         return (new Network)->send($url, $postData);
-    }
-
-    /**
-     * 获取客户端IP地址
-     * @param bool   $long {0:返回IP地址, 1:返回IPV4地址数字}
-     * @return string|int
-     */
-    public static function ip(bool $long = false): string|int {
-        $type      = $long ? 1 : 0;
-        static $ip = null;
-        if (null !== $ip) {
-            return $ip[$type];
-        }
-        if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $arr = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-            $pos = array_search('unknown', $arr);
-            if (false !== $pos) {
-                unset($arr[$pos]);
-            }
-            $ip = trim(current($arr));
-        } elseif (isset($_SERVER['HTTP_CLIENT_IP'])) {
-            $ip = $_SERVER['HTTP_CLIENT_IP'];
-        } elseif (isset($_SERVER['REMOTE_ADDR'])) {
-            $ip = $_SERVER['REMOTE_ADDR'];
-        }
-
-        // IP地址合法验证
-        $long = sprintf("%u", ip2long($ip));
-        $ip   = $long ? array($ip, $long): array('0.0.0.0', 0);
-        return $ip[$type];
     }
 
     public static function isLocalIp(string $ip): bool {

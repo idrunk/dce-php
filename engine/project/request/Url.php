@@ -31,7 +31,7 @@ class Url {
      */
     public static function make(string $path, array $arguments = [], string|null $suffix = null): string|null {
         $nodeTree = NodeManager::getTreeByPath($path);
-        $familyPaths = $nodeTree->getFamilyIds();
+        $familyPaths = $nodeTree->getParentIds();
         $urlParts = [];
         $currentNode = null;
         foreach ($familyPaths as $nodePath) {
