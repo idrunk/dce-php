@@ -16,6 +16,7 @@ use dce\db\query\builder\StatementInterface;
 use dce\db\query\QueryException;
 use dce\db\query\builder\schema\WhereConditionSchema;
 use dce\Dce;
+use dce\sharding\id_generator\IdgException;
 use dce\sharding\middleware\data_processor\DbReadProcessor;
 use dce\sharding\middleware\data_processor\DbWriteProcessor;
 use Iterator;
@@ -23,7 +24,7 @@ use Swoole\Coroutine\Barrier;
 use Throwable;
 
 class DbMiddleware extends Middleware {
-    private ShardingConfig $shardingConfig;
+    private ShardingConfig $config;
 
     private DbConnector $connector;
 
@@ -48,7 +49,7 @@ class DbMiddleware extends Middleware {
     protected function route(): void {
         $isWrite = $this->directiveParser->isWrite();
         if ($this->directiveParser->isSharding()) {
-            $this->shardingConfig = $this->directiveParser->getSharding();
+            $this->config = $this->directiveParser->getSharding();
             $dbMapping = $this->shardingRoute();
             if (SwooleUtility::inSwoole()) {
                 // Swoole环境则并发查询分库 (不做什么分离设计了, 直接放这直观方便)
@@ -97,7 +98,7 @@ class DbMiddleware extends Middleware {
         $dbConfigs = Dce::$config->mysql->getConfig($dbAlias, $isWrite);
         $connectorPool = DbPool::inst($dbAlias, $isWrite)->setConfigs($dbConfigs, false);
         // 若打开了事务开关, 则尝试开启事务
-        $transaction = ShardingTransaction::tryBegin($this->shardingConfig->alias, $dbAlias, $connectorPool);
+        $transaction = ShardingTransaction::tryBegin($this->config->alias, $dbAlias, $connectorPool);
         $inTransaction = $transaction instanceof ShardingTransaction;
         $connector = $inTransaction ? $transaction->getConnector() : $transaction;
         if ($this->directiveParser->isSelect()) {
@@ -147,7 +148,7 @@ class DbMiddleware extends Middleware {
             $dbSet = $this->navigationByCondition($conditions);
             if (! $dbSet) {
                 // 如果无法根据条件定位, 则查全部库
-                $dbSet = $this->shardingConfig->flipMapping;
+                $dbSet = $this->config->flipMapping;
             }
             foreach ($dbSet as $dbAlias) {
                 $dbMapping[$dbAlias][] = $statement;
@@ -164,53 +165,54 @@ class DbMiddleware extends Middleware {
 
     /**
      * 组装跨分库更新迁移sql组件 (分库更新数据时, 可能会更新分库依据字段, 这种字段值改变时可能需要迁库, 此方法即处理这种情况)
-     * @param array $storeData
+     * @param array $upData
      * @return array
      * @throws MiddlewareException
-     * @throws \dce\sharding\id_generator\IdgException
+     * @throws IdgException
      */
-    private function shardingUpdateTransfer(array $storeData): array {
-        $statement = $this->directiveParser->getStatement();
-        ['name' => $idName] = $this->shardingConfig->idColumn;
-        $mapping = $this->shardingConfig->flipMapping;
-        ['name' => $shardingName, 'tag' => $shardingTag] = $this->shardingConfig->shardingIdColumn;
-        $storeColumnValue = $storeData[$idName] ?? $storeData[$shardingName] ?? null;
-        if (! $storeColumnValue) {
+    private function shardingUpdateTransfer(array $upData): array {
+        [$upIdValue, $upShardingValue] = [$upData[$this->config->idColumn] ?? null, $upData[$this->config->shardingColumn] ?? null];
+        $upValue = $upShardingValue ?? $upIdValue;
+        if (null === $upValue) {
             // 如果待储存字段中不包括分库依据字段, 则为普通更新, 不会跨库迁移数据, 无需做特殊处理
             return [];
         }
-        if (! $this->shardingConfig->crossUpdate) {
-            throw new MiddlewareException(MiddlewareException::OPEN_CROSS_UPDATE_TIP);
-        }
+        ! $this->config->crossUpdate && throw new MiddlewareException(MiddlewareException::OPEN_CROSS_UPDATE_TIP);
+
+        $mapping = $this->config->flipMapping;
+        [$upValueColumn, $upValueTag] = null === $upShardingValue ? [$this->config->idColumn, $this->config->idTag] : [$this->config->shardingColumn, $this->config->shardingTag];
+        $upDbAlias = $this->config->isModulo() ? Dce::$config->idGenerator->mod($this->config->modulus, $upValue, $upValueTag) : self::rangeMappingEqual($mapping, $upValue)[0];
+
         $insertDataMapping = $deleteIdsMapping = [];
-        $dataToUpdate = (new Query($this->dbProxy))->table($statement->getTableSchema())->where($statement->getWhereSchema())->select();
-        if ($this->shardingConfig->isModulo()) {
-            $storeDbAlias = $mapping[Dce::$config->idGenerator->getClient($shardingTag)->extractGene($shardingTag, $storeColumnValue, $this->shardingConfig->modulus)];
-            foreach ($dataToUpdate as $datum) {
-                $shardingColumnValue = $datum[$shardingName];
-                $dbAlias = $mapping[Dce::$config->idGenerator->getClient($shardingTag)->extractGene($shardingTag, $shardingColumnValue, $this->shardingConfig->modulus)] ?? null;
-                if ($dbAlias != $storeDbAlias) {
-                    // 需要删除ID字段, 供移动插入到新库时自动生成新的
-                    unset($datum[$idName]);
-                    // 记录需要移动插入到新库的数据
-                    $insertDataMapping[$storeDbAlias][] = $datum;
-                    // 记录需要删除的记录ID (若在分库配置中未配置ID, 则会以分库字段作为待删数据的筛选条件)
-                    $deleteIdsMapping[$storeDbAlias][] = $shardingColumnValue;
+        $statement = $this->directiveParser->getStatement();
+        $oldData = (new Query($this->dbProxy))->table($statement->getTableSchema())->where($statement->getWhereSchema())->select();
+        foreach ($oldData as $old) {
+            // 如果表中没有有效的分库依据字段值，则无法进行跨库更新
+            $oldValue = $old[$upValueColumn] ?? null;
+            null === $oldValue && throw (new MiddlewareException(MiddlewareException::SHARDING_VALUE_NOT_SPECIFIED))->format($this->config->tableName, $upValueColumn);
+            $oldDbAlias = $this->config->isModulo() ? Dce::$config->idGenerator->mod($this->config->modulus, $oldValue, $upValueTag) : self::rangeMappingEqual($mapping, $oldValue)[0];
+            if ($upDbAlias !== $oldDbAlias) {
+                $insData = array_merge($old, $upData);
+
+                if ($this->config->shardingColumn && $this->config->idColumn) {
+                    if ($upShardingValue) {
+                        if ($this->config->idTag) {
+                            unset($insData[$this->config->idColumn]);
+                        } else if (null === $upIdValue) {
+                            throw (new MiddlewareException(MiddlewareException::UP_ID_VALUE_NOT_SPECIFIED))->format($this->config->tableName, $this->config->idColumn);
+                        }
+                    }
+                    $upIdValue && null === $upShardingValue
+                        && throw (new MiddlewareException(MiddlewareException::UP_SHARDING_VALUE_NOT_SPECIFIED))->format($this->config->tableName, $this->config->idColumn);
                 }
-                // 若目标储存库与源库相同, 则为常规的更新逻辑, 无需做特殊处理
-            }
-        } else if ($this->shardingConfig->isRange()) {
-            $storeDbAlias = self::rangeMappingEqual($mapping, $storeColumnValue)[0] ?? null;
-            foreach ($dataToUpdate as $datum) {
-                $shardingColumnValue = $datum[$shardingName];
-                $dbAlias = self::rangeMappingEqual($mapping, $shardingColumnValue)[0] ?? null;
-                if ($dbAlias != $storeDbAlias) {
-                    unset($datum[$idName]);
-                    $insertDataMapping[$storeDbAlias][] = $datum;
-                    $deleteIdsMapping[$storeDbAlias][] = $shardingColumnValue;
-                }
+
+                // 记录需要移动插入到新库的数据
+                $insertDataMapping[$upDbAlias][] = $insData;
+                // 记录需要删除的记录ID (若在分库配置中未配置ID, 则会以分库字段作为待删数据的筛选条件)
+                $deleteIdsMapping[$oldDbAlias][] = $oldValue;
             }
         }
+
         $dbMapping = [];
         foreach ($insertDataMapping as $dbAlias => $insertData) {
             // 向新库迁移插入数据
@@ -218,7 +220,7 @@ class DbMiddleware extends Middleware {
         }
         foreach ($deleteIdsMapping as $dbAlias => $deleteIds) {
             // 将旧库的已迁移数据删除
-            $dbMapping[$dbAlias][] = $this->directiveParser->buildDelete([$shardingName, 'in', $deleteIdsMapping]);
+            $dbMapping[$dbAlias][] = $this->directiveParser->buildDelete([$upValueTag, 'in', $deleteIdsMapping]);
         }
         return $dbMapping;
     }
@@ -229,68 +231,36 @@ class DbMiddleware extends Middleware {
      * @return array
      * @throws MiddlewareException
      * @throws QueryException
-     * @throws \dce\sharding\id_generator\IdgException
+     * @throws IdgException
      */
     private function navigationByStoreData(array $storeData): array {
-        ['name' => $idName] = $this->shardingConfig->idColumn;
-        ['name' => $shardingName, 'tag' => $shardingTag] = $this->shardingConfig->shardingColumn;
-        ['name' => $shardingIdName, 'tag' => $shardingIdTag] = $this->shardingConfig->shardingIdColumn;
-        $mapping = $this->shardingConfig->flipMapping;
-
-        if ($idName) {
-            foreach ($storeData as $k => $datum) {
-                if (isset($datum[$idName])) {
-                    // 如果有id了, 则不需生成了
-                    continue;
-                }
-                // 如果有配置分库字段, 则其亦为ID基因, 以基因生成ID, 方便与主体数据存入同一个库
-                if ($shardingName) {
-                    if (! isset($datum[$shardingName])) {
-                        throw (new MiddlewareException(MiddlewareException::GENE_COLUMN_NOT_FOUND))->format($shardingName);
-                    }
-                    // 先用生成器脱壳
-                    $geneId = Dce::$config->idGenerator->getClient($shardingTag)->extractGene($shardingTag, $datum[$shardingName]);
-                    $datum[$idName] = $this->lastInsertId = Dce::$config->idGenerator->generate($shardingTag, $geneId);
-                } else {
-                    $datum[$idName] = $this->lastInsertId = Dce::$config->idGenerator->generate($shardingIdTag);
-                }
-                $storeData[$k] = $datum;
-            }
-        }
-
         $dbStoreData = [];
-        if ($this->shardingConfig->isModulo()) {
-            foreach ($storeData as $datum) {
-                // ID或者外键分库ID皆可作为分库依据
-                $shardingId = $datum[$shardingIdName];
-                $remainder = Dce::$config->idGenerator->getClient($shardingIdTag)->extractGene($shardingIdTag, $shardingId, $this->shardingConfig->modulus);
-                $dbAlias = $mapping[$remainder] ?? null;
-                self::dataSorting($dbStoreData, $dbAlias, $shardingId, $datum);
+        foreach ($storeData as $datum) {
+            // 如果已配置idColumn且未传ID，则尝试自动生成
+            if ($this->config->idColumn && ! isset($datum[$this->config->idColumn])) {
+                ! $this->config->idTag && throw (new MiddlewareException(MiddlewareException::INSERT_ID_NOT_SPECIFIED))->format($this->config->idColumn);
+                if ($this->config->shardingColumn) {
+                    ! isset($datum[$this->config->shardingColumn]) && throw (new MiddlewareException(MiddlewareException::GENE_COLUMN_NOT_FOUND))->format($this->config->shardingColumn);
+                    $datum[$this->config->idColumn] = $this->lastInsertId = Dce::$config->idGenerator->generate($this->config->idTag, $datum[$this->config->shardingColumn], $this->config->shardingTag);
+                } else {
+                    $datum[$this->config->idColumn] = $this->lastInsertId = Dce::$config->idGenerator->generate($this->config->idTag);
+                }
             }
-        } else if ($this->shardingConfig->isRange()) {
-            foreach ($storeData as $datum) {
-                $id = $datum[$idName];
-                $dbAlias = self::rangeMappingEqual($mapping, $id)[0] ?? null;
-                self::dataSorting($dbStoreData, $dbAlias, $id, $datum);
+
+            $shardingValue = $datum[$this->config->shardingIdColumn] ?? null;
+            null === $shardingValue && throw (new MiddlewareException(MiddlewareException::SHARDING_COLUMN_NOT_SPECIFIED))->format($this->config->shardingIdColumn);
+            $dbAlias = null;
+            if ($this->config->isModulo()) {
+                $remainder = Dce::$config->idGenerator->mod($this->config->modulus, $shardingValue, $this->config->shardingIdTag);
+                $dbAlias = $this->config->flipMapping[$remainder] ?? null;
+            } else if ($this->config->isRange()) {
+                $dbAlias = self::rangeMappingEqual($this->config->flipMapping, $shardingValue)[0] ?? null;
             }
+            ! $dbAlias && throw (new QueryException(QueryException::ID_CANNOT_MATCH_DB))->format($shardingValue);
+            $dbStoreData[$dbAlias][] = $datum;
         }
 
         return $dbStoreData;
-    }
-
-    /**
-     * 分拣待储存数据, 根据ID划分库绑定
-     * @param array $dbStoreData
-     * @param string|null $dbAlias
-     * @param int $id
-     * @param array $datum
-     * @throws QueryException
-     */
-    private static function dataSorting(array & $dbStoreData, string|null $dbAlias, int $id, array $datum): void {
-        if (! $dbAlias) {
-            throw (new QueryException(QueryException::ID_CANNOT_MATCH_DB))->format($id);
-        }
-        $dbStoreData[$dbAlias][] = $datum;
     }
 
     /**
@@ -310,8 +280,8 @@ class DbMiddleware extends Middleware {
                     $subDbSet = $this->navigationByCondition($condition);
                 } else if ($condition instanceof WhereConditionSchema) {
                     // 如果当前字段为分库依据字段, 则尝试根据筛选值定位数据库集
-                    if (in_array($condition->columnPure, [$this->shardingConfig->idColumn['name'], $this->shardingConfig->shardingColumn['name']])) {
-                        $subDbSet = $this->locatingDbByCondition($condition);
+                    if (in_array($condition->columnPure, [$this->config->idColumn, $this->config->shardingColumn])) {
+                        $subDbSet = $this->locatingDbByCondition($condition, $condition->columnPure == $this->config->idColumn ? $this->config->idTag : $this->config->shardingTag);
                     }
                 }
                 if ($subDbSet) {
@@ -337,17 +307,17 @@ class DbMiddleware extends Middleware {
      * @param WhereConditionSchema $condition
      * @return array
      */
-    private function locatingDbByCondition(WhereConditionSchema $condition): array {
+    private function locatingDbByCondition(WhereConditionSchema $condition, string $shardingTag): array {
         $values = $condition->value;
         $dbSet = [];
-        $mapping = $this->shardingConfig->flipMapping;
-        if ($this->shardingConfig->isModulo()) {
+        $mapping = $this->config->flipMapping;
+        if ($this->config->isModulo()) {
             switch ($condition->operator) {
                 case '=':
                     $values = [$values];
                 case 'IN':
                     foreach ($values as $value) {
-                        $remainder = Dce::$config->idGenerator->getClient($this->shardingConfig->shardingIdColumn['tag'])->extractGene($this->shardingConfig->shardingIdColumn['tag'], $value, $this->shardingConfig->modulus);
+                        $remainder = Dce::$config->idGenerator->mod($this->config->modulus, $value, $shardingTag);
                         $dbName = $mapping[$remainder] ?? null;
                         if (null === $dbName) { // 如果某个值无法定位到库, 则实为无效值, 则应干脆不以该组不可靠的值去定位目标库
                             $dbSet = [];
@@ -357,7 +327,7 @@ class DbMiddleware extends Middleware {
                         }
                     }
             }
-        } else if ($this->shardingConfig->isRange()) {
+        } else if ($this->config->isRange()) {
             switch ($condition->operator) {
                 case '=':
                     $values = [$values];

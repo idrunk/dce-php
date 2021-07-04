@@ -257,8 +257,21 @@ abstract class Model implements ArrayAccess, ClassDecorator {
         return isset($this->$offset);
     }
 
-    public function offsetUnset($offset) {
+    public function offsetUnset(mixed $offset) {
         $offset = static::toModelKey($offset);
         unset($this->$offset);
+    }
+
+    /**
+     * 以属性键值对实例化一个模型对象
+     * @param array $properties
+     * @param bool $unsetDefault
+     * @param mixed ...$ctorArgs
+     * @return $this
+     */
+    public static function from(array $properties, bool $unsetDefault = true, mixed ... $ctorArgs): static {
+        $instance = new static(... $ctorArgs);
+        $instance->applyProperties($properties, $unsetDefault);
+        return $instance;
     }
 }

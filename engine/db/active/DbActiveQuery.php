@@ -11,6 +11,7 @@ use dce\db\Query;
 use dce\db\query\builder\RawBuilder;
 use dce\db\query\builder\schema\WhereSchema;
 use dce\db\query\builder\Statement\SelectStatement;
+use dce\model\Model;
 use Iterator;
 use JetBrains\PhpStorm\ArrayShape;
 
@@ -232,6 +233,13 @@ class DbActiveQuery extends ActiveQuery {
      * @return int|string
      */
     public function insert(array $data, bool|null $ignoreOrReplace = null): int|string {
+        $current = current($data);
+        if ($current instanceof Model) {
+            foreach ($data as $k => $datum) {
+                // 因为insert方法支持批量插入，而插入的数据有时为了方便需传递活动记录对象组，若为活动记录则需转为数据库式蛇底的数组下标字段名
+                $data[$k] = $datum->extractProperties();
+            }
+        }
         return $this->query->insert($data, $ignoreOrReplace);
     }
 

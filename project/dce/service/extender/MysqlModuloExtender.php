@@ -136,7 +136,6 @@ class MysqlModuloExtender extends ModuloExtender {
                 $sqlWhere = $this->getMaxWhereCondition($maxId);
                 $waitGroup->add();
                 go(function () use($waitGroup, $perTransfer, & $wasDone, & $batchLogs, $shardingConfig, $sqlWhere, $extendMapping, $srcDbAlias, $tableName, $sqlOrderBy) {
-                    ['name' => $shardingIdName, 'tag' => $shardingIdTag] = $shardingConfig->shardingIdColumn;
                     $limit = $perTransfer + $perTransfer * count($extendMapping);
                     // 取出批次可能需要迁移的源数据
                     $logs = $this->connections[$srcDbAlias]->queryAll(new RawBuilder("SELECT * FROM `{$tableName}` WHERE {$sqlWhere} ORDER BY {$sqlOrderBy} LIMIT {$limit}"));
@@ -152,7 +151,7 @@ class MysqlModuloExtender extends ModuloExtender {
                         }
                         foreach ($logs as $log) {
                             // 提取出排除掉服务ID后的可mod的ID并mod取余
-                            $remainder = Dce::$config->idGenerator->getClient($shardingIdTag)->extractGene($shardingIdTag, $log[$shardingIdName], $shardingConfig->targetModulus);
+                            $remainder = Dce::$config->idGenerator->mod($shardingConfig->modulus, $log[$shardingConfig->shardingIdColumn], $shardingConfig->shardingIdTag);
                             // 根据余数定位目标库并将记录与之mapping
                             if (key_exists($remainder, $extendMapping)) {
                                 $targetDbId = $extendMapping[$remainder];
@@ -296,14 +295,15 @@ class MysqlModuloExtender extends ModuloExtender {
     protected function hashClear(): bool {
         // 遍历分库规则数据表配置集
         foreach ($this->shardingConfigs as $tableName => $shardingConfig) {
-            $serverBitWidth = Dce::$config->idGenerator->getClient($shardingConfig->shardingIdColumn['tag'])->getBatch($shardingConfig->shardingIdColumn['tag'])->serverBitWidth;
+            $serverBitWidth = $shardingConfig->shardingIdTag ? Dce::$config->idGenerator->getClient($shardingConfig->shardingIdTag)->getBatch($shardingConfig->shardingIdTag)->serverBitWidth : null;
+            $divisorSql = null === $serverBitWidth ? "`$shardingConfig->shardingIdColumn` >> $serverBitWidth" : "crc32(`$shardingConfig->shardingIdColumn`)";
             // 遍历源库及其拓展库的映射
             $waitGroup = new WaitGroup();
             foreach ($shardingConfig->targetMapping as $dbAlias => $remainder) {
                 $waitGroup->add();
-                go(function () use($waitGroup, $dbAlias, $tableName, $serverBitWidth, $shardingConfig, $remainder) {
+                go(function () use($waitGroup, $dbAlias, $tableName, $divisorSql, $shardingConfig, $remainder) {
                     // 删除源库中已被迁移到新库的记录 (即按模取余非0的记录)
-                    $cntDeleted = $this->connections[$dbAlias]->execute("DELETE FROM `{$tableName}` WHERE (`{$shardingConfig->shardingIdColumn['name']}` >> {$serverBitWidth}) % {$shardingConfig->targetModulus} > {$remainder}", []);
+                    $cntDeleted = $this->connections[$dbAlias]->execute("DELETE FROM `$tableName` WHERE ($divisorSql) % $shardingConfig->targetModulus > $remainder", []);
                     $this->print("成功从{$dbAlias}.{$tableName}删除了{$cntDeleted}条拓表冗余数据");
                     $waitGroup->done();
                 });

@@ -75,15 +75,16 @@ final class DceIdGenerator extends Config {
     /**
      * 生成ID
      * @param string $tag
-     * @param int|string $uid
+     * @param int|string $uid 用户ID
+     * @param string|null $geneTag 基因标签, 传了则通过IDG拆包取基因ID, 否则以crc32编码取基因ID
      * @return int
      * @throws IdgException
      */
-    public function generate(string $tag, int|string $uid = 0): int {
+    public function generate(string $tag, int|string $uid = 0, string|null $geneTag = null): int {
         if ($this->clientRpcHosts) {
-            return IdgClientRpc::generate($tag, $uid);
+            return IdgClientRpc::generate($tag, $uid, $geneTag);
         } else {
-            return $this->getClient($tag)->generate($tag, $uid);
+            return $this->getClient($tag)->generate($tag, $uid, $geneTag);
         }
     }
 
@@ -95,12 +96,24 @@ final class DceIdGenerator extends Config {
      * @return array
      * @throws IdgException
      */
-    public function batchGenerate(string $tag, int $count, int|string $uid = 0): array {
+    public function batchGenerate(string $tag, int $count, int|string $uid = 0, string|null $geneTag = null): array {
         if ($this->clientRpcHosts) {
-            return IdgClientRpc::batchGenerate($tag, $count, $uid);
+            return IdgClientRpc::batchGenerate($tag, $count, $uid, $geneTag);
         } else {
-            return $this->getClient($tag)->batchGenerate($tag, $count, $uid);
+            return $this->getClient($tag)->batchGenerate($tag, $count, $uid, $geneTag);
         }
+    }
+
+    /**
+     * 取模以匹配分库
+     * @param int $modulus
+     * @param int|string $id
+     * @param string|null $tag
+     * @return int
+     * @throws IdgException
+     */
+    public function mod(int $modulus, int|string $id, string|null $tag = null): int {
+        return ($tag ? $this->getClient($tag)->extractGene($tag, $id) : IdGenerator::hashGene($id)) % $modulus;
     }
 
     /**

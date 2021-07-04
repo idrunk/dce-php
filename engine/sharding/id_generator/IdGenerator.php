@@ -73,22 +73,42 @@ final class IdGenerator {
      * 根据ID提取分库基因ModuloId
      * @param string $tag
      * @param int $id
-     * @param int $modulus 模数, 若传入了则执行取模运算计算余数
      * @return int
      * @throws IdgException
      */
-    public function extractGene(string $tag, int $id, int $modulus = 0): int {
-        return $this->getLock($tag)->extractGene($id, $modulus);
+    public function extractGene(string $tag, int $id): int {
+        return $this->getLock($tag)->extractGene($id);
+    }
+
+    /**
+     * 以hash算法生成基因ID
+     * @param int|string $uid
+     * @return int
+     */
+    public static function hashGene(int|string $uid): int {
+        return sprintf('%u', crc32($uid));
+    }
+
+    /**
+     * 生成基因ID
+     * @param int|string $uid
+     * @param string|null $geneTag
+     * @return int
+     * @throws IdgException
+     */
+    private function gene(int|string $uid, string|null $geneTag = null): int {
+        return $geneTag ? $this->extractGene($geneTag, $uid) : self::hashGene($uid);
     }
 
     /**
      * 生成ID
      * @param string $tag
-     * @param int|string $uid 用户ID, 若为字符串, 则会自动转为crc32的int
+     * @param int|string $uid 用户ID
+     * @param string|null $geneTag 基因标签, 传了则通过IDG拆包取基因ID, 否则以crc32编码取基因ID
      * @return int|array
      * @throws IdgException
      */
-    public function generate(string $tag, int|string $uid = 0): int|array {
+    public function generate(string $tag, int|string $uid = 0, string|null $geneTag = null): int|array {
         $this->storage->lock($tag);
         $client = $this->get($tag);
         // 设计缓存批次的概念以提升ID生成性能, 仅当缓存批次无效或过期时才从客户端储存申请新的缓存批次
@@ -97,7 +117,7 @@ final class IdGenerator {
             $client->setBatch($batch)->applyCacheBatch();
             $this->storage->save($tag, $batch);
         }
-        $result = $client->generate($uid);
+        $result = $client->generate($this->gene($uid, $geneTag));
         $this->storage->unlock($tag);
         return $result;
     }
@@ -118,14 +138,15 @@ final class IdGenerator {
      * @param string $tag
      * @param int $count
      * @param int|string $uid
+     * @param string|null $geneTag
      * @return int[]
      * @throws IdgException
      */
-    public function batchGenerate(string $tag, int $count, int|string $uid = 0): array {
+    public function batchGenerate(string $tag, int $count, int|string $uid = 0, string|null $geneTag = null): array {
         $this->storage->lock($tag);
         $client = $this->get($tag);
         $batch = $this->storage->load($tag);
-        $result = $client->setBatch($batch)->batchGenerate($count, $uid);
+        $result = $client->setBatch($batch)->batchGenerate($count, $this->gene($uid, $geneTag));
         $this->storage->save($tag, $batch);
         $this->storage->unlock($tag);
         return $result;
@@ -172,8 +193,8 @@ final class IdGenerator {
             $this->storage->save($tag, $batch);
         }
         return $this->clientMapping[$tag] = (match($batch->type) {
-            'increment' => new IdgClientIncrement($tag, $this->request),
-            'time' => new IdgClientTime($tag, $this->request),
+            IdgBatch::TYPE_INCREMENT => new IdgClientIncrement($tag, $this->request),
+            IdgBatch::TYPE_TIME => new IdgClientTime($tag, $this->request),
         })->setBatch($batch);
     }
 

@@ -11,6 +11,10 @@ use dce\base\TraitModel;
 class IdgBatch {
     use TraitModel;
 
+    public const TYPE_INCREMENT = 'increment';
+
+    public const TYPE_TIME = 'time';
+
     // ************* 需配置属性 *************
 
     /** @var string ID类型, {increment, time} */

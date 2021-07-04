@@ -67,10 +67,10 @@ abstract class IdgClient {
 
     /**
      * 生成ID
-     * @param int|string $uid
+     * @param int $uid
      * @return int
      */
-    final public function generate(int|string $uid = 0): int {
+    final public function generate(int $uid = 0): int {
         $base = $nextBit = 0;
         [$base, $nextBit] = $this->generateServer($base, $nextBit);
         [$base, $nextBit] = $this->generateModulo($base, $nextBit, $uid);
@@ -112,11 +112,11 @@ abstract class IdgClient {
     /**
      * 批量生成ID
      * @param int $count
-     * @param int|string $uid 用户ID, 若为字符串, 则会自动转为crc32的int
+     * @param int $uid 用户ID
      * @return array
      * @throws IdgException
      */
-    final public function batchGenerate(int $count, int|string $uid = 0): array {
+    final public function batchGenerate(int $count, int $uid = 0): array {
         $ids = [];
         for ($i = 0; $i < $count; $i ++) {
             if (! $this->validBatch($this->batch)) {
@@ -210,10 +210,6 @@ abstract class IdgClient {
     private function generateModulo(int $base, int $nextBit, int|string $uid): array {
         // 如果未配置, 则无需uid段
         if (! empty($this->batch->moduloBitWidth)) {
-            if (! is_numeric($uid)) {
-                // 如果UID为字符串, 则转为无符号crc32整数
-                $uid = sprintf('%u', crc32($uid));
-            }
             $moduloId = $uid % (1 << $this->batch->moduloBitWidth);
             $base += $moduloId << $nextBit;
             $nextBit += $this->batch->moduloBitWidth;
@@ -237,15 +233,11 @@ abstract class IdgClient {
     /**
      * 根据ID提取分库基因
      * @param int $id
-     * @param int $modulus 模数, 若传入了则执行取模运算计算余数
      * @return int
      */
-    public function extractGene(int $id, int $modulus = 0): int {
+    public function extractGene(int $id): int {
         if (! empty($this->batch->serverBitWidth)) {
             $id >>= $this->batch->serverBitWidth;
-        }
-        if ($modulus) {
-            $id %= $modulus;
         }
         return $id;
     }

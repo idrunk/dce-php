@@ -15,11 +15,11 @@ class MiddlewareException extends Exception {
     #[Language(['分库配置错误, 分库类型异常或未配置'])]
     public const CONFIG_SHARDING_TYPE_INVALID = 1800;
 
-    #[Language(['分库配置 %s > %s > id_column 异常'])]
-    public const CONFIG_ID_COLUMN_INVALID = 1801;
+    #[Language(['缺少分库配置 %s > %s > id_column'])]
+    public const CONFIG_ID_COLUMN_EMPTY = 1801;
 
-    #[Language(['分库配置 %s > %s > sharding_column 异常'])]
-    public const CONFIG_SHARDING_COLUMN_INVALID = 1802;
+    #[Language(['缺少分库配置 %s > %s > sharding_column'])]
+    public const CONFIG_SHARDING_COLUMN_EMPTY = 1802;
 
     #[Language(['分库配置错误, 未配置 %s 表内容切分依据字段'])]
     public const CONFIG_TABLE_SHARDING_RULE_EMPTY = 1803;
@@ -39,4 +39,19 @@ class MiddlewareException extends Exception {
 
     #[Language(['记录插入失败，获取新ID失败'])]
     public const INSERT_FAILED_NO_ID = 1824;
+
+    #[Language(['分库插入错误，未配置idTag时需手动指定待插入ID %s'])]
+    public const INSERT_ID_NOT_SPECIFIED = 1825;
+
+    #[Language(['分库依据字段 %s 未指定有效值'])]
+    public const SHARDING_COLUMN_NOT_SPECIFIED = 1826;
+
+    #[Language(['表 %s 中不存在分表依据字段 %s，或该字段有无效值，无法进行迁移更新'])]
+    public const SHARDING_VALUE_NOT_SPECIFIED = 1827;
+
+    #[Language(['跨库更新表 %s 时需指定idColumn字段 %s 的值'])]
+    public const UP_ID_VALUE_NOT_SPECIFIED = 1828;
+
+    #[Language(['跨库更新表 %s 时需指定shardingColumn字段 %s 的值'])]
+    public const UP_SHARDING_VALUE_NOT_SPECIFIED = 1829;
 }

@@ -99,7 +99,7 @@ final class IdgServer {
                 throw (new IdgException(IdgException::CONFIG_ITEM_MISSING))->format($configPath);
             }
             $configs[$tag] = IdgBatch::new()->setProperties(include($configPath));
-            if (! in_array($configs[$tag]->type ?? 0, ['increment', 'time'])) {
+            if (! in_array($configs[$tag]->type ?? 0, [IdgBatch::TYPE_INCREMENT, IdgBatch::TYPE_TIME])) {
                 throw (new IdgException(IdgException::PROPERTY_MAY_TYPE_ERROR))->format($configPath);
             }
         }
