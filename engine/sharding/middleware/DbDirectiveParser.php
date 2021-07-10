@@ -116,6 +116,7 @@ class DbDirectiveParser extends DirectiveParser {
         $tableSchema = $statement->getTableSchema();
         $joinSchema = $statement->getJoinSchema();
         $whereSchema = new WhereSchema();
+        $whereSchema->addCondition($this->whereConditions, false, false, 'AND');
         $whereSchema->addCondition($where, false, false, 'AND');
         $orderSchema = $statement->getOrderSchema();
         $limitSchema = $statement->getLimitSchema();

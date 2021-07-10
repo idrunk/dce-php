@@ -42,4 +42,7 @@ class ExtenderException extends Exception {
 
     #[Language(['扩展库不存在'])]
     public const EXTEND_DATABASE_NOT_EXISTS = 1876;
+
+    #[Language(['用户选择退出'])]
+    public const USER_QUIT = 1877;
 }

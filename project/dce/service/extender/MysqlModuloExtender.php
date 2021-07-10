@@ -151,7 +151,7 @@ class MysqlModuloExtender extends ModuloExtender {
                         }
                         foreach ($logs as $log) {
                             // 提取出排除掉服务ID后的可mod的ID并mod取余
-                            $remainder = Dce::$config->idGenerator->mod($shardingConfig->modulus, $log[$shardingConfig->shardingIdColumn], $shardingConfig->shardingIdTag);
+                            $remainder = Dce::$config->idGenerator->mod($shardingConfig->targetModulus, $log[$shardingConfig->shardingIdColumn], $shardingConfig->shardingIdTag);
                             // 根据余数定位目标库并将记录与之mapping
                             if (key_exists($remainder, $extendMapping)) {
                                 $targetDbId = $extendMapping[$remainder];
@@ -296,7 +296,7 @@ class MysqlModuloExtender extends ModuloExtender {
         // 遍历分库规则数据表配置集
         foreach ($this->shardingConfigs as $tableName => $shardingConfig) {
             $serverBitWidth = $shardingConfig->shardingIdTag ? Dce::$config->idGenerator->getClient($shardingConfig->shardingIdTag)->getBatch($shardingConfig->shardingIdTag)->serverBitWidth : null;
-            $divisorSql = null === $serverBitWidth ? "`$shardingConfig->shardingIdColumn` >> $serverBitWidth" : "crc32(`$shardingConfig->shardingIdColumn`)";
+            $divisorSql = null === $serverBitWidth ? "crc32(`$shardingConfig->shardingIdColumn`)" : "`$shardingConfig->shardingIdColumn` >> $serverBitWidth";
             // 遍历源库及其拓展库的映射
             $waitGroup = new WaitGroup();
             foreach ($shardingConfig->targetMapping as $dbAlias => $remainder) {

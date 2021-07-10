@@ -97,7 +97,7 @@ class ShardingConfig extends Config implements ConfigLibInterface {
                     // 必须至少配置一个分库规则
                     throw (new MiddlewareException(MiddlewareException::CONFIG_TABLE_SHARDING_RULE_EMPTY))->format($tableName);
                 }
-                [$table['sharding_id_column'], $table['sharding_id_column']] = isset($table['sharding_column'])
+                [$table['sharding_id_column'], $table['sharding_id_tag']] = isset($table['sharding_column'])
                     ? [$table['sharding_column'], $table['sharding_tag'] ?? null] : [$table['id_column'] ?? null, $table['id_tag'] ?? null];
                 $config = $table + $config;
                 $config['table_name'] = $tableName;

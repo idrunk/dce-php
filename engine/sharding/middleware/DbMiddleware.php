@@ -125,7 +125,7 @@ class DbMiddleware extends Middleware {
      * @throws MiddlewareException
      */
     private function shardingRoute(): array {
-        $dbMapping = $shardingMapping = [];
+        $dbMapping = [];
         if ($this->directiveParser->isInsert()) {
             $storeData = $this->directiveParser->getStoreData();
             $dbDataMapping = $this->navigationByStoreData($storeData);
@@ -137,8 +137,13 @@ class DbMiddleware extends Middleware {
             $statement = $this->directiveParser->getStatement();
             if ($this->directiveParser->isUpdate()) {
                 $storeData = $this->directiveParser->getStoreData();
-                // 组装跨分库更新迁移sql组件
-                $shardingMapping = $this->shardingUpdateTransfer($storeData);
+                // 组装跨分库更新迁移sql组件，并将更新迁移的sql组件压入sql语句映射表
+                // 凡是需要删除的语句都是先插入了，所以此处不必顾虑删除后异常中断导致数据丢失的问题
+                foreach ($this->shardingUpdateTransfer($storeData) as $dbAlias => $statementSet) {
+                    foreach ($statementSet as $stmt) {
+                        $dbMapping[$dbAlias][] = $stmt;
+                    }
+                }
             } else if ($this->directiveParser->isSelect()) {
                 // 查询语句需要做分库数据合并操作, 所以需要查出所有源数据后做合并处理, 需要重建查询语句
                 $statement = $this->directiveParser->buildShardingSelect();
@@ -153,12 +158,6 @@ class DbMiddleware extends Middleware {
             foreach ($dbSet as $dbAlias) {
                 $dbMapping[$dbAlias][] = $statement;
             }
-            // 将更新迁移的sql组件压入sql语句映射表
-            foreach ($shardingMapping as $dbAlias => $statementSet) {
-                foreach ($statementSet as $statement) {
-                    $dbMapping[$dbAlias][] = $statement;
-                }
-            }
         }
         return $dbMapping;
     }
@@ -166,22 +165,20 @@ class DbMiddleware extends Middleware {
     /**
      * 组装跨分库更新迁移sql组件 (分库更新数据时, 可能会更新分库依据字段, 这种字段值改变时可能需要迁库, 此方法即处理这种情况)
      * @param array $upData
-     * @return array
+     * @return StatementInterface[][]
      * @throws MiddlewareException
      * @throws IdgException
      */
     private function shardingUpdateTransfer(array $upData): array {
         [$upIdValue, $upShardingValue] = [$upData[$this->config->idColumn] ?? null, $upData[$this->config->shardingColumn] ?? null];
         $upValue = $upShardingValue ?? $upIdValue;
-        if (null === $upValue) {
-            // 如果待储存字段中不包括分库依据字段, 则为普通更新, 不会跨库迁移数据, 无需做特殊处理
-            return [];
-        }
+        // 如果待储存字段中不包括分库依据字段, 则为普通更新, 不会跨库迁移数据, 无需做特殊处理
+        if (null === $upValue) return [];
         ! $this->config->crossUpdate && throw new MiddlewareException(MiddlewareException::OPEN_CROSS_UPDATE_TIP);
 
         $mapping = $this->config->flipMapping;
         [$upValueColumn, $upValueTag] = null === $upShardingValue ? [$this->config->idColumn, $this->config->idTag] : [$this->config->shardingColumn, $this->config->shardingTag];
-        $upDbAlias = $this->config->isModulo() ? Dce::$config->idGenerator->mod($this->config->modulus, $upValue, $upValueTag) : self::rangeMappingEqual($mapping, $upValue)[0];
+        $upDbAlias = $this->config->isModulo() ? $mapping[Dce::$config->idGenerator->mod($this->config->modulus, $upValue, $upValueTag)] : self::rangeMappingEqual($mapping, $upValue)[0];
 
         $insertDataMapping = $deleteIdsMapping = [];
         $statement = $this->directiveParser->getStatement();
@@ -190,15 +187,15 @@ class DbMiddleware extends Middleware {
             // 如果表中没有有效的分库依据字段值，则无法进行跨库更新
             $oldValue = $old[$upValueColumn] ?? null;
             null === $oldValue && throw (new MiddlewareException(MiddlewareException::SHARDING_VALUE_NOT_SPECIFIED))->format($this->config->tableName, $upValueColumn);
-            $oldDbAlias = $this->config->isModulo() ? Dce::$config->idGenerator->mod($this->config->modulus, $oldValue, $upValueTag) : self::rangeMappingEqual($mapping, $oldValue)[0];
+            $oldDbAlias = $this->config->isModulo() ? $mapping[Dce::$config->idGenerator->mod($this->config->modulus, $oldValue, $upValueTag)] : self::rangeMappingEqual($mapping, $oldValue)[0];
             if ($upDbAlias !== $oldDbAlias) {
                 $insData = array_merge($old, $upData);
 
                 if ($this->config->shardingColumn && $this->config->idColumn) {
-                    if ($upShardingValue) {
-                        if ($this->config->idTag) {
-                            unset($insData[$this->config->idColumn]);
-                        } else if (null === $upIdValue) {
+                    if ($upShardingValue && null === $upIdValue) { // 如果传了分库字段值未传ID值
+                        if ($this->config->idTag) { // 如果配置了idTag则自动生成新的ID
+                            $insData[$this->config->idColumn] = Dce::$config->idGenerator->generate($this->config->idTag, $upShardingValue, $this->config->shardingTag);
+                        } else { // 否则抛出需指定ID的异常
                             throw (new MiddlewareException(MiddlewareException::UP_ID_VALUE_NOT_SPECIFIED))->format($this->config->tableName, $this->config->idColumn);
                         }
                     }
@@ -209,18 +206,18 @@ class DbMiddleware extends Middleware {
                 // 记录需要移动插入到新库的数据
                 $insertDataMapping[$upDbAlias][] = $insData;
                 // 记录需要删除的记录ID (若在分库配置中未配置ID, 则会以分库字段作为待删数据的筛选条件)
-                $deleteIdsMapping[$oldDbAlias][] = $oldValue;
+                $deleteIdsMapping[$oldDbAlias][$oldValue] ??= 1;
             }
         }
-
         $dbMapping = [];
         foreach ($insertDataMapping as $dbAlias => $insertData) {
             // 向新库迁移插入数据
             $dbMapping[$dbAlias][] = $this->directiveParser->buildInsert($insertData);
         }
-        foreach ($deleteIdsMapping as $dbAlias => $deleteIds) {
+        foreach ($deleteIdsMapping as $dbAlias => $deleteIdKeySet) {
             // 将旧库的已迁移数据删除
-            $dbMapping[$dbAlias][] = $this->directiveParser->buildDelete([$upValueTag, 'in', $deleteIdsMapping]);
+            // buildDelete里面已经自动拼装了主体语句的where条件，无需在此处处理
+            $dbMapping[$dbAlias][] = $this->directiveParser->buildDelete([$upValueColumn, 'in', array_keys($deleteIdKeySet)]);
         }
         return $dbMapping;
     }
@@ -307,7 +304,7 @@ class DbMiddleware extends Middleware {
      * @param WhereConditionSchema $condition
      * @return array
      */
-    private function locatingDbByCondition(WhereConditionSchema $condition, string $shardingTag): array {
+    private function locatingDbByCondition(WhereConditionSchema $condition, string|null $shardingTag): array {
         $values = $condition->value;
         $dbSet = [];
         $mapping = $this->config->flipMapping;

@@ -6,7 +6,7 @@
 
 namespace dce\base;
 
-use Co;
+use Swoole\Coroutine;
 use Swoole\Table;
 
 final class SwooleUtility {
@@ -19,7 +19,7 @@ final class SwooleUtility {
     }
 
     public static function inCoroutine(): bool {
-        return self::inSwoole() && Co::getCid() > 0;
+        return self::inSwoole() && Coroutine::getCid() > 0;
     }
 
     /**
@@ -27,7 +27,7 @@ final class SwooleUtility {
      * @param int $hookFlags
      */
     public static function coroutineHook(int $hookFlags = SWOOLE_HOOK_ALL): void {
-        Co::set(['hook_flags' => $hookFlags]);
+        Coroutine::set(['hook_flags' => $hookFlags]);
     }
 
     /**
@@ -35,8 +35,8 @@ final class SwooleUtility {
      * @param int $maxCoroutine
      */
     public static function coroutineValve(int $maxCoroutine = 1000): void {
-        while (Co::stats()['coroutine_num'] > $maxCoroutine) {
-            Co::sleep(0.01);
+        while (Coroutine::stats()['coroutine_num'] > $maxCoroutine) {
+            Coroutine::sleep(0.01);
         }
     }
 
@@ -112,7 +112,7 @@ final class SwooleUtility {
         $maximum = $maximum < 1 ? 1 : $maximum;
         $isGetLock = $initialLockState = self::processLocker($identification, $maximum);
         while (false === $isGetLock) {
-            Co::sleep(0.01);
+            Coroutine::sleep(0.01);
             $isGetLock = self::processLocker($identification, $maximum);
         }
         return $initialLockState;
@@ -179,7 +179,7 @@ final class SwooleUtility {
         $maximum = $maximum < 1 ? 1 : $maximum;
         $isGetLock = $initialLockState = self::coroutineLocker($identification, $maximum);
         while (false === $isGetLock) {
-            Co::sleep(0.01);
+            Coroutine::sleep(0.01);
             $isGetLock = self::coroutineLocker($identification, $maximum);
         }
         return $initialLockState;
@@ -200,7 +200,7 @@ final class SwooleUtility {
      */
     public static function rootProcessConstraint(): void {
         $ppid = posix_getppid();
-        if ($ppid) {
+        if ($ppid > 1) {
             throw new BaseException(BaseException::NEED_ROOT_PROCESS);
         }
     }

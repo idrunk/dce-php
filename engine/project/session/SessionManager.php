@@ -101,7 +101,7 @@ abstract class SessionManager {
      * @param int $mid
      * @param string $sid
      */
-    public function signIn(int $mid, string $sid): void {
+    public function login(int $mid, string $sid): void {
         $fdids = $this->getSessionForm($sid, true);
         if ($fdids) {
             // 如果当前sid有对应长连接, 则标记该连接
@@ -121,7 +121,7 @@ abstract class SessionManager {
      * @param int $apiPort
      * @throws SessionException
      */
-    public function fdSignIn(int $mid, int $fd, string $apiHost, int $apiPort): void {
+    public function fdLogin(int $mid, int $fd, string $apiHost, int $apiPort): void {
         $fdid = self::genFdid($fd, $apiHost, $apiPort);
         if (! $sid = $this->getFdForm($fdid)['sid'] ?? 0) {
             throw (new SessionException(SessionException::SID_BY_FDID_NOTFOUND))->format($fdid);
@@ -134,7 +134,7 @@ abstract class SessionManager {
      * 退出登录
      * @param string $sid
      */
-    public function signOut(string $sid): void {
+    public function logout(string $sid): void {
         $sessionForm = $this->getSessionForm($sid, null);
         if (! isset($sessionForm['mid'])) {
             return;

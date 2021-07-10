@@ -41,7 +41,9 @@ abstract class ModuloExtender extends Extender {
         if (! $this->checkExtendConfig()) {
             throw (new ExtenderException(ExtenderException::PLEASE_PREPARE_EXTENDS_CONFIG))->format($this->dbType);
         }
-        $this->print("扩展配置校验通过");
+        if (! in_array($this->input("扩展配置校验通过，确定要拓库吗？（继续请输入yes）"), ['y', 'yes'])) {
+            throw new ExtenderException(ExtenderException::USER_QUIT);
+        }
         if (! $this->dbsExists()) {
             throw new ExtenderException(ExtenderException::EXTEND_DATABASE_NOT_EXISTS);
         }
