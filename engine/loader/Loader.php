@@ -190,7 +190,7 @@ class Loader {
         // 加载方法库
         self::dirOnce(APP_COMMON . 'function/');
         // 初始化类装饰器
-        ClassDecoratorManager::bindDceClassLoad();
+        DecoratorManager::bindDceClassLoad();
     }
 
     /**

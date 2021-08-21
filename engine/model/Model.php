@@ -7,12 +7,13 @@
 namespace dce\model;
 
 use ArrayAccess;
-use dce\loader\ClassDecorator;
+use dce\loader\Decorator;
 use drunk\Char;
 use ReflectionClass;
 use ReflectionProperty;
+use Throwable;
 
-abstract class Model implements ArrayAccess, ClassDecorator {
+abstract class Model implements ArrayAccess, Decorator {
     /** @var string 默认场景名 */
     public const SCENARIO_DEFAULT = 'default';
 
@@ -104,24 +105,37 @@ abstract class Model implements ArrayAccess, ClassDecorator {
     /**
      * 校验当前模型属性值
      * @return $this
-     * @throws \Throwable
+     * @throws Throwable
      * @throws validator\ValidatorException
      */
     public function valid(): static {
-        if (! key_exists(static::class, self::$scenarioRulesMapping)) {
-            foreach (self::getProperties() as $property) {
-                foreach ($property->validators as $validator) {
-                    foreach ($validator->scenario as $scenario) {
-                        self::$scenarioRulesMapping[static::class][$scenario][] = $validator;
-                    }
-                }
-            }
-            foreach (self::$scenarioRulesMapping[static::class] as $scenario => $validators) {
-                self::$scenarioRulesMapping[static::class][$scenario] = Validator::validatorsClassify($validators);
-            }
-        }
         Validator::valid($this, self::$scenarioRulesMapping[static::class][$this->scenario] ?? []);
         return $this;
+    }
+
+    /**
+     * 根据模型属性校验器配置修正并校验数据
+     * @param array|scalar|Model $value 待校验数据或模型
+     * @param string $prop 对应模型属性名
+     * @param mixed|Validator::RULE_* $rule 适用规则，默认全规则
+     * @param mixed|static::SCENARIO_* $scenario 适用场景，默认全场景
+     * @throws Throwable
+     * @throws validator\ValidatorException
+     */
+    public static function correct(array|string|int|float|Model|bool|null & $value, string $prop, string|null $rule = null, string|null $scenario = null): void {
+        $prop = static::toModelKey($prop);
+        $classValidators = self::$scenarioRulesMapping[static::class];
+        $scenario && key_exists($scenario, $classValidators) && $classValidators = [$scenario => $classValidators[$scenario]];
+        $validators = array_reduce($classValidators, function($validators, $currentValidators) use($prop, $rule) {
+            foreach ($currentValidators as $type => $typeValidators) {
+                ! key_exists($type, $validators) && $validators[$type] = [];
+                // 仅取指定属性且或指定规则的校验器集
+                $typeValidators = array_filter($typeValidators, fn(Validator $validator) => $prop === $validator->property->name && (! $rule || $validator->rule === $rule));
+                array_push($validators[$type], ... $typeValidators);
+            }
+            return $validators;
+        }, []);
+        is_array($value) ? array_walk($value, fn(&$v) => Validator::valid($v, $validators)) : Validator::valid($value, $validators);
     }
 
     /**
@@ -130,6 +144,7 @@ abstract class Model implements ArrayAccess, ClassDecorator {
      */
     private static function initProperties(ReflectionClass $refClass): void {
         $staticClass = $refClass->getName();
+        self::$scenarioRulesMapping[$staticClass] = [];
         foreach ($refClass->getProperties(ReflectionProperty::IS_PUBLIC) as $refProperty) {
             if ($attributes = $refProperty->getAttributes(Property::class)) {
                 $properties[$refProperty->name] = $propertyInstance = $attributes[0]->newInstance();
@@ -139,8 +154,15 @@ abstract class Model implements ArrayAccess, ClassDecorator {
                 }
                 $fieldInstance = isset($staticClass::$fieldClass) && ($fieldAttrs = $refProperty->getAttributes($staticClass::$fieldClass)) ? $fieldAttrs[0]->newInstance() : null;
                 $propertyInstance->applyProperties($staticClass, $refProperty, $validatorInstances, $fieldInstance);
+
+                // 按场景分组校验器
+                foreach ($validatorInstances as $validator)
+                    foreach ($validator->scenario as $scenario)
+                        self::$scenarioRulesMapping[$staticClass][$scenario][] = $validator;
             }
         }
+        // 将校验器按照类型分组
+        array_walk(self::$scenarioRulesMapping[$staticClass], fn(&$validators) => $validators = Validator::validatorsClassify($validators));
         self::$properties[$staticClass] = $properties ?? [];
     }
 

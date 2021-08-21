@@ -40,20 +40,34 @@ final class Structure {
     }
 
     /**
-     * 查询 参1 在 参2 数组元素中是否有相同值, 返回其在参2中的索引值集
+     * 用回调函数在数组中查找匹配值的下标集
+     * @param callable $needle
+     * @param array $haystack
+     * @param bool $lazyMode 是否惰性查找（是则找到即返回下标，否则返回所有匹配的下标集）
+     * @return array|string|int|false
+     */
+    public static function arraySearch(callable $needle, array $haystack, bool $lazyMode = true): array|string|int|false {
+        $indexes = [];
+        foreach ($haystack as $i => $item) {
+            if (call_user_func($needle, $item)) {
+                if ($lazyMode) return $i;
+                $indexes[] = $i;
+            }
+        }
+        return $indexes ?: false;
+    }
+
+    /**
+     * 查询 参1 在 参2 数组元素中是否有相同矩阵值, 返回其在参2中的下标集
      * @param array $needle
      * @param array $haystack
      * @param bool $lazyMode  是否惰性模式
      * @return array|string|int|false
      */
-    public static function arraySearch(array $needle, array $haystack, bool $lazyMode = true): array|string|int|false {
-        $itemHaystack = current($haystack);
-        if (empty($needle) || empty($itemHaystack)) {
-            return false;
-        }
-        $keysIntersect = array_keys($needle);
-        $keysHaystack = array_keys($itemHaystack);
-        $keysIntersect = array_intersect($keysIntersect, $keysHaystack);
+    public static function arraySearchMatrix(array $needle, array $haystack, bool $lazyMode = true): array|string|int|false {
+        $haystackItem = current($haystack);
+        if (! $needle || ! $haystackItem) return false;
+        $keysIntersect = array_intersect(array_keys($needle), array_keys($haystackItem));
         $indexes = [];
         foreach ($haystack as $k => $item) {
             foreach ($keysIntersect as $key) {
@@ -61,9 +75,7 @@ final class Structure {
                     continue 2;
                 }
             }
-            if ($lazyMode) {
-                return $k;
-            }
+            if ($lazyMode) return $k;
             $indexes[] = $k;
         }
         return $indexes ?: false;
@@ -176,7 +188,7 @@ final class Structure {
         foreach ($matrix as $array) {
             $refOrderValues[] = $valueOrderMapping[$array[$column]] ?? 65535; // 没取到则往后排
         }
-        array_multisort($matrix, SORT_ASC, SORT_NUMERIC, $refOrderValues);
+        array_multisort($refOrderValues, SORT_ASC, SORT_NUMERIC, $matrix);
         return $matrix;
     }
 }

@@ -15,12 +15,10 @@ class RequiredValidator extends TypeEnding {
     protected function check(string|int|float|null|false $value):ValidatorException|null {
         if (empty($value)) {
             $allowEmpty = $this->getProperty('allowEmpty');
-            if ($allowEmpty->value) {
-                if (false === $value) {
-                    $this->addError($this->getGeneralError(null, lang(ValidatorException::REQUIRED_MISSING)));
-                }
-            } else {
+            if (! $allowEmpty->value) {
                 $this->addError($this->getGeneralError(null, lang(ValidatorException::CANNOT_BE_EMPTY)));
+            } else if (false === $value) {
+                $this->addError($this->getGeneralError(null, lang(ValidatorException::REQUIRED_MISSING)));
             }
         }
         return $this->getError();

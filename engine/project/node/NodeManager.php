@@ -115,7 +115,7 @@ final class NodeManager {
                     $nodes[] = $node = Node::refToNodeArguments($method, $attribute);
                     if ($node['controllerPath'] ?? false) {
                         unset($node['controllerPath']);
-                        $controllerPath = $node['path'];
+                        $controllerPath = $node['path'] ?? '';
                     }
                 }
             }

@@ -9,6 +9,7 @@ namespace dce\project\node;
 use Attribute;
 use dce\base\TraitModel;
 use drunk\Char;
+use drunk\Utility;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionMethod;
@@ -137,7 +138,7 @@ class Node {
      */
     private function init(array $properties, string $projectName): array {
         if (! isset($properties['path'])) {
-            throw new NodeException(NodeException::NODE_PATH_MISSION);
+            throw (new NodeException(NodeException::NODE_PATH_MISSION))->format(Utility::printable($properties));
         }
         $idGene = $properties['path_format'] = $properties['path'];
         if (0 !== stripos($idGene, $projectName)) {

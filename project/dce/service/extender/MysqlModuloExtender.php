@@ -283,7 +283,7 @@ class MysqlModuloExtender extends ModuloExtender {
                 // 如果目标模数与新配置模数不等, 则表示未应用新配
                 return false;
             }
-            if (false === Structure::arraySearch($shardingConfig->targetMapping, [$newShardingConfigs[$tableName]->mapping ?? []])) {
+            if (false === Structure::arraySearchMatrix($shardingConfig->targetMapping, [$newShardingConfigs[$tableName]->mapping ?? []])) {
                 // 如果目标映射与新配置映射不等, 则表示未应用新配
                 return false;
             }

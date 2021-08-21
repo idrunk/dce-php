@@ -21,9 +21,10 @@ class WhereSchema extends SchemaAbstract {
             $this->sqlPackage[] = $logic;
             $this->pushCondition($logic);
         }
+        $columnIsRaw = $column instanceof RawBuilder;
         [$conditionSqlPackage, $conditionPackage, $params] = $this->conditionPack(match (true) {
-            is_string($column) => [[$column, $operator, $value]],
-            is_array($column) && is_string($column[0] ?? null), $column instanceof RawBuilder, $column instanceof WhereSchema => [$column],
+            is_string($column), $columnIsRaw && false !== $operator => [[$column, $operator, $value]],
+            is_array($column) && is_string($column[0] ?? null), $columnIsRaw, $column instanceof WhereSchema => [$column],
             default => $column,
         });
         $this->sqlPackage[] = $conditionSqlPackage;

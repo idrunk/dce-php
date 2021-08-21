@@ -84,6 +84,7 @@ class ShardingConfig extends Config implements ConfigLibInterface {
             $config['cross_update'] = !! ($config['cross_update'] ?? false);
             $tables = $config['table'] ?? [];
             unset($config['table']);
+
             foreach ($tables as $tableName => $table) {
                 if (isset($table['id_tag']) && ! isset($table['id_column'])) {
                     // 配置了tag则必须配置column
@@ -99,10 +100,8 @@ class ShardingConfig extends Config implements ConfigLibInterface {
                 }
                 [$table['sharding_id_column'], $table['sharding_id_tag']] = isset($table['sharding_column'])
                     ? [$table['sharding_column'], $table['sharding_tag'] ?? null] : [$table['id_column'] ?? null, $table['id_tag'] ?? null];
-                $config = $table + $config;
-                $config['table_name'] = $tableName;
-                $config['alias'] = $alias;
-                $shardingMapping[$tableName] = new self($config);
+
+                $shardingMapping[$tableName] = new self(['table_name' => $tableName, 'alias' => $alias, ] + $table + $config);
             }
         }
         $instance = self::inst();

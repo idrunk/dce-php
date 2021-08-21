@@ -106,6 +106,9 @@ class Validator {
 
     public Property $property;
 
+    /** @var string|self::RULE_* $rule */
+    public string $rule;
+
     public ValidatorAbstract $validator;
 
     /** @var self[] */
@@ -172,42 +175,18 @@ class Validator {
                 }
             }
         } else {
-            if (null !== $max) {
-                $properties['max'] = $max;
-            }
-            if (null !== $min) {
-                $properties['min'] = $min;
-            }
-            if (null !== $set) {
-                $properties['set'] = $set;
-            }
-            if (null !== $regexp) {
-                $properties['regexp'] = $regexp;
-            }
-            if (null !== $keyword) {
-                $properties['keyword'] = $keyword;
-            }
-            if (null !== $error) {
-                $properties['error'] = $error;
-            }
-            if (null !== $combined) {
-                $properties['combined'] = $combined;
-            }
-            if (null !== $type) {
-                $properties['type'] = $type;
-            }
-            if (null !== $formatSet) {
-                $properties['formatSet'] = $formatSet;
-            }
-            if (null !== $decimal) {
-                $properties['decimal'] = $decimal;
-            }
-            if (null !== $negative) {
-                $properties['negative'] = $negative;
-            }
-            if (null !== $default) {
-                $properties['default'] = $default;
-            }
+            null !== $max && $properties['max'] = $max;
+            null !== $min && $properties['min'] = $min;
+            null !== $set && $properties['set'] = $set;
+            null !== $regexp && $properties['regexp'] = $regexp;
+            null !== $keyword && $properties['keyword'] = $keyword;
+            null !== $error && $properties['error'] = $error;
+            null !== $combined && $properties['combined'] = $combined;
+            null !== $type && $properties['type'] = $type;
+            null !== $formatSet && $properties['formatSet'] = $formatSet;
+            null !== $decimal && $properties['decimal'] = $decimal;
+            null !== $negative && $properties['negative'] = $negative;
+            null !== $default && $properties['default'] = $default;
         }
         $validator = self::$validatorMap[$rule] ?? null;
         if (! is_array($validator)) {
@@ -217,6 +196,7 @@ class Validator {
         unset($validator['class']);
         $properties = array_merge($validator, $properties ?? []);
         $this->validator = $validatorClass::inst($properties);
+        $this->rule = $rule;
     }
 
     public function setProperty(Property $property): self {
@@ -226,29 +206,29 @@ class Validator {
 
     /**
      * 验证模型
-     * @param Model $model
+     * @param Model|string|int|float|bool|null $modelValue
      * @param array $validatorEchelon
      * @throws Throwable
      * @throws ValidatorException
      */
-    public static function valid(Model $model, array $validatorEchelon): void {
-        self::validQueue($model, $validatorEchelon['assignment'] ?? []);
-        self::validQueue($model, $validatorEchelon['filter'] ?? []);
-        self::validQueue($model, $validatorEchelon['checker'] ?? []);
-        self::validQueue($model, $validatorEchelon['ending'] ?? []);
+    public static function valid(Model|string|int|float|bool|null & $modelValue, array $validatorEchelon): void {
+        self::validQueue($modelValue, $validatorEchelon['assignment'] ?? []);
+        self::validQueue($modelValue, $validatorEchelon['filter'] ?? []);
+        self::validQueue($modelValue, $validatorEchelon['checker'] ?? []);
+        self::validQueue($modelValue, $validatorEchelon['ending'] ?? []);
     }
 
     /**
      * 验证队列
-     * @param Model $model
+     * @param Model|string|int|float|bool|null $modelValue
      * @param self[] $validators
-     * @param bool $allowUnInitialized
      * @throws Throwable
      * @throws ValidatorException
      */
-    private static function validQueue(Model $model, array $validators, bool $allowUnInitialized = false) {
+    private static function validQueue(Model|string|int|float|bool|null & $modelValue, array $validators) {
+        $model = $modelValue instanceof Model ? $modelValue : null;
         foreach ($validators as $validator) {
-            $value = $validator->property->getValue($model);
+            $value = $model ? $validator->property->getValue($model) : $modelValue;
             try {
                 // 校验并取值
                 $newValue = $validator->validator->checkGetValue($value, $validator->property->name, $validator->property->alias, $model);
@@ -264,7 +244,7 @@ class Validator {
                 $throwable && throw $throwable;
             }
             if ($value !== $newValue) {
-                $model->{$validator->property->name} = $newValue;
+                $model ? $model->{$validator->property->name} = $newValue : $modelValue = $newValue;
             }
         }
     }
@@ -272,7 +252,7 @@ class Validator {
     /**
      * 将验证器按照类型分组
      * @param self[] $validators
-     * @return array
+     * @return self[][]
      * @throws ValidatorException
      */
     public static function validatorsClassify(array $validators): array {

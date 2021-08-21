@@ -95,7 +95,9 @@ abstract class DbActiveRecord extends ActiveRecord {
         return null;
     }
 
-    /** @inheritDoc */
+    /**
+     * @return DbActiveQuery<static>
+     */
     public static function query(): DbActiveQuery {
         return (new static)->getActiveQuery();
     }

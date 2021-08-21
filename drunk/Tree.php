@@ -9,6 +9,12 @@ namespace drunk;
 use ArrayAccess;
 
 abstract class Tree {
+    public const TRAVERSAL_STOP_CHILD = 3;
+
+    public const TRAVERSAL_STOP_SIBLING = 2;
+
+    public const TRAVERSAL_STOP_ALL = 1;
+
     /**
      * 树ID
      * @var string|null
@@ -40,7 +46,7 @@ abstract class Tree {
      * @param string|array $keys
      * @return static|null
      */
-    public function getChild(string|array $keys): static|null {
+    public function getChild(string|array $keys): self|null {
         $keys && ! is_array($keys) && $keys = [$keys];
         $child = $this;
         foreach ($keys as $key) {
@@ -103,9 +109,11 @@ abstract class Tree {
             $children = $parent->children;
             foreach ($children as $child) {
                 $result = call_user_func_array($callback, [$child]);
-                if (false === $result) {
+                if (self::TRAVERSAL_STOP_ALL === $result) {
+                    break 2;
+                } else if (self::TRAVERSAL_STOP_SIBLING === $result) {
                     break;
-                } else if ($result !== 0) {
+                } else if (self::TRAVERSAL_STOP_CHILD !== $result) {
                     $parents[] = $child;
                 }
             }
@@ -138,7 +146,8 @@ abstract class Tree {
     public static function from(array $arrays, self|string|int $pid, int $deep = 0, string $primaryKey = 'id', string $parentKey = 'pid', bool $pkAsIndex = false, int $currentDeep = 1): static {
         $parent = $pid;
         if (! $pid instanceof static) {
-            $parent = new static([$primaryKey => $pid]);
+            $index = Structure::arraySearch(fn($item) => $item[$primaryKey] == $pid, $arrays);
+            $parent = new static($index === false ? [$primaryKey => $pid] : $arrays[$index]);
             $parent->id = $pid;
         }
         foreach ($arrays as $k => $v) {

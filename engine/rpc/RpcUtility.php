@@ -331,7 +331,7 @@ final class RpcUtility {
     public static function hostsMerge(array $hosts, array $hostsToMerge): array {
         $hostsToMerge = self::hostsFormat($hostsToMerge);
         foreach ($hostsToMerge as $hostToMerge) {
-            if (false !== $index = Structure::arraySearch(['host' => $hostToMerge['host'], 'port' => $hostToMerge['port']], $hosts)) {
+            if (false !== $index = Structure::arraySearchMatrix(['host' => $hostToMerge['host'], 'port' => $hostToMerge['port']], $hosts)) {
                 $hosts[$index] = $hostToMerge;
             } else {
                 $hosts[] = $hostToMerge;

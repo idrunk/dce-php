@@ -10,7 +10,7 @@ use dce\base\Exception;
 use dce\config\DceConfig;
 use dce\Dce;
 use dce\i18n\Language;
-use dce\loader\ClassDecorator;
+use dce\loader\Decorator;
 use dce\log\LogManager;
 use dce\project\request\RequestManager;
 use dce\project\session\Session;
@@ -26,7 +26,7 @@ use tcp\service\RawRequestTcp;
 use tcp\service\RawRequestUdp;
 use Throwable;
 
-abstract class ServerMatrix implements ClassDecorator {
+abstract class ServerMatrix implements Decorator {
     protected static Language|array $langStarted = ["%s 服务器已启动于 %s:%s.\n\n", "%s server started with %s:%s.\n\n"];
 
     /** @var string 定义RawRequestHttp类名, (可在子类覆盖此属性使用自定义RawRequest类) */

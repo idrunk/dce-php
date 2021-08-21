@@ -8,7 +8,7 @@ namespace dce\base;
 
 use dce\Dce;
 use dce\i18n\Language;
-use dce\loader\ClassDecorator;
+use dce\loader\Decorator;
 use dce\log\LogManager;
 use dce\project\request\RawRequestHttp;
 use dce\project\request\Request;
@@ -18,7 +18,7 @@ use dce\service\server\RawRequestConnection;
 use Stringable;
 use Throwable;
 
-class Exception extends \Exception implements ClassDecorator {
+class Exception extends \Exception implements Decorator {
     /**
      * @var string[] 可抛出到用户端的异常码列表
      * <pre>

@@ -133,12 +133,10 @@ abstract class ValidatorAbstract {
     protected function getProperty(string $name, string|Stringable|null $requiredError = null): ValidatorProperty|null {
         if (key_exists($name, $this->properties)) {
             return $this->properties[$name];
-        } else {
-            if ($requiredError) {
-                $this->addError($this->getGeneralError(null, null) ?: $requiredError);
-            }
-            return null;
+        } else if ($requiredError) {
+            $this->addError($this->getGeneralError(null, null) ?: $requiredError);
         }
+        return null;
     }
 
     /**

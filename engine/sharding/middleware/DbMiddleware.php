@@ -288,7 +288,7 @@ class DbMiddleware extends Middleware {
                     } else if ('OR' === $logic) { // OR则为并集
                         $dbSet = array_unique(array_merge($dbSet, $subDbSet));
                     } else { // AND为交集
-                        $dbSet = array_intersect($dbSet, $subDbSet);
+                        $dbSet = $dbSet ? array_intersect($dbSet, $subDbSet) : $subDbSet;
                     }
                 } else if ('OR' === $logic) {
                     // 如果当前条件非分库条件, 且逻辑为或, 则表示无法利用分库字段直接定位到具体分库来查询, 可以直接返回为空条件组

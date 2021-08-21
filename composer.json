@@ -16,13 +16,15 @@
         "swoole/ide-helper": "@dev"
     },
     "require-dev": {
-        "fakerphp/faker": "^1.13"
+        "fakerphp/faker": "^1.13",
+        "vimeo/psalm": "^4.9"
     },
     "suggest": {
         "ext-curl": "*",
         "ext-redis": "*",
         "ext-memcache": "*",
-        "ext-memcached": "*"
+        "ext-memcached": "*",
+        "vimeo/psalm": "^4.9"
     },
     "autoload": {
         "files": ["engine/run.php"]

@@ -9,4 +9,4 @@ namespace dce\loader;
 use Attribute;
 
 #[Attribute(Attribute::TARGET_CLASS)]
-interface ClassDecorator {}
+interface Decorator {}

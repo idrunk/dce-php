@@ -9,6 +9,9 @@ namespace dce\loader;
 use dce\base\BaseException;
 use dce\event\Event;
 use dce\i18n\Language;
+use dce\loader\attr\Constructor;
+use dce\loader\attr\Singleton;
+use dce\loader\attr\Sington;
 use dce\model\Model;
 use ReflectionClass;
 use ReflectionClassConstant;
@@ -18,7 +21,7 @@ use ReflectionProperty;
 use ReflectionType;
 use ReflectionUnionType;
 
-class ClassDecoratorManager {
+class DecoratorManager {
     public static function bindDceClassLoad(): void {
         Event::on(Loader::EVENT_ON_CLASS_LOAD, [self::class, 'decorate']);
     }
@@ -31,9 +34,9 @@ class ClassDecoratorManager {
      */
     public static function decorate(string $className): void {
         $refClass = new ReflectionClass($className);
-        if ($refClass->implementsInterface(ClassDecorator::class) || $refClass->getAttributes(ClassDecorator::class)) {
+        if ($refClass->implementsInterface(Decorator::class) || $refClass->getAttributes(Decorator::class)) {
             // 如果刚加载的类实现了装饰器接口, 或者标记了装饰器注解, 则尝试执行各种装饰动作
-            self::initStaticInstance($refClass);
+            self::initConstructor($refClass);
             self::initLanguage($refClass);
             self::initModel($refClass);
         }
@@ -43,17 +46,20 @@ class ClassDecoratorManager {
      * 初始实例化类静态属性
      * @param ReflectionClass $refClass
      */
-    private static function initStaticInstance(ReflectionClass $refClass): void {
+    private static function initConstructor(ReflectionClass $refClass): void {
         $refProperties = $refClass->getProperties(ReflectionProperty::IS_STATIC);
         foreach ($refProperties as $refProperty) {
             $typeClass = self::getTypeClass($refProperty->getType());
-            if ($typeClass && (($attrs = $refProperty->getAttributes(StaticInstance::class)) || is_subclass_of($typeClass, StaticInstance::class))) {
+            if ($typeClass && (
+                ($attrs = $refProperty->getAttributes(Singleton::class)) ||
+                ($attrs = $refProperty->getAttributes(Sington::class)) ||
+                ($attrs = $refProperty->getAttributes(Constructor::class)) ||
+                is_subclass_of($typeClass, Constructor::class)
+            )) {
                 $refProperty->setAccessible(true);
-                $params = $attrs ? $attrs[0]->getArguments() : [];
-                if ($refProperty->hasDefaultValue()) {
-                    array_unshift($params, $refProperty->getDefaultValue());
-                }
-                $refProperty->setValue(new $typeClass(... $params));
+                [$attrClass, $params] = $attrs ? [$attrs[0]->getName(), $attrs[0]->getArguments()] : [null, []];
+                $refProperty->hasDefaultValue() && array_unshift($params, $refProperty->getDefaultValue());
+                $refProperty->setValue(call_user_func($attrClass === Singleton::class ? [Singleton::class, 'gen'] : [Sington::class, $attrClass === Sington::class ? 'gen' : 'new'], $typeClass, ... $params));
             }
         }
     }

@@ -18,7 +18,7 @@ class UniqueValidator extends TypeEnding {
         if ($this->model instanceof ActiveRecord) {
             $combined = $this->getProperty('combined');
             $combinedNames = $combined->value ?? [];
-            $whereConditions = [$this->modelPropertyName, '=', $value];
+            $whereConditions = [[$this->model::toDbKey($this->modelPropertyName), '=', $value]];
             foreach ($combinedNames as $combinedName) {
                 $whereConditions[] = [$combinedName, '=', $this->model->{$this->model::toModelKey($combinedName)}];
             }

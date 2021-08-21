@@ -73,7 +73,7 @@ final class LogManager {
     public static function request(Request $request): void {
         if (DCE_CLI_MODE && $request->config->log['access']['request'] && ($rawRequest = $request->rawRequest) && ! $rawRequest instanceof RawRequestCli) {
             $requestData = is_string($rawRequest->getRawData()) ? $rawRequest->getRawData() : json_encode($rawRequest->getRawData(), JSON_UNESCAPED_UNICODE);
-            printf("[%s] (求 %s) %s%s\n\n\n", date('Y-m-d H:i:s'), $rawRequest->getClientInfo()['request'], $request->session->getId() ?? '', $requestData ? "\n\n$requestData" : '');
+            printf("[%s] (求 %s) %s%s\n\n\n", date('Y-m-d H:i:s'), $rawRequest->getClientInfo()['request'], $request->session->getId() ?? '', self::contentFormat($requestData));
         }
     }
 
@@ -86,7 +86,7 @@ final class LogManager {
         if (DCE_CLI_MODE && ($project = RequestManager::current()->project ?? null) && $project->getConfig()->log['access']['response']) {
             $request = RequestManager::current();
             $responseData = is_string($data) ? $data : json_encode($data, JSON_UNESCAPED_UNICODE);
-            printf("[%s] (应 %s) %s%s\n\n\n", date('Y-m-d H:i:s'), $rawRequest->getClientInfo()['request'], $request->session->getId() ?? '', $responseData ? "\n\n$responseData" : '');
+            printf("[%s] (应 %s) %s%s\n\n\n", date('Y-m-d H:i:s'), $rawRequest->getClientInfo()['request'], $request->session->getId() ?? '', self::contentFormat($responseData, false));
         }
     }
 
@@ -137,7 +137,14 @@ final class LogManager {
                 $ip = $fd;
                 $sid = ''; // udp未自动开启session，可能没有sid
             }
-            printf("[%s] (发 %s %s/%s) %s%s\n\n\n", date('Y-m-d H:i:s'), $type, $ip, $path ?: '', $sid, $data ? "\n\n$data" : '');
+            printf("[%s] (发 %s %s/%s) %s%s\n\n\n", date('Y-m-d H:i:s'), $type, $ip, $path ?: '', $sid, self::contentFormat($data, false));
         }
+    }
+
+    private static function contentFormat(string $content, bool $short = true): string {
+        $len = mb_strlen($content);
+        $max = $short ? 1024 : 16384;
+        $content && $content = "\n\n$content";
+        return mb_substr($content, 0, $max) . ($len > $max ? '...' : '');
     }
 }

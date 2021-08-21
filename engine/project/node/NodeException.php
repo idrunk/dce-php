@@ -11,7 +11,7 @@ use dce\i18n\Language;
 
 // 1210-1219
 class NodeException extends Exception {
-    #[Language(['节点配置缺少path属性'])]
+    #[Language(['节点配置 %s 缺少path属性'])]
     public const NODE_PATH_MISSION = 1210;
 
     #[Language(['Methods必须为字符串数组, 如["get", "post"]'])]

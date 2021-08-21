@@ -12,9 +12,13 @@ use dce\db\query\builder\RawBuilder;
 use dce\db\query\builder\schema\WhereSchema;
 use dce\db\query\builder\Statement\SelectStatement;
 use dce\model\Model;
+use dce\model\ModelException;
 use Iterator;
 use JetBrains\PhpStorm\ArrayShape;
 
+/**
+ * @template T
+ */
 class DbActiveQuery extends ActiveQuery {
     private Query $query;
 
@@ -24,6 +28,9 @@ class DbActiveQuery extends ActiveQuery {
     ]])]
     private array $relationData = [];
 
+    /**
+     * @param T $activeRecord
+     */
     public function __construct(
         protected DbActiveRecord $activeRecord,
     ) {
@@ -31,7 +38,9 @@ class DbActiveQuery extends ActiveQuery {
         $this->query->table($this->activeRecord::getTableName());
     }
 
-    /** @inheritDoc */
+    /**
+     * @return T
+     */
     public function getActiveRecord(): DbActiveRecord {
         return $this->activeRecord;
     }
@@ -41,7 +50,7 @@ class DbActiveQuery extends ActiveQuery {
      * @param string|array|RawBuilder|WhereSchema $columnName
      * @param string|int|float|false|RawBuilder|SelectStatement $operator
      * @param string|int|float|array|false|RawBuilder|SelectStatement $value
-     * @return $this
+     * @return self<T>
      */
     public function where(string|array|RawBuilder|WhereSchema $columnName, string|int|float|false|RawBuilder|SelectStatement $operator = false, string|int|float|array|false|RawBuilder|SelectStatement $value = false): self {
         $this->query->where($columnName, $operator, $value);
@@ -52,7 +61,7 @@ class DbActiveQuery extends ActiveQuery {
      * 设置排序规则
      * @param string|array|RawBuilder $columnName
      * @param string|null $order
-     * @return $this
+     * @return self<T>
      */
     public function order(string|array|RawBuilder $columnName, string|null $order = null): self {
         $this->query->order($columnName, $order);
@@ -63,7 +72,7 @@ class DbActiveQuery extends ActiveQuery {
      * 设置记录截取量
      * @param int $limit
      * @param int $offset
-     * @return $this
+     * @return self<T>
      */
     public function limit(int $limit, int $offset = 0): self {
         $this->query->limit($limit, $offset);
@@ -73,7 +82,7 @@ class DbActiveQuery extends ActiveQuery {
     /**
      * 多记录查询实例化结果集并返回
      * @param string|RawBuilder|null $indexColumn
-     * @return ActiveRecord[]
+     * @return T[]
      * @throws ActiveException
      */
     public function select(string|RawBuilder|null $indexColumn = null): array {
@@ -156,7 +165,7 @@ class DbActiveQuery extends ActiveQuery {
      * @param array $data
      * @param array $viaRelationQueue
      * @return ActiveRecord[]
-     * @throws ActiveException
+     * @throws ActiveException|ModelException
      */
     private function loadRelationData(string $relationName, array $data, array &$viaRelationQueue = []): array {
         // 需加载的数据可能已在之前作为中间数据加载过, 所以若已加载过则直接取出返回即可
@@ -194,7 +203,7 @@ class DbActiveQuery extends ActiveQuery {
 
     /**
      * 多记录查询, 返回迭代器, 遍历时实例化为活动记录对象
-     * @return Iterator
+     * @return Iterator<T>
      * @throws ActiveException
      */
     public function each(): Iterator {
@@ -215,7 +224,7 @@ class DbActiveQuery extends ActiveQuery {
 
     /**
      * 筛选一条数据库数据, 转为活动记录对象并返回
-     * @return ActiveRecord|array|false
+     * @return T|array|false
      */
     public function find(): ActiveRecord|array|false {
         $data = $this->query->find();

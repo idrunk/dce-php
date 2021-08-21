@@ -9,7 +9,7 @@ namespace dce\i18n;
 use Attribute;
 use dce\base\BaseException;
 use dce\Dce;
-use dce\loader\StaticInstance;
+use dce\loader\attr\Constructor;
 use Stringable;
 
 /**
@@ -17,7 +17,7 @@ use Stringable;
  * @package dce\i18n
  */
 #[Attribute(Attribute::TARGET_CLASS_CONSTANT | Attribute::TARGET_PROPERTY)]
-class Language implements Stringable, StaticInstance {
+class Language implements Stringable, Constructor {
     /**
      * https://zh.wikipedia.org/wiki/ISO_639-1
      */
