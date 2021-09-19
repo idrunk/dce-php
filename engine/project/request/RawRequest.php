@@ -47,9 +47,8 @@ abstract class RawRequest {
 
     /**
      * 取客户端信息, {ip, port}
-     * @return array
+     * @return array{ip: string, port: int, request: string}
      */
-    #[ArrayShape(['ip' => 'string', 'port' => 'int', 'request' => 'string'])]
     abstract public function getClientInfo(): array;
 
     /**

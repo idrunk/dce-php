@@ -38,7 +38,6 @@ class Controller {
         $this->rawRequest = $this->request->rawRequest;
         $this->isResponseMode = $this->rawRequest instanceof RawRequestHttp || ($this->rawRequest instanceof RawRequestConnection && $this->rawRequest->isResponseMode());
         $this->rendererInstance = Renderer::inst($this, $this->isResponseMode);
-        $this->__init();
     }
 
     /** 安全的控制器构造方法, 子类可重写且无需调用父类方法 */
@@ -50,6 +49,7 @@ class Controller {
      */
     public function call(string $method): void {
         if (! $this->rendered) {
+            $this->__init();
             $this->$method();
             $this->isResponseMode && $this->render(); // 无需给非请求响应模型实现渲染缓存器, 因为他们不能自动渲染, 反正需要手动, 即使需要缓存也得自行实现
         }

@@ -108,6 +108,6 @@ class RawRequestCli extends RawRequest {
 
     /** @inheritDoc */
     public function getClientInfo(): array {
-        return [];
+        return ['request' => "$this->method /$this->path"];
     }
 }

@@ -125,6 +125,6 @@ final class Dce {
         }
         self::$initState = 3;
 
-        Exception::callCatch([RequestManager::class, 'route'], DCE_CLI_MODE ? RawRequestCli::class : RawRequestHttpCgi::class);
+        Exception::catchRequest([RequestManager::class, 'route'], DCE_CLI_MODE ? RawRequestCli::class : RawRequestHttpCgi::class);
     }
 }

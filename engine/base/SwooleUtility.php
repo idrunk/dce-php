@@ -199,9 +199,8 @@ final class SwooleUtility {
      * @throws Exception
      */
     public static function rootProcessConstraint(): void {
-        $ppid = posix_getppid();
-        if ($ppid > 1) {
-            throw new BaseException(BaseException::NEED_ROOT_PROCESS);
-        }
+        static $masterPid;
+        null === $masterPid && $masterPid = posix_getpid();
+        posix_getpid() !== $masterPid && throw new BaseException(BaseException::NEED_ROOT_PROCESS);
     }
 }

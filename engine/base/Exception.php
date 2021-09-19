@@ -138,7 +138,7 @@ class Exception extends \Exception implements Decorator {
         return false;
     }
 
-    public static function callCatch(callable $callable, mixed ... $params): void {
+    public static function catchRequest(callable $callable, mixed ... $params): void {
         try {
             call_user_func($callable, ... $params);
         } catch (QuietException) {
@@ -169,6 +169,21 @@ class Exception extends \Exception implements Decorator {
                     ($request->controller ?? 0) ? $request->controller->exception($exception) : $request->rawRequest->response(self::render($exception, null), $request->rawRequest->path);
                 }
             }
+        }
+    }
+
+    /**
+     * @param callable<Throwable, void>|bool $matched
+     * @param callable $callable
+     * @param mixed ...$params
+     * @throws Throwable
+     */
+    public static function catchWarning(callable|bool $matched, callable $callable, mixed ... $params): void {
+        try {
+            call_user_func($callable, ... $params);
+        } catch (Throwable $throwable) {
+            is_callable($matched) && $matched = call_user_func($matched, $throwable);
+            $matched ? LogManager::exception($throwable, true, true) : throw $throwable;
         }
     }
 

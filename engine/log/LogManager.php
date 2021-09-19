@@ -29,9 +29,10 @@ final class LogManager {
      * 打印记录异常
      * @param Throwable $throwable
      * @param bool $isSimple
+     * @param bool $isWarn
      */
-    public static function exception(Throwable $throwable, bool $isSimple): void {
-        $pureContent = self::exceptionRender($throwable, $isSimple);
+    public static function exception(Throwable $throwable, bool $isSimple, bool $isWarn = false): void {
+        $pureContent = self::exceptionRender($throwable, $isSimple, warn: $isWarn);
 
         // 打印异常
         DCE_CLI_MODE && Dce::$config->log['exception']['console'] && print($pureContent);
@@ -49,15 +50,18 @@ final class LogManager {
      * @param Throwable $throwable
      * @param bool|null $simple {null: 渲染为通用响应结构体, true: 渲染为简介提示, false: 渲染为详细异常}
      * @param bool $html 是否用html包裹
+     * @param bool $warn
      * @return string
      */
-    public static function exceptionRender(Throwable $throwable, bool|null $simple = false, bool $html = false): string {
+    public static function exceptionRender(Throwable $throwable, bool|null $simple = false, bool $html = false, bool $warn = false): string {
         $now = date('Y-m-d H:i:s');
         if ($simple === null) {
             $data = ['status' => false];
             $throwable->getCode() && $data['code'] = $throwable->getCode();
             $throwable->getMessage() && $data['message'] = $throwable->getMessage();
             $content = json_encode($data, JSON_UNESCAPED_UNICODE);
+        } else if ($warn) {
+            $content = sprintf("[%s] (警告：%s) %s\n\n\n", $now, $throwable->getCode(), $throwable->getMessage());
         } else {
             $content = $simple ? sprintf("[%s] (%s: %s) %s\n\n\n", $now, get_class($throwable), $throwable->getCode(), $throwable->getMessage())
                 : sprintf("[%s] (%s: %s) %s\n\n%s\n\n\n", $now, get_class($throwable),$throwable->getCode(), $throwable->getMessage(), $throwable);

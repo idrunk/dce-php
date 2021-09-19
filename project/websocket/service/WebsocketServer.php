@@ -67,14 +67,14 @@ class WebsocketServer extends ServerMatrix {
         }
         $this->eventBeforeStart($this->server);
 
-        $this->server->on('open', fn(Server $server, Request $request) => Exception::callCatch(fn() => $this->takeoverOpen($server, $request)));
+        $this->server->on('open', fn(Server $server, Request $request) => Exception::catchRequest(fn() => $this->takeoverOpen($server, $request)));
 
-        $this->server->on('message', fn(Server $server, Frame $frame) => Exception::callCatch(fn() => $this->takeoverMessage($server, $frame)));
+        $this->server->on('message', fn(Server $server, Frame $frame) => Exception::catchRequest(fn() => $this->takeoverMessage($server, $frame)));
 
-        $this->server->on('close', fn(Server $server, int $fd, int $reactorId) => Exception::callCatch(fn() => $this->takeoverClose($server, $fd, $reactorId)));
+        $this->server->on('close', fn(Server $server, int $fd, int $reactorId) => Exception::catchRequest(fn() => $this->takeoverClose($server, $fd, $reactorId)));
 
         if ($websocketConfig['enable_http'] ?? false) {
-            $this->server->on('request', fn(Request $request, Response $response) => Exception::callCatch(fn() => $this->takeoverRequest($request, $response)));
+            $this->server->on('request', fn(Request $request, Response $response) => Exception::catchRequest(fn() => $this->takeoverRequest($request, $response)));
         }
 
         // 扩展自定义的Swoole Server事件回调
@@ -112,7 +112,7 @@ class WebsocketServer extends ServerMatrix {
      * @param Frame $frame
      */
     private function takeoverMessage(Server $server, Frame $frame): void {
-        Exception::callCatch([RequestManager::class, 'route'], static::$rawRequestWebsocketClass, $this, $frame);
+        Exception::catchRequest([RequestManager::class, 'route'], static::$rawRequestWebsocketClass, $this, $frame);
     }
 
     /**

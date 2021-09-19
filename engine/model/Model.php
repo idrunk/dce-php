@@ -63,11 +63,11 @@ abstract class Model implements ArrayAccess, Decorator {
      * 提取模型属性键值表
      * @return array
      */
-    public function extractProperties(): array {
+    public function extractProperties(bool $toDbKey = true): array {
         $mapping = [];
         foreach (static::getProperties() as $property) {
             if (false !== $value = $property->getValue($this)) {
-                $mappingKey = static::toDbKey($property->name);
+                $mappingKey = $toDbKey ? static::toDbKey($property->name) : $property->name;
                 $mapping[$mappingKey] = $value;
             }
         }

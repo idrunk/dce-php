@@ -51,7 +51,7 @@ class HttpServer extends ServerMatrix {
         }
         $this->eventBeforeStart($this->server);
 
-        $this->server->on('request', fn(Request $request, Response $response) => Exception::callCatch(fn() => $this->takeoverRequest($request, $response)));
+        $this->server->on('request', fn(Request $request, Response $response) => Exception::catchRequest(fn() => $this->takeoverRequest($request, $response)));
 
         // 扩展自定义的Swoole Server事件回调
         foreach ($swooleHttpEvents as $eventName => $eventCallback) {

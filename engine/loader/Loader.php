@@ -187,6 +187,7 @@ class Loader {
         self::prepare('\controller\*', APP_COMMON . 'controller/');
         self::prepare('\model\*', APP_COMMON . 'model/');
         self::prepare('\service\*', APP_COMMON . 'service/');
+        self::prepare('\lib\*', APP_COMMON . 'lib/');
         // 加载方法库
         self::dirOnce(APP_COMMON . 'function/');
         // 初始化类装饰器
@@ -201,5 +202,6 @@ class Loader {
         self::prepare("\\{$project->name}\\controller\\*", "{$project->path}controller/", true); // 预加载控制器类
         self::prepare("\\{$project->name}\\model\\*", "{$project->path}model/", true); // 预加载模型类
         self::prepare("\\{$project->name}\\service\\*", "{$project->path}service/", true); // 预加载服务类
+        self::prepare("\\{$project->name}\\lib\\*", "{$project->path}lib/");
     }
 }

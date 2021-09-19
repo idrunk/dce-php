@@ -51,13 +51,13 @@ class TcpServer extends ServerMatrix {
         }
         $this->eventBeforeStart($this->server);
 
-        $this->server->on('connect', fn(Server $server, int $fd, int $reactorId) => Exception::callCatch(fn() => $this->takeoverConnect($server, $fd, $reactorId)));
+        $this->server->on('connect', fn(Server $server, int $fd, int $reactorId) => Exception::catchRequest(fn() => $this->takeoverConnect($server, $fd, $reactorId)));
 
-        $this->server->on('receive', fn(Server $server, int $fd, int $reactorId, string $data) => Exception::callCatch(fn() => $this->takeoverReceive($server, $fd, $reactorId, $data)));
+        $this->server->on('receive', fn(Server $server, int $fd, int $reactorId, string $data) => Exception::catchRequest(fn() => $this->takeoverReceive($server, $fd, $reactorId, $data)));
 
-        $this->server->on('packet', fn(Server $server, string $data, array $clientInfo) => Exception::callCatch(fn() => $this->takeoverPacket($server, $data, $clientInfo)));
+        $this->server->on('packet', fn(Server $server, string $data, array $clientInfo) => Exception::catchRequest(fn() => $this->takeoverPacket($server, $data, $clientInfo)));
 
-        $this->server->on('close', fn(Server $server, int $fd, int $reactorId) => Exception::callCatch(fn() => $this->takeoverClose($server, $fd, $reactorId)));
+        $this->server->on('close', fn(Server $server, int $fd, int $reactorId) => Exception::catchRequest(fn() => $this->takeoverClose($server, $fd, $reactorId)));
 
         // 扩展自定义的Swoole Server事件回调
         foreach ($swooleTcpEvents as $eventName => $eventCallback) {

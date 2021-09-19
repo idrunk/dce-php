@@ -115,9 +115,8 @@ class DbActiveQuery extends ActiveQuery {
      * @throws ActiveException
      */
     private function loadAllRelationData(array $data): array {
-        if (! $this->relationNames) {
-            return $data;
-        }
+        if (! $this->relationNames || ! $data) return $data;
+
         // 遍历关系名, 批量查询出所有关联关系数据
         foreach ($this->relationNames as $relationName) {
             $this->loadRelationData($relationName, $data);
@@ -188,12 +187,13 @@ class DbActiveQuery extends ActiveQuery {
         // 这里在为单一条件时没问题, 在为多条件时会多查出单条件匹配但可能多条件不匹配的数据, 但对于最终正确结果的匹配无影响
         $relationMapping = $activeQueryRelation->getMapping();
         foreach ($relationMapping as $foreignKey => $relationKey) {
-            $relationWhereParams = array_column($conditionRelationData, $activeQueryRelation->getActiveQuery()->activeRecord::toModelKey($relationKey));
+            $relationWhereParams = array_column($conditionRelationData, $activeQueryRelation->getActiveQuery()->activeRecord::toDbKey($relationKey));
+            // todo 需过滤无效的空条件，且关系条件为空时不应抛出异常，但不查库，直接返回空集即可
             if (! $relationWhereParams) {
                 throw (new ActiveException(ActiveException::NO_FOREIGN_IN_VIA_GETTER))->format($relationName, $foreignKey);
             }
             // 取一条关联关系数据时允许用户设置limit:1以提升性能, 但如果通过with批量查的, 则不能limit了, 需要清除limit条件
-            $activeQueryRelation->getActiveQuery()->where($foreignKey, 'in', $relationWhereParams)->limit(0);
+            $activeQueryRelation->getActiveQuery()->where($foreignKey, 'in', array_unique($relationWhereParams))->limit(0);
         }
         // 根据依赖关系批量查出所有关联数据
         $relationData = $activeQueryRelation->getActiveQuery()->select();
@@ -233,6 +233,14 @@ class DbActiveQuery extends ActiveQuery {
         }
         $this->activeRecord->setQueriedProperties($data);
         return $this->activeRecord;
+    }
+
+    /**
+     * 查询记录数
+     * @return int
+     */
+    public function count(): int {
+        return $this->query->count();
     }
 
     /**
