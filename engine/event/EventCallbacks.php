@@ -114,10 +114,8 @@ class EventCallbacks {
             call_user_func_array($v['callback'], [... $v['args'], ... $args]); // 这里可能无法
             if ($v['max_trigger_count'] > 0) {
                 $v['trigger_count'] ++;
-                if ($v['trigger_count'] >= $v['max_trigger_count']) { // 如果回调执行次数到达上限, 则删除回调并跳过
-                    $this->removeByIndex($k);
-                    continue;
-                }
+                // 如果回调执行次数到达上限, 则删除回调并跳过
+                $v['trigger_count'] >= $v['max_trigger_count'] && $this->removeByIndex($k);
             }
         }
         return true;

@@ -228,7 +228,7 @@ class Validator {
     private static function validQueue(Model|string|int|float|bool|null & $modelValue, array $validators) {
         $model = $modelValue instanceof Model ? $modelValue : null;
         foreach ($validators as $validator) {
-            $value = $model ? $validator->property->getValue($model) : $modelValue;
+            $value = $model ? $validator->property->getValue($model, false) : $modelValue;
             try {
                 // 校验并取值
                 $newValue = $validator->validator->checkGetValue($value, $validator->property->name, $validator->property->alias, $model);

@@ -6,23 +6,34 @@
 
 namespace websocket\service;
 
-use dce\Dce;
 use dce\log\LogManager;
 use dce\project\request\Request;
+use dce\service\server\Connection;
 use dce\service\server\RawRequestConnection;
 use Swoole\WebSocket\Frame;
 
 class RawRequestWebsocket extends RawRequestConnection {
+    public const ConnectionPath = 'websocket/connecting';
+
     public string $method = 'websocket';
 
     /** @var array Websocket的cookie是在open时缓存的, 在请求中是只读的 */
     public array $cookie;
 
+    private Frame $frame;
+
     public function __construct(
         private WebsocketServer $server,
-        private Frame $frame,
+        Frame|Connection $frame,
     ) {
-        $this->fd = $this->frame->fd;
+        if ($frame instanceof Connection) {
+            $this->isConnecting = true;
+            $this->connection = $frame;
+        } else {
+            $this->frame = $frame;
+            $this->connection = Connection::from($frame->fd);
+        }
+        $this->fd = $frame->fd;
     }
 
     /**
@@ -33,25 +44,25 @@ class RawRequestWebsocket extends RawRequestConnection {
         return $this->server;
     }
 
-    /** @inheritDoc */
-    public function getRaw(): Frame {
+    /** @return Frame */
+    public function getRaw(): mixed {
         return $this->frame;
     }
 
     /** @inheritDoc */
     public function init(): void {
-        ['path' => $this->path, 'requestId' => $this->requestId, 'data' => $this->rawData, 'dataParsed' => $this->dataParsed] = $this->unPack($this->frame->data);
+        ['path' => $this->path, 'requestId' => $this->requestId, 'data' => $this->rawData, 'dataParsed' => $this->dataParsed] = $this->isConnecting
+            ? ['path' => $this->connection->initialNode->pathFormat, 'requestId' => null, 'data' => $this->connection->swRequest->server['query_string'], 'dataParsed' => $this->connection->swRequest->get]
+            : $this->unPack($this->frame->data);
     }
 
     /** @inheritDoc */
     public function supplementRequest(Request $request): void {
         $request->fd = $this->fd;
         $request->rawData = $this->rawData;
-        if (is_array($this->dataParsed)) {
-            $request->request = $this->dataParsed;
-        }
-        $this->cookie = Dce::$cache->var->get(['cookie', $request->fd]) ?: [];
-        $request->session = Dce::$cache->var->get(['session', $request->fd]);
+        $request->request = is_array($this->dataParsed) ? $this->dataParsed : [];
+        $request->session = $this->connection->session;
+        $this->cookie = $this->connection->swRequest->cookie ?? [];
     }
 
     /** @inheritDoc */

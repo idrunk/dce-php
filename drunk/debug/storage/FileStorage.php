@@ -12,12 +12,13 @@ namespace drunk\debug\storage;
  * @package drunk\debug\storage\FileStorage
  */
 class FileStorage extends DebugStorage {
-    public function push(string $path, string $content): void {
+    public function push(string $path, string $content, string $logType = self::LogTypeAppend): void {
         $filePath = $this->genPath($path);
         if (! is_dir($fileDir = dirname($filePath))) {
             mkdir($fileDir, 0766, true);
         }
         $content .= "\n";
-        file_put_contents($filePath, $content, FILE_APPEND | LOCK_EX);
+        $logType === self::LogTypePrepend && $content .= file_get_contents($filePath) ?: '';
+        file_put_contents($filePath, $content, ($logType === self::LogTypeAppend ? FILE_APPEND : 0) | LOCK_EX);
     }
 }

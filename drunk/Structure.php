@@ -185,10 +185,17 @@ final class Structure {
     public static function sortByColumnRef(array $matrix, string $column, array $refValues): array {
         $valueOrderMapping = array_flip($refValues);
         $refOrderValues = [];
-        foreach ($matrix as $array) {
+        foreach ($matrix as $array)
             $refOrderValues[] = $valueOrderMapping[$array[$column]] ?? 65535; // 没取到则往后排
-        }
         array_multisort($refOrderValues, SORT_ASC, SORT_NUMERIC, $matrix);
         return $matrix;
+    }
+
+    public static function arrayChangeKeyCase(array $array, bool|null $bigCamel = false): array {
+        return array_reduce(array_keys($array), function($t, $k) use($array, $bigCamel) {
+            $v = $array[$k];
+            $t[$bigCamel === null ? Char::snakelike($k) : Char::camelize($k, $bigCamel)] = is_array($v) ? self::arrayChangeKeyCase($v, $bigCamel) : $v;
+            return $t;
+        }, []);
     }
 }

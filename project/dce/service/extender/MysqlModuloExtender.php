@@ -14,6 +14,7 @@ use dce\db\query\builder\schema\InsertSchema;
 use dce\db\query\builder\schema\TableSchema;
 use dce\db\query\builder\Statement\InsertStatement;
 use dce\Dce;
+use dce\sharding\middleware\ShardingConfig;
 use drunk\Structure;
 use Swoole\Coroutine\WaitGroup;
 
@@ -31,7 +32,7 @@ class MysqlModuloExtender extends ModuloExtender {
      * MysqlModuloExtender constructor.
      */
     protected function __construct() {
-        $this->shardingConfigs = Dce::$config->sharding->filter(['type' => $this->shardingType, 'dbType' => $this->dbType]);
+        $this->shardingConfigs = Dce::$config->sharding->filter(fn($c) => $c->type === $this->shardingType && $c->dbType === $this->dbType);
         $this->srcDatabases = Dce::$config->mysql->filter();
 
         $this->extendConfig = Dce::$config->shardingExtend;
@@ -277,7 +278,7 @@ class MysqlModuloExtender extends ModuloExtender {
     /** @inheritDoc */
     protected function checkApplyExtendConfig(): bool {
         $newConfig = ConfigManager::newCommonConfig();
-        $newShardingConfigs = $newConfig->sharding->filter(['type' => $this->shardingType, 'dbType' => $this->dbType]);
+        $newShardingConfigs = $newConfig->sharding->filter(fn($c) => $c->type === $this->shardingType && $c->dbType === $this->dbType);
         foreach ($this->shardingConfigs as $tableName => $shardingConfig) {
             if ($shardingConfig->targetModulus !== ($newShardingConfigs[$tableName]->modulus ?? 0)) {
                 // 如果目标模数与新配置模数不等, 则表示未应用新配

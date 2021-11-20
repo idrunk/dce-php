@@ -16,12 +16,13 @@ use dce\db\query\builder\StatementInterface;
 use dce\db\query\QueryException;
 use dce\db\query\builder\schema\WhereConditionSchema;
 use dce\Dce;
+use dce\pool\ChannelAbstract;
 use dce\sharding\id_generator\IdgException;
 use dce\sharding\middleware\data_processor\DbReadProcessor;
 use dce\sharding\middleware\data_processor\DbWriteProcessor;
 use Iterator;
 use Swoole\Coroutine\Barrier;
-use Throwable;
+use Swoole\Coroutine\WaitGroup;
 
 class DbMiddleware extends Middleware {
     private ShardingConfig $config;
@@ -51,31 +52,19 @@ class DbMiddleware extends Middleware {
         if ($this->directiveParser->isSharding()) {
             $this->config = $this->directiveParser->getSharding();
             $dbMapping = $this->shardingRoute();
-            if (SwooleUtility::inSwoole()) {
-                // Swoole环境则并发查询分库 (不做什么分离设计了, 直接放这直观方便)
-                $barrier = Barrier::make();
-                $throw = null;
-                foreach ($dbMapping as $dbAlias => $statementSet) {
-                    go(function () use ($statementSet, $dbAlias, $isWrite, $barrier, & $throw) {
-                        try {
-                            // 同库不并发 (除了跨库更新的情况外, 当前查询不会拆为多条, 可以避免可能出现的并发问题)
-                            foreach ($statementSet as $statement) {
-                                $this->directDistribute($statement, $dbAlias, $isWrite);
-                            }
-                        } catch (Throwable $throwable) {
-                            ! $throw && $throw = $throwable;
-                        }
-                    });
-                }
-                Barrier::wait($barrier);
-                $throw && throw $throw;
-            } else {
-                foreach ($dbMapping as $dbAlias => $statementSet) {
-                    foreach ($statementSet as $statement) {
-                        $this->directDistribute($statement, $dbAlias, $isWrite);
-                    }
-                }
+            $barrier = SwooleUtility::inSwoole() ? Barrier::make() : null;
+            $thrownChannel = ChannelAbstract::autoNew(64);
+            // Swoole环境则并发查询分库 (不做什么分离设计了, 直接放这直观方便)
+            foreach ($dbMapping as $dbAlias => $statementSet) {
+                $connectorPool = DbPool::inst($dbAlias, $isWrite)->setConfigs(Dce::$config->mysql->getConfig($dbAlias, $isWrite), false);
+                // warn 容器必须放在这层，若放在外层，可能因多次执行导致数据混淆，放在内层则会导致同库并发顺序问题
+                $connectorPool->retryableContainer(function() use ($statementSet, $dbAlias, $connectorPool) {
+                    // 同库不并发 (除了跨库更新的情况外, 当前查询不会拆为多条, 可以避免可能出现的并发问题)
+                    foreach ($statementSet as $statement) $this->directDistribute($statement, $dbAlias, $connectorPool);
+                }, $thrownChannel, $barrier);
             }
+            $barrier && Barrier::wait($barrier);
+            ! $thrownChannel->isEmpty() && throw $thrownChannel->pop();
         } else {
             // 将非分库查询全部打发给default连接器处理, 直接返回其查询结果
             $dbConfigs = Dce::$config->mysql->getConfig($this->dbProxy->dbAlias, $isWrite);
@@ -91,12 +80,10 @@ class DbMiddleware extends Middleware {
      * SQL指令分发器
      * @param StatementInterface $statement
      * @param string $dbAlias
-     * @param bool $isWrite
+     * @param DbPool $connectorPool
      * @throws TransactionException
      */
-    private function directDistribute(StatementInterface $statement, string $dbAlias, bool $isWrite): void {
-        $dbConfigs = Dce::$config->mysql->getConfig($dbAlias, $isWrite);
-        $connectorPool = DbPool::inst($dbAlias, $isWrite)->setConfigs($dbConfigs, false);
+    private function directDistribute(StatementInterface $statement, string $dbAlias, DbPool $connectorPool): void {
         // 若打开了事务开关, 则尝试开启事务
         $transaction = ShardingTransaction::tryBegin($this->config->alias, $dbAlias, $connectorPool);
         $inTransaction = $transaction instanceof ShardingTransaction;
@@ -413,9 +400,8 @@ class DbMiddleware extends Middleware {
      * @return DbReadProcessor|DbWriteProcessor
      */
     public function getProcessor(): DbReadProcessor|DbWriteProcessor {
-        if (! isset($this->processor)) {
-            $this->processor = $this->directiveParser->isSelect() ? new DbReadProcessor($this->directiveParser) : new DbWriteProcessor($this->directiveParser);
-        }
+        ! isset($this->processor)
+            && $this->processor = $this->directiveParser->isSelect() ? new DbReadProcessor($this->directiveParser) : new DbWriteProcessor();
         return $this->processor;
     }
 

@@ -21,6 +21,9 @@ abstract class Session {
 
     protected static array $config;
 
+    /** @var int renew时旧会话存活时间（若客户端未获取新sid仍以旧的请求，则将自动续期，否则若生成新sid后未新发请求，则旧会话会在此时间后自动过期，以兼容长连接模式） */
+    protected static int $oldTtl = 180;
+
     protected bool $touched = false;
 
     private string $sid;
@@ -194,8 +197,7 @@ abstract class Session {
 
     /**
      * 取源信息
-     * @return array
+     * @return array{create_time: int, long_live: bool, ttl: int, expiry: int, reference: string}
      */
-    #[ArrayShape(['create_time' => 'int', 'long_live' => 'bool', 'ttl' => 'int', 'expiry' => 'int'])]
     abstract public function getMeta(): array;
 }

@@ -6,9 +6,15 @@
 
 namespace dce\pool;
 
+use dce\log\LogManager;
 use drunk\Utility;
+use Swoole\Coroutine\Barrier;
+use Swoole\Coroutine\WaitGroup;
+use Throwable;
 
 abstract class Pool {
+    private const DefaultMaxRetries = 3;
+
     private static string $channelClass = CoroutineChannel::class;
 
     private static array $instMapping = [];
@@ -22,6 +28,10 @@ abstract class Pool {
     private array $configs = [];
 
     private string $configClass;
+
+    private int $maxRetries;
+
+    private int $retries = 0;
 
     private function __construct(string $configClass) {
         if (! is_subclass_of($configClass, PoolProductionConfig::class)) {
@@ -95,8 +105,8 @@ abstract class Pool {
             }
             $configs[$k] = $matchedInstanceConfig;
             $channelMapping[$k] = $channel;
-
         }
+        $configs && $this->maxRetries = $configs[0]->maxRetries ?? self::DefaultMaxRetries;
         $this->configs = $configs;
         $this->channelMapping = $channelMapping;
         return $this;
@@ -186,13 +196,9 @@ abstract class Pool {
     final protected function get(array $config = []): object {
         if ($config) {
             $configIndex = $this->getConfigIndex($config);
-            if (null === $configIndex) {
-                throw new PoolException(PoolException::CONFIG_PRODUCTION_NOT_MATCH);
-            }
-            $config = $this->getProductionConfig($configIndex);
-        } else {
-            $config = $this->getProductionConfig($configIndex);
+            null === $configIndex && throw new PoolException(PoolException::CONFIG_PRODUCTION_NOT_MATCH);
         }
+        $config = $this->getProductionConfig($configIndex);
         $channel = $this->getChannel($configIndex);
         // 根据此产销率, 实现了惰性生产的特性, 只有当生产的实例被销售完后, 才尝试生产新的
         if ($config->getYieldSalesRate() >= 1) {
@@ -216,9 +222,7 @@ abstract class Pool {
         $config->consume();
         // 使用Swoole协程通道时, 若通道中无实例, 则会挂起, 等到有消费方归还后, 再取出, 并继续后续动作
         $instance = $channel->pop();
-        if (null === $instance) {
-            throw new PoolException(PoolException::CHANNEL_BUSYING);
-        }
+        null === $instance && throw new PoolException(PoolException::CHANNEL_BUSYING);
         $this->productMapping->refresh($instance);
         return $instance;
     }
@@ -244,6 +248,46 @@ abstract class Pool {
         $this->productMapping->set($instance, $config, $channel);
         $this->put($instance); // 入池
     }
+
+    /**
+     * 重试容器，容器中代码执行时，若连接异常断开，则可被自动重新执行以便连接池重连
+     * @param callable $callback
+     * @param ChannelAbstract $thrownChannel
+     * @param Barrier|null $barrier
+     */
+    final public function retryableContainer(callable $callback, ChannelAbstract $thrownChannel, Barrier $barrier = null): void {
+        $barrier !== null ? go(fn($barrier) => $this->tryCall($callback, $thrownChannel), $barrier) : $this->tryCall($callback, $thrownChannel);
+    }
+
+    private function tryCall(callable $callback, ChannelAbstract $thrownChannel): void {
+        try {
+            call_user_func($callback);
+        } catch (Throwable $throwable) {
+            $retryable = $this->retryable($throwable);
+            // 若可重试却已超限，则抛出超限异常
+            true === $retryable && $this->maxRetries > 0 && $this->retries >= $this->maxRetries
+                && $retryable = (new PoolException(PoolException::DISCONNECTED_RETRIES_OVERFLOWED))->format($this->maxRetries);
+
+            // 若可重试未超限，则重试，否则若未标记过异常，则标记异常以便外面抛出
+            if (true === $retryable) {
+                // 首次重试前弹警告
+                ! $this->retries && LogManager::warning((new PoolException(PoolException::WARNING_RETRY_CONNECT))->format(static::class));
+                $this->retry($callback, $thrownChannel);
+            } else {
+                $thrownChannel->push($retryable ?: $throwable);
+            }
+
+            // explain 可重试的异常发生于从实例池取出的连接，其已不在池中，且后续池容量不足时会自动回收垃圾，此处无需处理；非实例池的异常更加无需处理。
+        }
+    }
+
+    private function retry(callable $callback, ChannelAbstract $thrownChannel): void {
+        $this->retries ++;
+        $this->tryCall($callback, $thrownChannel);
+        $this->retries --;
+    }
+
+    abstract protected function retryable(Throwable $throwable): Throwable|bool;
 
     /**
      * 子类可以覆盖此方法, 用于从配置中心动态取配置

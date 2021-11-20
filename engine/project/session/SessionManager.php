@@ -8,16 +8,15 @@ namespace dce\project\session;
 
 use dce\Dce;
 use dce\rpc\RpcClient;
+use dce\service\server\Connection;
 use dce\service\server\ConnectionException;
 use dce\storage\redis\DceRedis;
+use drunk\Structure;
 use rpc\dce\service\RpcServerApi;
 use Throwable;
 
 abstract class SessionManager {
-    /** @var string SessionManager FdForm Tcp fd标记 */
     public const EXTRA_TCP = 'tcp';
-
-    /** @var string SessionManager FdForm Websocket fd标记 */
     public const EXTRA_WS = 'ws';
 
     protected static array $config;
@@ -38,17 +37,6 @@ abstract class SessionManager {
         return $instance;
     }
 
-    /**
-     * 清空FdForm, 服务器初始化时调用, 防止前次服务器发生异常导致未正常断开连接而留下垃圾数据
-     * @param string $apiHost
-     * @param int $apiPort
-     */
-    final public function clear(string $apiHost, int $apiPort): void {
-        foreach ($this->listFdForm(0, null, self::genFdid(0, $apiHost, $apiPort) . '/*') as ['fd' => $fdOld, 'host' => $hostOld, 'port' => $portOld]) {
-            $this->disconnect($fdOld, $hostOld, $portOld);
-        }
-    }
-
     /** 初始化处理Session配置 */
     private static function initConfig(): void {
         if (isset(self::$config)) {
@@ -62,20 +50,15 @@ abstract class SessionManager {
 
     /**
      * 连接时同步会话状态
-     * @param string $sid
-     * @param int $fd
-     * @param string $apiHost
-     * @param int $apiPort
+     * @param Connection $conn
      * @param string $extra
      */
-    public function connect(string $sid, int $fd, string $apiHost, int $apiPort, string $extra): void {
-        $fdid = $this->setFdForm($sid, $fd, $apiHost, $apiPort, $extra);
-        $this->setSessionForm($sid, $fdid);
-        $mid = $this->getSessionForm($sid);
-        if ($mid) {
-            // 如果sid已经登录了mid, 则将当前fd加入MemberForm
-            $this->setMemberForm($mid, $fdid);
-        }
+    public function connect(Connection $conn, string $extra): void {
+        $fdid = $this->setFdForm($conn->fd, $conn->server->apiHost, $conn->server->apiPort, $extra);
+        $this->setSessionForm($conn->session->getId(), $fdid);
+        $mid = $this->getSessionForm($conn->session->getId());
+        // 如果sid已经登录了mid, 则将当前fd加入MemberForm
+        $mid && $this->setMemberForm($mid, $fdid);
     }
 
     /**
@@ -84,13 +67,13 @@ abstract class SessionManager {
      * @param string $apiHost
      * @param int $apiPort
      */
-    public function disconnect(int $fd, string $apiHost, int $apiPort): void {
-        $fdid = self::genFdid($fd, $apiHost, $apiPort);
+    public function disconnect(Connection $conn): void {
+        $fdid = self::genFdid($conn->fd, $conn->server->apiHost, $conn->server->apiPort);
         $fdForm = $this->getFdForm($fdid);
         if ($fdForm) {
             $this->delFdForm($fdid);
-            if ($fdForm['sid'] && $mid = $this->getSessionForm($fdForm['sid'])) {
-                $this->delSessionForm($fdForm['sid'], $fdid);
+            if ($mid = $this->getSessionForm($conn->session->getId())) {
+                $this->delSessionForm($conn->session->getId(), true);
                 $this->delMemberForm($mid, $fdid);
             }
         }
@@ -102,30 +85,8 @@ abstract class SessionManager {
      * @param string $sid
      */
     public function login(int $mid, string $sid): void {
-        $fdids = $this->getSessionForm($sid, true);
-        if ($fdids) {
-            // 如果当前sid有对应长连接, 则标记该连接
-            $this->setSessionForm($sid, mid: $mid);
-            $this->setMemberForm($mid, $fdids, $sid);
-        } else {
-            $this->setSessionForm($sid, mid: $mid);
-            $this->setMemberForm($mid, sid: $sid);
-        }
-    }
-
-    /**
-     * 处理长连接登录, 标记mid相关信息
-     * @param int $mid
-     * @param int $fd
-     * @param string $apiHost
-     * @param int $apiPort
-     * @throws SessionException
-     */
-    public function fdLogin(int $mid, int $fd, string $apiHost, int $apiPort): void {
-        $fdid = self::genFdid($fd, $apiHost, $apiPort);
-        if (! $sid = $this->getFdForm($fdid)['sid'] ?? 0) {
-            throw (new SessionException(SessionException::SID_BY_FDID_NOTFOUND))->format($fdid);
-        }
+        $fdid = $this->getSessionForm($sid, true) ?: null;
+        // 如果当前sid有对应长连接, 则标记该连接
         $this->setSessionForm($sid, mid: $mid);
         $this->setMemberForm($mid, $fdid, $sid);
     }
@@ -136,15 +97,11 @@ abstract class SessionManager {
      */
     public function logout(string $sid): void {
         $sessionForm = $this->getSessionForm($sid, null);
-        if (! isset($sessionForm['mid'])) {
-            return;
-        }
-        if (isset($sessionForm['fdid'])) {
+        if (! isset($sessionForm['mid'])) return;
+        if (isset($sessionForm['fdid'])) { // 如果有长连接, 则也清除掉
             $this->delSessionForm($sid, false);
-            // 如果有长连接, 则也清除掉
             $this->delMemberForm($sessionForm['mid'], $sessionForm['fdid'], $sid);
-        } else {
-            // 如果没有长连接, 则直接删掉整个SessionForm
+        } else { // 如果没有长连接, 则直接删掉整个SessionForm
             $this->delSessionForm($sid, null);
             $this->delMemberForm($sessionForm['mid'], sid: $sid);
         }
@@ -163,9 +120,9 @@ abstract class SessionManager {
             if ($session->isAlive()) {
                 $sessions[] = $session;
             } else {
-                if ($fdids = $this->getSessionForm($sid, true)) {
+                if ($fdid = $this->getSessionForm($sid, true)) {
                     // 在这里仅处理MemberForm与SessionForm而不处理FdForm, 因为删掉FdForm的sid无意义, fd必须绑定sid, 否则无法正常使用, FdForm的维护可以交给Server处理而不在此处
-                    $this->delMemberForm($mid, $fdids, $sid);
+                    $this->delMemberForm($mid, $fdid, $sid);
                 } else {
                     $this->delMemberForm($mid, sid: $sid);
                 }
@@ -220,7 +177,7 @@ abstract class SessionManager {
         $sessionForm = $this->getSessionForm($originalSid, null);
         if ($sessionForm) {
             if ($sessionForm['mid'] ?? 0) {
-                $this->setMemberForm($sessionForm['mid'], sid: $session->getId());
+                $this->setMemberForm($sessionForm['mid'], $sessionForm['fdid'] ?? null, $session->getId());
                 $this->delMemberForm($sessionForm['mid'], sid: $originalSid);
             }
             $this->setSessionForm($session->getId(), $sessionForm['fdid'] ?? null, $sessionForm['mid'] ?? null);
@@ -238,7 +195,7 @@ abstract class SessionManager {
      */
     public function sendMessage(int $mid, mixed $message, string|false $path): bool|null {
         $result = null;
-        $fdids = $this->getMemberForm($mid);
+        ['fdid' => $fdids, 'sid' => $sids] = $this->getMemberForm($mid, null);
         foreach ($fdids as $fdid) {
             try {
                 if ($this->sendMessageFd($fdid, $message, $path)) {
@@ -251,9 +208,11 @@ abstract class SessionManager {
                 if ($throwable instanceof ConnectionException) {
                     // 如果是连接错误, 则删掉已登录用户连接标识
                     $this->delMemberForm($mid, $fdid);
+                    false !== $index = Structure::arraySearch(fn($sid) => $this->getSessionForm($sid, true) === $fdid, $sids)
+                        && $this->delSessionForm($sids[$index], true);
                 }
                 // 发送成功过则不变, 否则设为失败
-                $result = $result ?: false;
+                null === $result && $result = false;
             }
         }
         return $result;
@@ -271,7 +230,7 @@ abstract class SessionManager {
         static $rpcPreloadedMapping = [];
         $fdForm = $this->getFdForm($fdid);
         if ($fdForm['host'] ?? 0) {
-            ['sid' => $sid, 'fd' => $fd, 'host' => $host, 'port' => $port, 'extra' => $extra] = $fdForm;
+            ['fd' => $fd, 'host' => $host, 'port' => $port, 'extra' => $extra] = $fdForm;
             $hostId = self::genFdid(0, $host, $port);
             if (! key_exists($hostId, $rpcPreloadedMapping)) {
                 // 这里多次preload也没关系, 但没必要, 缓存以节省开销
@@ -286,7 +245,6 @@ abstract class SessionManager {
                 return true;
             } catch (ConnectionException $exception) {
                 // 如果连接异常了, 则删掉关系数据
-                $this->delSessionForm($sid, $fdid);
                 $this->delFdForm($fdid);
                 throw $exception;
             }
@@ -306,25 +264,32 @@ abstract class SessionManager {
         return is_int($fd) || $host || $port ? "{$host}:{$port}" . ($fd ? "/{$fd}" : '') : $fd;
     }
 
+    protected static function sessionBool2Prop(bool|null $fdidOrMid): string|null {
+        return $fdidOrMid === null ? null : ['mid', 'fdid'][$fdidOrMid];
+    }
+
+    protected static function memberBool2Prop(bool|null $fdidOrSid): string|null {
+        return $fdidOrSid === null ? null : ['sid', 'fdid'][$fdidOrSid];
+    }
+
     /**
      * 添加FdForm映射
-     * @param string $sid
      * @param int $fd
      * @param string $host
      * @param int $port
      * @param string $extra
      * @return string
      */
-    abstract protected function setFdForm(string $sid, int $fd, string $host, int $port, string $extra): string;
+    abstract protected function setFdForm(int $fd, string $host, int $port, string $extra): string;
 
     /**
      * 取FdForm
      * @param string|int $fd
      * @param string $host
      * @param int $port
-     * @return array|false
+     * @return array{fd: int, host: string, port: int, extra: string}|false
      */
-    abstract public function getFdForm(string|int $fd, string $host = '', int $port = 0): array|false;
+    abstract protected function getFdForm(string|int $fd, string $host = '', int $port = 0): array|false;
 
     /**
      * 删除FdForm
@@ -340,7 +305,7 @@ abstract class SessionManager {
      * @param int $offset
      * @param int|null $limit
      * @param string $pattern
-     * @return array
+     * @return list<array{fd: int, host: string, port: int, extra: string}>
      */
     abstract public function listFdForm(int $offset = 0, int|null $limit = 100, string $pattern = '*'): array;
 
@@ -348,50 +313,50 @@ abstract class SessionManager {
     /**
      * 设置sid=>SessionForm映射
      * @param string $sid
-     * @param string|array|null $fdids
+     * @param string|null $fdid
      * @param int|null $mid
      */
-    abstract protected function setSessionForm(string $sid, string|array|null $fdids = null, int|null $mid = null): void;
+    abstract protected function setSessionForm(string $sid, string|null $fdid = null, int|null $mid = null): void;
 
     /**
      * 根据sid取SessionForm
      * @param string $sid
      * @param bool|null $fdidOrMid {null: all, true: fdid, false: mid}
-     * @return array|int|false
+     * @return array{fdid: string, mid: int}|string|int|false
      */
-    abstract public function getSessionForm(string $sid, bool|null $fdidOrMid = false): array|int|false;
+    abstract public function getSessionForm(string $sid, bool|null $fdidOrMid = false): array|string|int|false;
 
     /**
      * 删除sid=>SessionForm映射
      * @param string $sid
-     * @param string|array|false|null $fdidOrMid {null: 删SessionForm, string|array: 删fdid, false: 清空mid}
+     * @param bool|null $fdidOrMid {null: 删SessionForm, true: 删fdid, false: 清空mid}
      * @return bool
      */
-    abstract protected function delSessionForm(string $sid, string|array|false|null $fdidOrMid): bool;
+    abstract protected function delSessionForm(string $sid, bool|null $fdidOrMid): bool;
 
 
     /**
      * 绑定mid对应的sid/fdid
      * @param int $mid
-     * @param string|array|null $fdids
+     * @param string|null $fdid
      * @param string|null $sid
      */
-    abstract protected function setMemberForm(int $mid, string|array|null $fdids = null, string|null $sid = null): void;
+    abstract protected function setMemberForm(int $mid, string|null $fdid = null, string|null $sid = null): void;
 
     /**
      * 取mid对应的sid/fdid集
      * @param int $mid
-     * @param bool|null $fdidOrSid {null: all, true: fdidSet, false: sidSet}
-     * @return array|false
+     * @param bool|null $fdidOrSid {null: all, true: fdid, false: sid}
+     * @return array{fdid: list<string>, sid: list<string>}|list<string>|false
      */
     abstract public function getMemberForm(int $mid, bool|null $fdidOrSid = true): array|false;
 
     /**
      * 删除mid对应的sid/fdid (不做清除功能, 因为没有这样的场景, 应该在取数据发现无效时回调删除, 全删完时自动清除)
      * @param int $mid
-     * @param string|array|null $fdids
+     * @param string|null $fdid
      * @param string|null $sid
      * @return bool
      */
-    abstract protected function delMemberForm(int $mid, string|array|null $fdids = null, string|null $sid = null): bool;
+    abstract protected function delMemberForm(int $mid, string|null $fdid = null, string|null $sid = null): bool;
 }

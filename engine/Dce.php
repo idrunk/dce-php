@@ -11,7 +11,9 @@ use dce\base\Lock;
 use dce\cache\CacheManager;
 use dce\config\ConfigManager;
 use dce\config\DceConfig;
+use dce\event\Daemon;
 use dce\event\Event;
+use dce\i18n\Language;
 use dce\loader\Loader;
 use dce\log\LogManager;
 use dce\project\node\NodeManager;
@@ -47,6 +49,7 @@ final class Dce {
         Loader::prepareCommon();
         // 加载公共配置
         self::$config = ConfigManager::getCommonConfig();
+        LogManager::dce(new Language(['正在加载Dce类库...', 'DCE library loading...']));
         // PHP初始化
         self::phpInit();
         // 初始化日志类
@@ -71,9 +74,7 @@ final class Dce {
      */
     public static function getId(): string {
         static $id;
-        if (null === $id) {
-            $id = self::$config->app['id'] ?? 0;
-        }
+        null === $id && $id = self::$config->app['id'] ?? 0;
         return $id;
     }
 
@@ -108,13 +109,16 @@ final class Dce {
         // 扫描并加载项目
         ProjectManager::scanLoad();
         self::$isDevEnvBool = !! ProjectManager::get(self::DEV_PROJECT_NAME);
-        if (self::$config->bootstrap) {
-            call_user_func(self::$config->bootstrap); // 执行用户自定义引导程序
-        }
+        self::bootstrap();
         // 扫描并初始化节点集
         NodeManager::scanInit();
         // 事件中可能会派生新进程，在此前需将环境初始化好
         Event::trigger(Event::AFTER_DCE_INIT);
+    }
+
+    private static function bootstrap(): void {
+        self::$config->bootstrap && call_user_func(self::$config->bootstrap); // 执行用户自定义引导程序
+        Event::one(Event::AFTER_ROUTE, [Daemon::class, 'tryAutoDaemon']);
     }
 
     /** 引导路由 */
@@ -125,6 +129,7 @@ final class Dce {
         }
         self::$initState = 3;
 
+        LogManager::dce(new Language(['正在引导请求处理器...', 'Request handler is booting...']));
         Exception::catchRequest([RequestManager::class, 'route'], DCE_CLI_MODE ? RawRequestCli::class : RawRequestHttpCgi::class);
     }
 }

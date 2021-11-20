@@ -10,27 +10,19 @@ use dce\Dce;
 use dce\project\Project;
 use dce\project\ProjectManager;
 use dce\project\render\Renderer;
+use drunk\Structure;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
 
 final class NodeManager {
-    /**
-     * 所有项目根节点树
-     * @var NodeTree|false
-     */
+    /** @var NodeTree|false 所有项目根节点树 */
     private static NodeTree|false $nodeTree;
 
-    /**
-     * 路径节点树映射表
-     * @var array|false
-     */
+    /** @var array|false 路径节点树映射表 */
     private static array|false $pathTreeMapping;
 
-    /**
-     * ID节点树映射表
-     * @var array|false
-     */
+    /** @var array|false ID节点树映射表 */
     private static array|false $idTreeMapping;
 
     /**
@@ -331,5 +323,12 @@ final class NodeManager {
             }
         }
         return $hostTreeMapping[$host] ?? null;
+    }
+
+    public static function exists(string $path, bool $tryFillRoot = true): NodeTree|null {
+        $paths = [$path];
+        $tryFillRoot && $paths = array_reduce(ProjectManager::getAll(false), fn($ps, $p) => ["$p->name/$path", ... $ps], $paths);
+        $pathIndex = Structure::arraySearch(fn($p) => key_exists($p, self::$pathTreeMapping), $paths);
+        return $pathIndex === false ? null : self::getTreeByPath($paths[$pathIndex]);
     }
 }

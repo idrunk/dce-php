@@ -7,12 +7,10 @@
 namespace dce\sharding\id_generator;
 
 use ArrayAccess;
-use dce\base\Exception;
 use dce\config\Config;
 use dce\Dce;
 use dce\event\Event;
 use dce\rpc\RpcClient;
-use dce\rpc\RpcServer;
 use dce\rpc\RpcUtility;
 use dce\sharding\id_generator\bridge\IdgRequestLocal;
 use dce\sharding\id_generator\bridge\IdgStorage;
@@ -51,8 +49,8 @@ final class DceIdGenerator extends Config {
             $serverHosts = RpcUtility::hostsFormat($this->serverRpcHosts);
             if ($this->serverStorage) {
                 // 如果配置了服务端储存器, 则表示需要自动创建一个IdgServer的RPC服务
-                Exception::catchWarning(fn($throw) => preg_match('/Swoole.+not\s+found/ui', $throw->getMessage()), fn() =>
-                    RpcServer::new(RpcServer::host($serverHosts[0]['host'], $serverHosts[0]['port'] ?? 0))->preload(__DIR__ . '/server/IdgServerRpc.php')->start());
+                array_push(Dce::$config->rpcService['hosts'], ... $serverHosts);
+                Dce::$config->rpcService['preloads'][] = __DIR__ . '/server/IdgServerRpc.php';
             }
             RpcClient::preload('\rpc\didg\IdgServerRpc', $serverHosts);
             // 如果未配置请求器, 则设为系统默认的RPC请求器
@@ -66,8 +64,8 @@ final class DceIdGenerator extends Config {
             $clientHosts = RpcUtility::hostsFormat($this->clientRpcHosts);
             if ($this->clientStorage) {
                 // 如果配置了客户端储存器, 则表示需要自动创建一个IdgClient的RPC服务
-                Exception::catchWarning(fn($throw) => preg_match('/Swoole.+not\s+found/ui', $throw->getMessage()), fn() =>
-                    RpcServer::new(RpcServer::host($clientHosts[0]['host'], $clientHosts[0]['port'] ?? 0))->preload(__DIR__ . '/client/IdgClientRpc.php')->start());
+                array_push(Dce::$config->rpcService['hosts'], ... $clientHosts);
+                Dce::$config->rpcService['preloads'][] = __DIR__ . '/client/IdgClientRpc.php';
             }
             RpcClient::preload('\rpc\didg\IdgClientRpc', $clientHosts);
         }

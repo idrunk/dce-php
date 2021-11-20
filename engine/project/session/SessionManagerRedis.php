@@ -12,32 +12,33 @@ class SessionManagerRedis extends SessionManager {
     private const TTL = 259200; // 秒内未主动删除的将自动过期
 
     private const FDID_PREFIX = 'sm-fdid:';
-
     private const SID_PREFIX = 'sm-sid:';
-
     private const MID_PREFIX = 'sm-mid:';
 
+    private static function fdidKey(string $fdid): string { return self::FDID_PREFIX . $fdid; }
+    private static function sidKey(string $sid): string { return self::SID_PREFIX . $sid; }
+    private static function midKey(string $mid): string { return self::MID_PREFIX . $mid; }
+
     /** @inheritDoc */
-    protected function setFdForm(string $sid, int $fd, string $host, int $port, string $extra): string {
+    protected function setFdForm(int $fd, string $host, int $port, string $extra): string {
         $fdid = self::genFdid($fd, $host, $port);
         $redis = DceRedis::get(self::$config['manager_index']);
-        $redis->hMSet(self::FDID_PREFIX . $fdid, [
-            'sid' => $sid,
+        $redis->hMSet(self::fdidKey($fdid), [
             'fd' => $fd,
             'host' => $host,
             'port' => $port,
             'extra' => $extra,
         ]);
-        $redis->expire(self::FDID_PREFIX . $fdid, self::TTL);
+        $redis->expire(self::fdidKey($fdid), self::TTL);
         DceRedis::put($redis);
         return $fdid;
     }
 
     /** @inheritDoc */
-    public function getFdForm(int|string $fd, string $host = '', int $port = 0): array|false {
+    protected function getFdForm(int|string $fd, string $host = '', int $port = 0): array|false {
         $fdid = self::genFdid($fd, $host, $port);
         $redis = DceRedis::get(self::$config['manager_index']);
-        $fdForm = $redis->hGetAll(self::FDID_PREFIX . $fdid);
+        $fdForm = $redis->hGetAll(self::fdidKey($fdid));
         DceRedis::put($redis);
         return $fdForm ?: false;
     }
@@ -46,7 +47,7 @@ class SessionManagerRedis extends SessionManager {
     protected function delFdForm(int|string $fd, string $host = '', int $port = 0): bool {
         $fdid = self::genFdid($fd, $host, $port);
         $redis = DceRedis::get(self::$config['manager_index']);
-        $affected = $redis->del(self::FDID_PREFIX . $fdid);
+        $affected = $redis->del(self::fdidKey($fdid));
         DceRedis::put($redis);
         return !! $affected;
     }
@@ -60,7 +61,7 @@ class SessionManagerRedis extends SessionManager {
         $list = [];
         $prefixLength = strlen(self::FDID_PREFIX);
         // 迭代式取FdForm集
-        while($index < $upperLimit && $keys = $redis->scan($iterator, self::FDID_PREFIX . $pattern, $limit)) {
+        while($index < $upperLimit && $keys = $redis->scan($iterator, self::fdidKey($pattern), $limit)) {
             $count = count($keys);
             $diff = $offset - $index;
             if ($diff <= $count) {
@@ -80,105 +81,74 @@ class SessionManagerRedis extends SessionManager {
     }
 
     /** @inheritDoc */
-    protected function setSessionForm(string $sid , string|array|null $fdids = null , int|null $mid = null): void {
+    protected function setSessionForm(string $sid , string|null $fdid = null , int|null $mid = null): void {
         $redis = DceRedis::get(self::$config['manager_index']);
-        $form = $redis->hGetAll(self::SID_PREFIX . $sid) ?: [];
-        foreach (is_array($fdids) ? $fdids : [$fdids] as $fdid) {
-            if ($fdid && ! in_array($fdid, $form['fdid'] ?? [])) {
-                $form['fdid'][] = $fdid;
-            }
-        }
-        if ($mid) {
-            $form['mid'] = $mid;
-        }
-        $redis->hMSet(self::SID_PREFIX . $sid, $form);
-        $redis->expire(self::SID_PREFIX . $sid, self::TTL);
+        $form = $redis->hGetAll(self::sidKey($sid)) ?: [];
+        $fdid && $form['fdid'] = $fdid;
+        $mid && $form['mid'] = $mid;
+        $redis->hMSet(self::sidKey($sid), $form);
+        $redis->expire(self::sidKey($sid), self::TTL);
         DceRedis::put($redis);
     }
 
     /** @inheritDoc */
-    public function getSessionForm(string $sid , bool|null $fdidOrMid = false): array|int|false {
+    public function getSessionForm(string $sid , bool|null $fdidOrMid = false): array|string|int|false {
         $redis = DceRedis::get(self::$config['manager_index']);
-        $data = $redis->hGetAll(self::SID_PREFIX . $sid);
+        $data = $redis->hGetAll(self::sidKey($sid));
         DceRedis::put($redis);
-        $property = $fdidOrMid ? 'fdid' : (false === $fdidOrMid ? 'mid' : null);
+        $property = self::sessionBool2Prop($fdidOrMid);
         return $property ? $data[$property] ?? false : $data ?? false;
     }
 
     /** @inheritDoc */
-    protected function delSessionForm(string $sid , string|array|false|null $fdidOrMid): bool {
+    protected function delSessionForm(string $sid , bool|null $fdidOrMid): bool {
         $result = true;
         $redis = DceRedis::get(self::$config['manager_index']);
-        if ($form = $redis->hGetAll(self::SID_PREFIX . $sid)) {
-            if ($fdidOrMid) {
-                foreach (is_array($fdidOrMid) ? $fdidOrMid : [$fdidOrMid] as $fdid) {
-                    if ($fdid && false !== ($index = array_search($fdid, $form['fdid'] ?? []))) {
-                        array_splice($form['fdid'], $index, 1);
-                    }
-                }
-                if (! key_exists('fdid', $form)) {
-                    // 如果集删完了, 则整个直接干掉
-                    $result = $redis->hDel(self::SID_PREFIX . $sid, 'fdid');
-                } else {
-                    $result = $redis->hSet(self::SID_PREFIX . $sid, 'fdid', $form['fdid']);
-                }
-            } else if (false === $fdidOrMid) {
-                $result = $redis->hDel(self::SID_PREFIX . $sid, 'mid');
-            } else {
-                $result = $redis->del(self::SID_PREFIX . $sid);
+        if ($form = $redis->hGetAll(self::sidKey($sid))) {
+            $prop = self::sessionBool2Prop($fdidOrMid);
+            if ($prop) {
+                $result = $redis->hDel(self::sidKey($sid), $prop);
+                unset($form[$prop]);
             }
+            ! ($prop && $form) && $result = $redis->del(self::sidKey($sid));
         }
         DceRedis::put($redis);
         return $result;
     }
 
     /** @inheritDoc */
-    protected function setMemberForm(int $mid , string|array|null $fdids = null , string|null $sid = null): void {
-        if (! $sid && ! $fdids) {
-            throw (new SessionException(SessionException::EMPTY_FORM_PARAMETERS))->format($mid);
-        }
+    protected function setMemberForm(int $mid , string|null $fdid = null , string|null $sid = null): void {
+        ! $sid && ! $fdid && throw (new SessionException(SessionException::EMPTY_FORM_PARAMETERS))->format($mid);
+
         $redis = DceRedis::get(self::$config['manager_index']);
-        $form = $redis->hGetAll(self::MID_PREFIX . $mid);
-        if ($sid && ! in_array($sid, $form['sid'] ?? [])) {
-            $form['sid'][] = $sid;
-        }
-        foreach (is_array($fdids) ? $fdids : [$fdids] as $fdid) {
-            if ($fdid && ! in_array($fdid, $form['fdid'] ?? [])) {
-                $form['fdid'][] = $fdid;
-            }
-        }
-        $redis->hMSet(self::MID_PREFIX . $mid, $form);
-        $redis->expire(self::MID_PREFIX . $mid, self::TTL);
+        $form = $redis->hGetAll(self::midKey($mid));
+
+        $sid && ! in_array($sid, $form['sid'] ?? []) && $form['sid'][] = $sid;
+        $fdid && ! in_array($fdid, $form['fdid'] ?? []) && $form['fdid'][] = $fdid;
+
+        $redis->hMSet(self::midKey($mid), $form);
+        $redis->expire(self::midKey($mid), self::TTL);
         DceRedis::put($redis);
     }
 
     /** @inheritDoc */
     public function getMemberForm(int $mid , bool|null $fdidOrSid = true): array|false {
         $redis = DceRedis::get(self::$config['manager_index']);
-        $form = $redis->hGetAll(self::MID_PREFIX . $mid);
+        $form = $redis->hGetAll(self::midKey($mid));
         DceRedis::put($redis);
-        $property = $fdidOrSid ? 'fdid' : (false === $fdidOrSid ? 'sid' : null);
+        $property = self::memberBool2Prop($fdidOrSid);
         return $property ? $form[$property] ?? [] : $form ?? false;
     }
 
     /** @inheritDoc */
-    protected function delMemberForm(int $mid , string|array|null $fdids = null , string|null $sid = null): bool {
+    protected function delMemberForm(int $mid , string|null $fdid = null , string|null $sid = null): bool {
         $result = true;
         $redis = DceRedis::get(self::$config['manager_index']);
-        if ($form = $redis->hGetAll(self::MID_PREFIX . $mid)) {
-            if ($sid && false !== ($index = array_search($sid, $form['sid'] ?? []))) {
-                array_splice($form['sid'], $index, 1);
-            }
-            foreach (is_array($fdids) ? $fdids : [$fdids] as $fdid) {
-                if ($fdid && false !== ($index = array_search($fdid, $form['fdid'] ?? []))) {
-                    array_splice($form['fdid'], $index, 1);
-                }
-            }
-            if (empty($form['sid']) && empty($form['fdid'])) {
-                $result = $redis->del(self::MID_PREFIX . $mid);
-            } else {
-                $result = $redis->hMSet(self::MID_PREFIX . $mid, $form);
-            }
+        if ($form = $redis->hGetAll(self::midKey($mid))) {
+
+            $sid && false !== ($index = array_search($sid, $form['sid'] ?? [])) && array_splice($form['sid'], $index, 1);
+            $fdid && false !== ($index = array_search($fdid, $form['fdid'] ?? [])) && array_splice($form['fdid'], $index, 1);
+            $result = empty($form['sid']) && empty($form['fdid']) ? $redis->del(self::midKey($mid)) : $redis->hMSet(self::midKey($mid), $form);
         }
         DceRedis::put($redis);
         return $result;

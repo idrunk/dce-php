@@ -8,15 +8,20 @@ namespace dce\service\server;
 
 use dce\base\Exception;
 use dce\config\DceConfig;
-use dce\Dce;
+use dce\event\Daemon;
+use dce\event\Event;
 use dce\i18n\Language;
 use dce\loader\Decorator;
+use dce\loader\Loader;
 use dce\log\LogManager;
+use dce\project\node\NodeManager;
+use dce\project\request\RawRequestHttp;
 use dce\project\request\RequestManager;
 use dce\project\session\Session;
 use dce\project\session\SessionManager;
 use dce\rpc\RpcClient;
 use dce\rpc\RpcServer;
+use dce\rpc\RpcUtility;
 use http\service\RawRequestHttpSwoole;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
@@ -27,15 +32,15 @@ use tcp\service\RawRequestUdp;
 use Throwable;
 
 abstract class ServerMatrix implements Decorator {
-    protected static Language|array $langStarted = ["%s 服务器已启动于 %s:%s.\n\n", "%s server started with %s:%s.\n\n"];
+    protected static Language|array $langStarted = ["%s 服务器已启动于 %s:%s.", "%s server started with %s:%s."];
 
-    /** @var string 定义RawRequestHttp类名, (可在子类覆盖此属性使用自定义RawRequest类) */
+    /** @var class-string<RawRequestHttp> 定义RawRequestHttp类名, (可在子类覆盖此属性使用自定义RawRequest类) */
     protected static string $rawRequestHttpClass = RawRequestHttpSwoole::class;
 
-    /** @var string 定义RawRequestTcp类名 */
+    /** @var class-string<RawRequestTcp> 定义RawRequestTcp类名 */
     protected static string $rawRequestTcpClass = RawRequestTcp::class;
 
-    /** @var string 定义RawRequestUdp类名 */
+    /** @var class-string<RawRequestUdp> 定义RawRequestUdp类名 */
     protected static string $rawRequestUdpClass = RawRequestUdp::class;
 
     /** @var string 服务接口Rpc监听主机地址 */
@@ -90,7 +95,7 @@ abstract class ServerMatrix implements Decorator {
      * @return array
      */
     protected function eventsToBeBound(): array {
-        return [];
+        return ['WorkerStart' => fn() => srand(), ];
     }
 
     /**
@@ -119,11 +124,17 @@ abstract class ServerMatrix implements Decorator {
      * @param int $reactorId
      */
     protected function takeoverConnect(Server $server, int $fd, int $reactorId): void {
-        $session = Session::newBySid(true); // 生成一个Session对象并var缓存
-        LogManager::connect($this, $fd, $session->getId());
-        Dce::$cache->var->set(['session', $fd], $session);
-        SessionManager::inst()->connect($session->getId(), $fd, $this->apiHost, $this->apiPort, SessionManager::EXTRA_TCP);
-        $this->eventOnConnect($server, $fd, $reactorId);
+        Exception::catchRequest(function() use($server, $fd, $reactorId) {
+            $initialNode = NodeManager::exists(static::$rawRequestTcpClass::ConnectionPath);
+            $conn = Connection::from($fd, $this)->setProps($initialNode, Session::newBySid(true));
+            SessionManager::inst()->connect($conn, SessionManager::EXTRA_TCP);
+            if ($initialNode) {
+                RequestManager::route(static::$rawRequestTcpClass, $this, $conn, $fd, $reactorId);
+            } else {
+                LogManager::connect($conn);
+                $this->eventOnConnect($server, $fd, $reactorId);
+            }
+        });
     }
 
     /**
@@ -164,11 +175,11 @@ abstract class ServerMatrix implements Decorator {
      * @param int $reactorId
      */
     protected function takeoverClose(Server $server, int $fd, int $reactorId): void {
-        LogManager::disconnect($this, $fd);
+        $conn = Connection::from($fd);
+        LogManager::connect($conn, false);
         $this->eventOnClose($server, $fd, $reactorId);
-        SessionManager::inst()->disconnect($fd, $this->apiHost, $this->apiPort);
-        Dce::$cache->var->del(['session', $fd]);
-        Dce::$cache->var->del(['cookie', $fd]);
+        SessionManager::inst()->disconnect($conn);
+        $conn->destroy();
     }
 
     /**
@@ -202,16 +213,13 @@ abstract class ServerMatrix implements Decorator {
      * 执行服务器Api服务
      */
     protected function runApiService(): void {
-        $this->getServer()->addProcess(new Process(function () {
-            $rpcServer = RpcServer::new(RpcServer::host(static::$localRpcHost))->preload(static::$serverApiPath);
-            if ($this->apiHost && $this->apiPort) {
-                // 这里不做过多的安全限制, 服务器接口安全可以通过物理服务器防火墙管理
-                $rpcServer->addHost(RpcServer::host($this->apiHost, $this->apiPort)->setAuth($this->apiPassword));
-            }
-            $rpcServer->start(false);
+        $this->getServer()->addProcess(Daemon::runDaemon(function(RpcServer $rpcServer) {
+            $rpcServer->addHost(RpcServer::host(static::$localRpcHost));
+            // 这里不做过多的安全限制, 服务器接口安全可以通过物理服务器防火墙管理
+            $this->apiHost && $this->apiPort && $rpcServer->addHost(RpcServer::host($this->apiHost, $this->apiPort)->setAuth($this->apiPassword));
+            Loader::once(static::$serverApiPath);
             static::$serverApiClass::logServer($this);
-            SessionManager::inst()->clear($this->apiHost, $this->apiPort);
-        }, false, SOCK_STREAM, true));
+        }));
     }
 
     /** 预挂载服务接口本地Rpc客户端 */

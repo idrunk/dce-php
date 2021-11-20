@@ -133,25 +133,11 @@ class ShardingConfig extends Config implements ConfigLibInterface {
     }
 
     /**
-     * @param array $conditions
+     * @param callable<self, bool> $matcher
      * @return self[]
      */
-    public function filter(array $conditions): array {
-        $instances = $this->all();
-        $matchedInstances = [];
-        foreach ($instances as $tableName => $instance) {
-            $matched = true;
-            foreach ($conditions as $k => $v) {
-                if ($instance->get($k) !== $v) {
-                    $matched = false;
-                    break;
-                }
-            }
-            if ($matched) {
-                $matchedInstances[$tableName] = $instance;
-            }
-        }
-        return $matchedInstances;
+    public function filter(callable $matcher): array {
+        return array_filter($this->all(), $matcher);
     }
 
     /**

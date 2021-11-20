@@ -45,15 +45,15 @@ abstract class DbActiveRecord extends ActiveRecord {
     }
 
     /** @inheritDoc */
-    public function insert(bool $needLoadNew = false): int|string {
+    public function insert(bool $needLoadNew = false, bool|null $ignoreOrReplace = null): int|string {
         $this->valid();
-        $data = $this->extractProperties();
-        $insertId = $this->getActiveQuery()->insert($data);
+        $data = $this->extract(true, false);
+        $insertId = $this->getActiveQuery()->insert($data, $ignoreOrReplace);
         $pk = static::getPkNames();
         if ($insertId && count($pk) === 1) {
             if ($needLoadNew) {
                 // 查出数据库中真正储存的数据填充到当前属性, 如插入NOW()则取到插入的实时时间
-                $data = static::find($insertId)->extractProperties();
+                $data = static::find($insertId)->extract(true, false);
             } else {
                 $data[$pk[0]] = $insertId;
             }
@@ -65,7 +65,7 @@ abstract class DbActiveRecord extends ActiveRecord {
     /** @inheritDoc */
     public function update(): int {
         $this->valid();
-        $data = $this->extractProperties();
+        $data = $this->extract(true, false);
         $where = $this->genPropertyConditions();
         return $this->getActiveQuery()->where($where)->update($data);
     }

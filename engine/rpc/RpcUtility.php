@@ -6,6 +6,7 @@
 
 namespace dce\rpc;
 
+use dce\Dce;
 use drunk\Network;
 use drunk\Structure;
 
@@ -297,7 +298,6 @@ final class RpcUtility {
      * @return bool
      */
     public static function verifyToken(string $password, string $token): bool {
-        testPass($password, self::genToken($password), $token);
         return self::genToken($password) === $token;
     }
 
@@ -309,14 +309,11 @@ final class RpcUtility {
      */
     public static function hostsFormat(array $hosts): array {
         $firstKey = array_key_first($hosts);
-        if (null === $firstKey) {
-            throw new RpcException(RpcException::EMPTY_RPC_HOSTS);
-        }
-        if (0 !== $firstKey) {
-            $hosts = [$hosts];
-        }
-        if (! isset($hosts[0]['host']) || ! isset($hosts[0]['port'])) {
-            throw new RpcException(RpcException::INVALID_RPC_HOSTS);
+        null === $firstKey && throw new RpcException(RpcException::EMPTY_RPC_HOSTS);
+        0 !== $firstKey && $hosts = [$hosts];
+        foreach ($hosts as $k => $host) {
+            ! (isset($host['host']) && isset($host['port'])) && throw new RpcException(RpcException::INVALID_RPC_HOSTS);
+            $hosts[$k]['host'] = self::uniqueSock($host['host']);
         }
         return $hosts;
     }
@@ -338,5 +335,10 @@ final class RpcUtility {
             }
         }
         return $hosts;
+    }
+
+    public static function uniqueSock(string $sockPath): string {
+        return str_ends_with($sockPath, '.sock') && ! str_contains($sockPath, Dce::getId())
+            ? preg_replace('/(^|\/)([^\/]+)$/ui', '${1}'. Dce::getId() . '-$2', $sockPath) : $sockPath;
     }
 }

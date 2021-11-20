@@ -14,7 +14,13 @@ class Event {
      * Request对象初始化前回调
      * @callable(RawRequest)
      */
-    public const BEFORE_REQUEST = 'BEFORE_REQUEST';
+    public const BEFORE_ROUTE = 'BEFORE_ROUTE';
+
+    /**
+     * Request对象初始化后回调
+     * @callable(Request)
+     */
+    public const AFTER_ROUTE = 'AFTER_ROUTE';
 
     /**
      * 进入控制器前回调
@@ -33,6 +39,8 @@ class Event {
      * @callable(Controller)
      */
     public const AFTER_CONTROLLER = 'AFTER_RESPONSE';
+
+    public const AFTER_DAEMON = 'AFTER_DAEMON';
 
     /** @var EventCallbacks[] $events */
     private static array $events = [];

@@ -19,9 +19,7 @@ class UpdateSchema extends SchemaAbstract {
 
         foreach ($this->columns as $k=>$column) {
             $columnName = self::tableWrap($column);
-            if (!$columnName) {
-                throw (new QueryException(QueryException::COLUMN_INVALID))->format($column);
-            }
+            ! $columnName && throw (new QueryException(QueryException::COLUMN_INVALID))->format($column);
             $this->columns[$k] = $columnName;
         }
 
@@ -29,6 +27,7 @@ class UpdateSchema extends SchemaAbstract {
             $value = $data[$column] ?? null;
             if ($value instanceof RawBuilder) {
                 $this->sqlPackage[] = "{$this->columns[$k]}=$value";
+                $this->mergeParams($value->getParams());
             } else if ($value instanceof SelectStatement) {
                 $this->sqlPackage[] = "{$this->columns[$k]}=($value)";
                 $this->mergeParams($value->getParams());

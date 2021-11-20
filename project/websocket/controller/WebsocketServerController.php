@@ -8,7 +8,6 @@ namespace websocket\controller;
 
 use dce\config\ConfigException;
 use dce\project\Controller;
-use dce\project\request\Request;
 use rpc\dce\service\RpcServerApi;
 use websocket\service\WebsocketServer;
 

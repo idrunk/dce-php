@@ -6,25 +6,35 @@
 
 namespace tcp\service;
 
-use dce\Dce;
 use dce\log\LogManager;
 use dce\project\request\Request;
+use dce\service\server\Connection;
 use dce\service\server\RawRequestConnection;
 use dce\service\server\ServerMatrix;
 
 class RawRequestTcp extends RawRequestConnection {
+    public const ConnectionPath = 'tcp/connecting';
+
     public string $method = 'tcp';
 
     private array $raw;
 
     public function __construct(
         private ServerMatrix $server,
-        string $data, int $fd, int $reactor_id,
+        string|Connection $data,
+        protected int $fd,
+        int $reactorId,
     ) {
-        $this->fd = $fd;
+        if ($data instanceof Connection) {
+            $this->isConnecting = true;
+            $this->connection = $data;
+            $data = null;
+        } else {
+            $this->connection = Connection::from($fd);
+        }
         $this->raw = [
             'fd' => $fd,
-            'reactor_id' => $reactor_id,
+            'reactor_id' => $reactorId,
             'data' => $data,
         ];
     }
@@ -41,18 +51,16 @@ class RawRequestTcp extends RawRequestConnection {
 
     /** @inheritDoc */
     public function init(): void {
-        ['path' => $this->path, 'requestId' => $this->requestId, 'data' => $this->rawData, 'dataParsed' => $this->dataParsed] = $this->unPack($this->raw['data']);
+        ['path' => $this->path, 'requestId' => $this->requestId, 'data' => $this->rawData, 'dataParsed' => $this->dataParsed] = $this->isConnecting
+            ? ['path' => $this->connection->initialNode->pathFormat, 'requestId' => null, 'data' => '', 'dataParsed' => null] : $this->unPack($this->raw['data']);
     }
 
     /** @inheritDoc */
     public function supplementRequest(Request $request): void {
         $request->fd = $this->fd;
         $request->rawData = $this->rawData;
-        if (is_array($this->dataParsed)) {
-            $request->request = $this->dataParsed;
-        }
-        // 从var缓存取连接建立时实例化的Session对象
-        $request->session = Dce::$cache->var->get(['session', $request->fd]);
+        $request->request = is_array($this->dataParsed) ? $this->dataParsed : [];
+        $request->session = $this->connection->session;
     }
 
     /** @inheritDoc */

@@ -11,6 +11,10 @@ namespace drunk\debug\storage;
  * Interface StorageInterface
  */
 abstract class DebugStorage {
+    public const LogTypeAppend = 'append';
+    public const LogTypeReplace = 'replace';
+    public const LogTypePrepend = 'prepend';
+
     public function __construct(
         protected string $root,
     ) {
@@ -30,7 +34,7 @@ abstract class DebugStorage {
      * 压入调试内容
      * @param string $path
      * @param string $content
-     * @return mixed
+     * @param string $logType
      */
-    abstract public function push(string $path, string $content): void;
+    abstract public function push(string $path, string $content, string $logType = self::LogTypeAppend): void;
 }

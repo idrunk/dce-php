@@ -20,11 +20,13 @@
         "vimeo/psalm": "^4.9"
     },
     "suggest": {
+        "ext-pdo": "*",
         "ext-curl": "*",
+        "ext-posix": "*",
+        "ext-sockets": "*",
         "ext-redis": "*",
         "ext-memcache": "*",
-        "ext-memcached": "*",
-        "vimeo/psalm": "^4.9"
+        "ext-memcached": "*"
     },
     "autoload": {
         "files": ["engine/run.php"]

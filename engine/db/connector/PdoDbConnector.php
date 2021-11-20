@@ -142,6 +142,6 @@ class PdoDbConnector extends DbConnector {
     }
 
     public function rollback(): bool {
-        return $this->connection->rollBack();
+        return ! $this->connection->inTransaction() || $this->connection->rollBack();
     }
 }

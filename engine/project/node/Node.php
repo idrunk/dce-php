@@ -272,9 +272,9 @@ class Node {
         }
         [, $dir, $method] = $matches;
         $dir = str_replace('\\', '/', $dir);
-        if ($controllerPath && $nodePath !== $controllerPath) {
+        if ($controllerPath && $nodePath !== $controllerPath && ($node['controllerPath'] ?? null) !== false) {
             $dir .= "{$controllerPath}/";
         }
-        $node['path'] = $dir . ($nodePath ?: Char::snakelike($method));
+        $node['path'] = $dir . ($nodePath ?: $method);
     }
 }

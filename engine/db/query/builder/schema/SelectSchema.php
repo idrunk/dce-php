@@ -20,15 +20,13 @@ class SelectSchema extends SchemaAbstract {
             $columns = [$columns];
         }
         foreach ($columns as $alias => $column) {
-            if ($isAutoRaw && is_string($column)) {
-                $column = new RawBuilder($column, false);
-            }
+            $isAutoRaw && is_string($column) && $column = new RawBuilder($column, false);
             $this->extendColumn($column, is_int($alias) ? null : $alias);
         }
     }
 
     public function extendColumn(string|RawBuilder $column, string|null $alias = null) {
-        if ($column instanceof RawBuilder || is_numeric($column)) {
+        if (($isRaw = $column instanceof RawBuilder) || is_numeric($column)) {
             $columnName = $column;
         } else if (! (is_string($column) && $columnName = self::tableWrap($column, true))) {
             throw (new QueryException(QueryException::SELECT_COLUMN_INVALID))->format(self::printable($column));
@@ -36,6 +34,7 @@ class SelectSchema extends SchemaAbstract {
         $columnName .= $alias ? " {$alias}" : '';
         if (! in_array($columnName, $this->getConditions())) {
             $this->pushCondition($columnName);
+            $isRaw && $this->mergeParams($column->getParams());
         }
     }
 

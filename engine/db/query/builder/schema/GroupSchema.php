@@ -23,6 +23,7 @@ class GroupSchema extends SchemaAbstract {
             }
             if ($column instanceof RawBuilder) {
                 $this->pushCondition($column);
+                $this->mergeParams($column->getParams());
             } else if (is_string($column) && $column = self::tableWrap($column)) {
                 $this->pushCondition($column);
             } else {

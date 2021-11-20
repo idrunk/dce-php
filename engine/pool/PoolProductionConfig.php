@@ -10,34 +10,21 @@ use ArrayAccess;
 use dce\config\Config;
 
 abstract class PoolProductionConfig extends Config {
-    /**
-     * 容量
-     * @var int
-     */
+    public int $maxRetries;
+
+    /** @var int 容量 */
     private int $capacity;
 
-    /**
-     * 实例产量
-     * @var int
-     */
+    /** @var int 实例产量 */
     private int $yields = 0;
 
-    /**
-     * 实例生产率
-     * @var float
-     */
+    /** @var float 实例生产率 */
     private float $yieldRate = 0;
 
-    /**
-     * 实例销量
-     * @var int
-     */
+    /** @var int 实例销量 */
     private int $sales = 0;
 
-    /**
-     * 实例销率
-     * @var float
-     */
+    /** @var float 实例销率 */
     private float $salesRate = 0;
 
     /**

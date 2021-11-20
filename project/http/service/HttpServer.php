@@ -7,12 +7,14 @@
 namespace http\service;
 
 use dce\base\Exception;
+use dce\log\LogManager;
 use dce\project\ProjectManager;
 use dce\project\request\RawRequestHttp;
 use dce\service\server\ServerMatrix;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
 use Swoole\Http\Server;
+use Swoole\Server as BaseServer;
 
 class HttpServer extends ServerMatrix {
     protected static string $localRpcHost = '/var/run/dce_http_api.sock';
@@ -64,7 +66,7 @@ class HttpServer extends ServerMatrix {
         }
 
         $this->runApiService();
-        echo self::$langStarted->format('Http', $host, $port);
+        LogManager::dce(self::$langStarted->format('Http', $host, $port));
         $this->server->start();
     }
 
@@ -72,7 +74,7 @@ class HttpServer extends ServerMatrix {
      * 取Http Server服务
      * @return Server
      */
-    final public function getServer(): Server {
+    final public function getServer(): BaseServer {
         return $this->server;
     }
 }

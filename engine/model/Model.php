@@ -14,6 +14,10 @@ use ReflectionProperty;
 use Throwable;
 
 abstract class Model implements ArrayAccess, Decorator {
+    public const COVER_TYPE_UNSET = 'unset_default'; // todo 镜像升8.1后换成enum
+    public const COVER_TYPE_REPLACE = 'replace_value';
+    public const COVER_TYPE_IGNORE = 'ignore_existed';
+
     /** @var string 默认场景名 */
     public const SCENARIO_DEFAULT = 'default';
 
@@ -40,19 +44,24 @@ abstract class Model implements ArrayAccess, Decorator {
     /**
      * 应用模型属性值
      * @param array|ArrayAccess $properties 待赋值属性键值表
-     * @param bool $unsetDefault 是否清空待赋值属性键之外的属性值
+     * @param string $coverType
      * @return $this
      */
-    public function applyProperties(array|ArrayAccess $properties, bool $unsetDefault = true): static {
-        foreach ($properties as $name => $property) {
-            $passedKeys[] = $key = static::toModelKey($name);
-            $this->$key = $property;
-        }
-        // 如果需要转驼峰式且配置了字段类, 则表示是从数据库取出的数据
-        if ($unsetDefault && isset($passedKeys)) {
-            foreach (static::getProperties() as $property) {
-                if ($property->refProperty->hasDefaultValue() && ! in_array($property->name, $passedKeys)) {
-                    unset($this->{$property->name});
+    public function apply(array|ArrayAccess $properties, string $coverType = self::COVER_TYPE_REPLACE): static {
+        $passedKeys = array_keys(is_array($properties)
+            ? $properties = array_reduce(array_keys($properties), fn($ps, $k) => array_merge($ps, [static::toModelKey($k) => $properties[$k]]), [])
+            : array_filter(get_object_vars($properties), fn($v) => $v !== null));
+
+        if ($coverType === self::COVER_TYPE_IGNORE) {
+            foreach ($passedKeys as $key) $this->$key ??= $properties[$key];
+        } else {
+            foreach ($passedKeys as $key) $this->$key = $properties[$key];
+            if ($coverType === self::COVER_TYPE_UNSET) {
+                foreach (static::getProperties() as $property) {
+                    if ($property->refProperty->hasDefaultValue() && ! in_array($property->name, $passedKeys)) {
+                        // 如果需要清空默认值，且属性有默认值也未被传入值覆盖，则清除掉
+                        unset($this->{$property->name});
+                    }
                 }
             }
         }
@@ -61,12 +70,14 @@ abstract class Model implements ArrayAccess, Decorator {
 
     /**
      * 提取模型属性键值表
+     * @param bool $toDbKey
+     * @param mixed $null
      * @return array
      */
-    public function extractProperties(bool $toDbKey = true): array {
+    public function extract(bool $toDbKey = false, mixed $null = null): array {
         $mapping = [];
         foreach (static::getProperties() as $property) {
-            if (false !== $value = $property->getValue($this)) {
+            if ($null !== $value = $property->getValue($this, $null)) {
                 $mappingKey = $toDbKey ? static::toDbKey($property->name) : $property->name;
                 $mapping[$mappingKey] = $value;
             }
@@ -287,13 +298,13 @@ abstract class Model implements ArrayAccess, Decorator {
     /**
      * 以属性键值对实例化一个模型对象
      * @param array $properties
-     * @param bool $unsetDefault
+     * @param string $coverType
      * @param mixed ...$ctorArgs
      * @return $this
      */
-    public static function from(array $properties, bool $unsetDefault = true, mixed ... $ctorArgs): static {
+    public static function from(array $properties, string $coverType = self::COVER_TYPE_UNSET, mixed ... $ctorArgs): static {
         $instance = new static(... $ctorArgs);
-        $instance->applyProperties($properties, $unsetDefault);
+        $instance->apply($properties, $coverType);
         return $instance;
     }
 }

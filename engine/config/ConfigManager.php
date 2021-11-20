@@ -6,6 +6,7 @@
 
 namespace dce\config;
 
+use dce\loader\attr\Singleton;
 use dce\project\Project;
 use drunk\Structure;
 
@@ -17,11 +18,7 @@ final class ConfigManager {
      * @return DceConfig
      */
     public static function getCommonConfig(): DceConfig {
-        static $instance;
-        if (null === $instance) {
-            $instance = self::newCommonConfig();
-        }
-        return $instance;
+        return Singleton::gen([self::class, 'newCommonConfig'], DceConfig::class);
     }
 
     /**

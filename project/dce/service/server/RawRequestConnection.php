@@ -12,6 +12,11 @@ use dce\project\request\RawRequest;
 use dce\project\request\RequestException;
 
 abstract class RawRequestConnection extends RawRequest {
+    /** @var bool 是否正建立连接 */
+    public bool $isConnecting = false;
+    /** @var Connection 当前连接 */
+    public Connection $connection;
+
     /** @var string 路径内容分隔符 */
     protected const PATH_SEPARATOR = ';';
 
@@ -31,7 +36,7 @@ abstract class RawRequestConnection extends RawRequest {
     public function routeGetNode(): Node {
         $nodeTree = NodeManager::getTreeByPath($this->path);
         ! $nodeTree && in_array($this->path, ['', '/']) && $nodeTree = NodeManager::getTreeByPath('dce/empty/connection');
-        $node = $nodeTree ? $nodeTree->getFirstNode() : null;
+        $node = $nodeTree?->getFirstNode();
         ! key_exists($this->method, $node->methods ?? []) && throw (new RequestException(RequestException::NODE_LOCATION_FAILED))->format($this->getClientInfo()['request']);
         return $node;
     }

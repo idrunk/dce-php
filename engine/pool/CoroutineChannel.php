@@ -28,7 +28,7 @@ class CoroutineChannel extends ChannelAbstract {
         return $this->channel->isEmpty();
     }
 
-    public function getLength(): int {
+    public function length(): int {
         return $this->channel->length();
     }
 }

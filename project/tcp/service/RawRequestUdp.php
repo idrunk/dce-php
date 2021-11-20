@@ -41,9 +41,7 @@ class RawRequestUdp extends RawRequestConnection {
     /** @inheritDoc */
     public function supplementRequest(Request $request): void {
         $request->rawData = $this->rawData;
-        if (is_array($this->dataParsed)) {
-            $request->request = $this->dataParsed;
-        }
+        $request->request = is_array($this->dataParsed) ? $this->dataParsed : [];
     }
 
     /** @inheritDoc */

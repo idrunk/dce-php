@@ -23,12 +23,12 @@ class TableSchema extends SchemaAbstract {
     }
 
     public function tablePack(string|RawBuilder|SelectStatement $table) {
-        $tableSql = null;
         $params = [];
         if (is_string($table) && $tableName = self::tableWrap($table)) {
             $tableSql = $tableName;
         } else if ($table instanceof RawBuilder) {
             $tableSql = "$table";
+            $params = $table->getParams();
         } else if ($table instanceof SelectStatement) {
             $tableSql = "($table)";
             $params = $table->getParams();

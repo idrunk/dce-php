@@ -43,12 +43,17 @@ class Property {
         return $this;
     }
 
+    public function isInitialized(Model $model): bool {
+        return $this->refProperty->isInitialized($model);
+    }
+
     /**
      * 取模型属性值, false表示属性未初始化
      * @param Model $model
+     * @param mixed $default
      * @return string|int|float|false|null
      */
-    public function getValue(Model $model): string|int|float|null|false {
-        return $this->refProperty->isInitialized($model) ? $model->{$this->name} : false;
+    public function getValue(Model $model, mixed $default = null): string|int|float|null|false {
+        return $this->isInitialized($model) ? $model->{$this->name} : $default;
     }
 }

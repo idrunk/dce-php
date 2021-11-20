@@ -100,9 +100,7 @@ class RpcClient {
                 $namespace = implode('\\', $classNameSplit);
                 $parentClass = '\\' . self::class;
                 $scripts = "class {$baseClassName} extends {$parentClass} {}";
-                if ($namespace) {
-                    $scripts = "namespace $namespace { $scripts }";
-                }
+                $namespace && $scripts = "namespace $namespace { $scripts }";
                 try {
                     // 因为callStatic时才会进到这里, 所以classname是绝对合法的, 所以此处不会有安全漏洞
                     eval($scripts);
@@ -206,16 +204,10 @@ class RpcClient {
      * @throws RpcException
      */
     private static function request(Client $client, string $data): string {
-        if (! $client->send($data)) {
-            throw new RpcException($client->errMsg ?: lang(RpcException::REQUEST_FAILED), $client->errCode);
-        }
+        ! $client->send($data) && throw new RpcException($client->errMsg ?: lang(RpcException::REQUEST_FAILED), $client->errCode);
         $response = $client->recv(self::$receiveTimeout);
-        if ($client->errCode > 0) {
-            throw new RpcException($client->errMsg ?: RpcException::RESPONSE_TIMEOUT, $client->errCode);
-        }
-        if (! $response) {
-            throw new RpcException(RpcException::EMPTY_RESPONSE);
-        }
+        $client->errCode > 0 && throw new RpcException($client->errMsg ?: RpcException::RESPONSE_TIMEOUT, $client->errCode);
+        ! $response && throw new RpcException(RpcException::EMPTY_RESPONSE);
         return $response;
     }
 

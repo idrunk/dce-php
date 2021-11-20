@@ -8,9 +8,10 @@ namespace dce\controller;
 
 use dce\Dce;
 use dce\project\Controller;
+use dce\project\node\Node;
 
 class UtilityController extends Controller {
-    // 清除缓存
+    #[Node('cache/clear', name: '清除缓存')]
     public function cacheClear() {
         $cacheType = $this->request->cli['--type'] ?? $this->request->cli['-t'] ?? 'file';
         Dce::$cache->{$cacheType}->clear();

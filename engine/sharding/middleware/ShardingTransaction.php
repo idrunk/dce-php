@@ -16,6 +16,9 @@ use dce\project\request\RequestManager;
 class ShardingTransaction extends Transaction {
     public const NO_SHARDING_ALIAS = 'no_sharding';
 
+    /** @var int 使用次数，事务中已经发起得查询数 */
+    public int $uses = 0;
+
     private int $requestId;
 
     private string $dbAlias;
@@ -27,7 +30,6 @@ class ShardingTransaction extends Transaction {
     ) {
         parent::__construct();
         $this->requestId = RequestManager::currentId();
-        // mark 这玩意儿大概单独做成延时任务比较好
         $this->clearExpired();
     }
 
@@ -57,13 +59,11 @@ class ShardingTransaction extends Transaction {
      * @param string $shardingAlias
      * @return static|null
      */
-    private static function aliasMatch(string $shardingAlias): self|null {
+    public static function aliasMatch(string $shardingAlias): self|null {
         $requestId = RequestManager::currentId();
-        foreach (self::$pond as $transaction) {
-            if ($transaction->requestId === $requestId && $transaction->shardingAlias === $shardingAlias) {
+        foreach (self::$pond as $transaction)
+            if ($transaction->requestId === $requestId && $transaction->shardingAlias === $shardingAlias)
                 return $transaction;
-            }
-        }
         return null;
     }
 
@@ -89,6 +89,7 @@ class ShardingTransaction extends Transaction {
                 $transaction->dbAlias = $dbAlias;
                 $connector->begin();
             }
+            $transaction->uses ++;
             return $transaction;
         } else {
             return $dbPool->fetch();

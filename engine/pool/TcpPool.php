@@ -8,6 +8,7 @@ namespace dce\pool;
 
 use Swoole\Coroutine\Client;
 use Swoole\Timer;
+use Throwable;
 
 class TcpPool extends Pool {
     private array $tickMapping = [];
@@ -50,5 +51,9 @@ class TcpPool extends Pool {
      */
     public static function inst(string ... $identities): static {
         return parent::getInstance(TcpPoolProductionConfig::class, ... $identities);
+    }
+
+    protected function retryable(Throwable $throwable): bool {
+        return false;
     }
 }

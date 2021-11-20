@@ -15,9 +15,8 @@ class Project {
     /** @var bool $isComplete 是否已完善 */
     public bool $isComplete = false;
 
-    public string $name;
-
-    public string $path;
+    /** @var bool 是否系统项目（内置项目） */
+    public bool $isSystematic = false;
 
     public NodeTree $nodeTree;
 
@@ -27,9 +26,11 @@ class Project {
 
     public array $extra = [];
 
-    public function __construct(string $name, string $path) {
-        $this->name = $name;
-        $this->path = $path;
+    public function __construct(
+        public string $name,
+        public string $path,
+    ) {
+        str_starts_with($this->path, ProjectManager::$systemProjectRoot) && $this->isSystematic = true;
     }
 
     public function setNodeTree(NodeTree $nodeTree) {

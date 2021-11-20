@@ -9,7 +9,10 @@ namespace dce\db\proxy;
 use dce\db\connector\DbConnector;
 
 abstract class Transaction {
-    protected static int $time_to_expire = 60;
+    protected static int $timeToExpire = 60;
+
+    /** @var int 执行回收操作的百分率 */
+    protected static int $percentageCollect = 10;
 
     /** @var static[] $pond */
     protected static array $pond = [];
@@ -52,6 +55,11 @@ abstract class Transaction {
     protected function markConnector(DbConnector $connector): self {
         $this->connector = $connector;
         return $this;
+    }
+
+    /** 清除绑定的属性 */
+    public function clearBounds(): void {
+        unset($this->connector);
     }
 
     /**
@@ -108,11 +116,12 @@ abstract class Transaction {
      * 回滚超时的事务
      */
     protected function clearExpired(): void {
-        $minEffectiveStamp = time() - self::$time_to_expire;
+        if (rand() * 100 >= self::$percentageCollect) return;
+
+        $minEffectiveStamp = time() - self::$timeToExpire;
         foreach (self::$pond as $transaction) {
-            if ($transaction->createStamp < $minEffectiveStamp) {
+            if ($transaction->createStamp < $minEffectiveStamp)
                 $transaction->rollback();
-            }
         }
     }
 

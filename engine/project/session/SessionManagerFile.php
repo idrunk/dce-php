@@ -16,11 +16,10 @@ class SessionManagerFile extends SessionManager {
     private const MID_MAPPING_KEY = 'session-manager-mid';
 
     /** @inheritDoc */
-    protected function setFdForm(string $sid, int $fd, string $host, int $port, string $extra): string {
+    protected function setFdForm(int $fd, string $host, int $port, string $extra): string {
         $fdid = self::genFdid($fd, $host, $port);
         $mapping = Dce::$cache->file->get(self::FDID_MAPPING_KEY) ?: [];
         $mapping[$fdid] = [
-            'sid' => $sid,
             'fd' => $fd,
             'host' => $host,
             'port' => $port,
@@ -31,7 +30,7 @@ class SessionManagerFile extends SessionManager {
     }
 
     /** @inheritDoc */
-    public function getFdForm(string|int $fd, string $host = '', int $port = 0): array|false {
+    protected function getFdForm(string|int $fd, string $host = '', int $port = 0): array|false {
         $mapping = Dce::$cache->file->get(self::FDID_MAPPING_KEY);
         return $mapping[self::genFdid($fd, $host, $port)] ?? false;
     }
@@ -54,90 +53,58 @@ class SessionManagerFile extends SessionManager {
     }
 
     /** @inheritDoc */
-    protected function setSessionForm(string $sid, string|array|null $fdids = null, int|null $mid = null): void {
+    protected function setSessionForm(string $sid, string|null $fdid = null, int|null $mid = null): void {
         $mapping = Dce::$cache->file->get(self::SID_MAPPING_KEY) ?: [];
-        foreach (is_array($fdids) ? $fdids : [$fdids] as $fdid) {
-            if ($fdid && ! in_array($fdid, $mapping[$sid]['fdid'] ?? [])) {
-                $mapping[$sid]['fdid'][] = $fdid;
-            }
-        }
-        if ($mid) {
-            $mapping[$sid]['mid'] = $mid;
-        }
+        $fdid && $mapping[$sid]['fdid'] = $fdid;
+        $mid && $mapping[$sid]['mid'] = $mid;
         Dce::$cache->file->set(self::SID_MAPPING_KEY, $mapping);
     }
 
     /** @inheritDoc */
-    public function getSessionForm(string $sid, bool|null $fdidOrMid = false): array|int|false {
-        $property = $fdidOrMid ? 'fdid' : (false === $fdidOrMid ? 'mid' : null);
+    public function getSessionForm(string $sid, bool|null $fdidOrMid = false): array|string|int|false {
+        $property = self::sessionBool2Prop($fdidOrMid);
         $mapping = Dce::$cache->file->get(self::SID_MAPPING_KEY);
         return $property ? $mapping[$sid][$property] ?? false : $mapping[$sid] ?? false;
     }
 
     /** @inheritDoc */
-    protected function delSessionForm(string $sid, string|array|false|null $fdidOrMid): bool {
+    protected function delSessionForm(string $sid, bool|null $fdidOrMid): bool {
         $mapping = Dce::$cache->file->get(self::SID_MAPPING_KEY);
         if (isset($mapping[$sid])) {
-            if ($fdidOrMid) {
-                foreach (is_array($fdidOrMid) ? $fdidOrMid : [$fdidOrMid] as $fdid) {
-                    if ($fdid && false !== ($index = array_search($fdid, $mapping[$sid]['fdid'] ?? []))) {
-                        array_splice($mapping[$sid]['fdid'], $index, 1);
-                        if (! $mapping[$sid]['fdid']) {
-                            unset($mapping[$sid]['fdid']);
-                        }
-                    }
-                }
-            } else if (false === $fdidOrMid) {
-                unset($mapping[$sid]['mid']);
-            }
-            if (null === $fdidOrMid || ! $mapping[$sid]) {
-                // 如果需要删SessionForm或者已经空了, 则整个删掉
-                unset($mapping[$sid]);
-            }
+            $prop = self::sessionBool2Prop($fdidOrMid);
+            if ($fdidOrMid) unset($mapping[$sid][$prop]);
+            if (! $fdidOrMid || ! $mapping[$sid]) unset($mapping[$sid]);
             return Dce::$cache->file->set(self::SID_MAPPING_KEY, $mapping);
         }
         return true;
     }
 
     /** @inheritDoc */
-    protected function setMemberForm(int $mid, string|array|null $fdids = null, string|null $sid = null): void {
-        if (! $sid && ! $fdids) {
-            throw (new SessionException(SessionException::EMPTY_FORM_PARAMETERS))->format($mid);
-        }
+    protected function setMemberForm(int $mid, string|null $fdid = null, string|null $sid = null): void {
+        ! $sid && ! $fdid && throw (new SessionException(SessionException::EMPTY_FORM_PARAMETERS))->format($mid);
+
         $mapping = Dce::$cache->file->get(self::MID_MAPPING_KEY) ?: [];
-        if ($sid && ! in_array($sid, $mapping[$mid]['sid'] ?? [])) {
-            $mapping[$mid]['sid'][] = $sid;
-        }
-        foreach (is_array($fdids) ? $fdids : [$fdids] as $fdid) {
-            if ($fdid && ! in_array($fdid, $mapping[$mid]['fdid'] ?? [])) {
-                $mapping[$mid]['fdid'][] = $fdid;
-            }
-        }
+        $sid && ! in_array($sid, $mapping[$mid]['sid'] ?? []) && $mapping[$mid]['sid'][] = $sid;
+        $fdid && ! in_array($fdid, $mapping[$mid]['fdid'] ?? []) && $mapping[$mid]['fdid'][] = $fdid;
+
         Dce::$cache->file->set(self::MID_MAPPING_KEY, $mapping);
     }
 
     /** @inheritDoc */
     public function getMemberForm(int $mid, bool|null $fdidOrSid = true): array|false {
-        $property = $fdidOrSid ? 'fdid' : (false === $fdidOrSid ? 'sid' : null);
+        $property = self::memberBool2Prop($fdidOrSid);
         $mapping = Dce::$cache->file->get(self::MID_MAPPING_KEY);
         return $property ? $mapping[$mid][$property] ?? [] : $mapping[$mid] ?? false;
     }
 
     /** @inheritDoc */
-    protected function delMemberForm(int $mid, string|array|null $fdids = null, string|null $sid = null): bool {
+    protected function delMemberForm(int $mid, string|null $fdid = null, string|null $sid = null): bool {
         $mapping = Dce::$cache->file->get(self::MID_MAPPING_KEY);
         if (isset($mapping[$mid])) {
-            if ($sid && false !== ($index = array_search($sid, $mapping[$mid]['sid'] ?? []))) {
-                array_splice($mapping[$mid]['sid'], $index, 1);
-            }
-            foreach (is_array($fdids) ? $fdids : [$fdids] as $fdid) {
-                if ($fdid && false !== ($index = array_search($fdid, $mapping[$mid]['fdid'] ?? []))) {
-                    array_splice($mapping[$mid]['fdid'], $index, 1);
-                }
-            }
-            if (empty($mapping[$mid]['sid']) && empty($mapping[$mid]['fdid'])) {
-                unset($mapping[$mid]);
-            }
+            $sid && false !== ($index = array_search($sid, $mapping[$mid]['sid'] ?? [])) && array_splice($mapping[$mid]['sid'], $index, 1);
+            $fdid && false !== ($index = array_search($fdid, $mapping[$mid]['fdid'] ?? [])) && array_splice($mapping[$mid]['fdid'], $index, 1);
+            if (empty($mapping[$mid]['sid']) && empty($mapping[$mid]['fdid'])) unset($mapping[$mid]);
+
             return Dce::$cache->file->set(self::MID_MAPPING_KEY, $mapping);
         }
         return true;

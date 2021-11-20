@@ -37,7 +37,7 @@ class DateValidator extends TypeChecker {
      * @param string|int|float|null|false $value
      * @return ValidatorException|null
      */
-    protected function check(string|int|float|null|false $value):ValidatorException|null {
+    protected function check(string|int|float|null|false $value): ValidatorException|null {
         $formatSet = $this->getProperty('formatSet');
         $type = $this->getProperty('type', lang(ValidatorException::FORMATSET_OR_TYPE_REQUIRED));
         if ($formatSet) {

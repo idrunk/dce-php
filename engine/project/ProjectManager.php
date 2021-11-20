@@ -10,25 +10,25 @@ use dce\Dce;
 use dce\loader\Loader;
 
 class ProjectManager {
+    /** @var string 内置服务项目根目录 */
+    private const SystemProjectRoot = DCE_ROOT . 'project/';
+    public static string $systemProjectRoot;
+
     /** @var Project[] $projects 所有项目 */
     private static array $projects;
 
-    /** @var string 内置服务项目根目录 */
-    private const SERVER_DIR = DCE_ROOT . 'project/';
-
     /** 初始化应用项目配置 */
     public static function scanLoad() {
+        self::$systemProjectRoot = realpath(self::SystemProjectRoot);
         $projectPaths = $projects = [];
         foreach (
             [
-                self::SERVER_DIR,
+                self::SystemProjectRoot,
                 APP_PROJECT_ROOT,
                 ... Dce::$config->projectPaths ?? []
             ] as $path
         ) {
-            if (! is_dir($path)) {
-                throw (new ProjectException(ProjectException::PROJECT_PATH_INVALID))->format($path);
-            }
+            ! is_dir($path) && throw (new ProjectException(ProjectException::PROJECT_PATH_INVALID))->format($path);
             $lastPathChar = substr($path, -1);
             if ($lastPathChar === '/') { // 以斜杠结尾的, 将扫描该路径下的目录作为项目
                 // 应用目录下所有子目录均视为项目
@@ -57,9 +57,10 @@ class ProjectManager {
 
     /**
      * 取所有项目
+     * @param bool|null $justSystematic
      * @return Project[]
      */
-    public static function getAll(): array {
-        return self::$projects;
+    public static function getAll(bool $justSystematic = null): array {
+        return null === $justSystematic ? self::$projects : array_filter(self::$projects, fn($project) => $project->isSystematic === $justSystematic);
     }
 }

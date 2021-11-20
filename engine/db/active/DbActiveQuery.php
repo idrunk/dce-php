@@ -20,6 +20,9 @@ use JetBrains\PhpStorm\ArrayShape;
  * @template T
  */
 class DbActiveQuery extends ActiveQuery {
+    /** @var T $activeRecord */
+    protected DbActiveRecord $activeRecord;
+
     private Query $query;
 
     #[ArrayShape([[
@@ -28,12 +31,10 @@ class DbActiveQuery extends ActiveQuery {
     ]])]
     private array $relationData = [];
 
-    /**
-     * @param T $activeRecord
-     */
     public function __construct(
-        protected DbActiveRecord $activeRecord,
+        DbActiveRecord $activeRecord,
     ) {
+        $this->activeRecord = $activeRecord;
         $this->query = new Query($this->activeRecord::getProxy());
         $this->query->table($this->activeRecord::getTableName());
     }
@@ -82,7 +83,7 @@ class DbActiveQuery extends ActiveQuery {
     /**
      * 多记录查询实例化结果集并返回
      * @param string|RawBuilder|null $indexColumn
-     * @return T[]
+     * @return list<T>|list<DbActiveRecord>
      * @throws ActiveException
      */
     public function select(string|RawBuilder|null $indexColumn = null): array {
@@ -254,7 +255,7 @@ class DbActiveQuery extends ActiveQuery {
         if ($current instanceof Model) {
             foreach ($data as $k => $datum) {
                 // 因为insert方法支持批量插入，而插入的数据有时为了方便需传递活动记录对象组，若为活动记录则需转为数据库式蛇底的数组下标字段名
-                $data[$k] = $datum->extractProperties();
+                $data[$k] = $datum->extract();
             }
         }
         return $this->query->insert($data, $ignoreOrReplace);

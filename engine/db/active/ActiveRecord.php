@@ -40,9 +40,9 @@ abstract class ActiveRecord extends Model {
      * 处理Getter值 (取关联数据)
      * @param string $name
      * @param mixed $value
-     * @return ActiveRecord|array|false|null
+     * @return ActiveRecord|array|string|int|float|false|null
      */
-    protected function handleGetter(string $name, mixed $value): ActiveRecord|array|false|null {
+    protected function handleGetter(string $name, mixed $value): ActiveRecord|array|string|int|float|false|null {
         if ($value instanceof ActiveRelation) {
             $value = $value->screen();
         }
@@ -55,8 +55,8 @@ abstract class ActiveRecord extends Model {
      */
     public function setQueriedProperties(array $properties): void {
         $this->clearGetterValues()->createByQuery = true;
-        static::applyProperties($properties);
-        $this->originalProperties = $this->extractProperties();
+        static::apply($properties);
+        $this->originalProperties = $this->extract(true, false);
     }
 
     /**

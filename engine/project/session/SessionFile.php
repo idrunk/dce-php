@@ -75,7 +75,7 @@ class SessionFile extends Session {
     /** @inheritDoc */
     public function renew(bool $longLive = false): static {
         $data = $this->getAll();
-        $this->destroy();
+        $this->destroy(); // warn 文件型会话不保证新生后一定不丢失
         $this->setId(self::genId());
         // 如果是长存session，则设置较长的过期时间，否则取原过期时间或短过期时间
         $ttl = $longLive && self::$config['long_ttl'] ? self::$config['long_ttl'] : (self::$config['ttl'] ?: 3600);

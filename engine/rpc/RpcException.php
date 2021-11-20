@@ -8,18 +8,20 @@ namespace dce\rpc;
 
 use dce\base\Exception;
 use dce\i18n\Language;
+use dce\log\LogManager;
+use Throwable;
 
 // 1700-1799
 class RpcException extends Exception {
     // 脚本异常
-    #[Language(['rpc_servers配置异常'])]
-    public const INVALID_RPC_SERVERS_CONFIG = 1700;
+    #[Language(['rpc_connection配置异常'])]
+    public const INVALID_RPC_CONNECTION_CONFIG = 1700;
 
-    #[Language(['rpc_servers[]配置异常'])]
-    public const INVALID_RPC_SERVERS_CONFIG2 = 1701;
+    #[Language(['rpc_connection[]配置异常'])]
+    public const INVALID_RPC_CONNECTION_CONFIG2 = 1701;
 
-    #[Language(['rpc_servers[][]配置异常'])]
-    public const INVALID_RPC_SERVERS_CONFIG3 = 1702;
+    #[Language(['rpc_connection[][]配置异常'])]
+    public const INVALID_RPC_CONNECTION_CONFIG3 = 1702;
 
     #[Language(['类 %s 未注册远程过程服务'])]
     public const CLASS_NOT_REGISTER = 1703;
@@ -57,6 +59,9 @@ class RpcException extends Exception {
     #[Language(['无效RpcHosts配置'])]
     public const INVALID_RPC_HOSTS = 1714;
 
+    #[Language(['rpc_service配置异常'])]
+    public const INVALID_RPC_SERVICE_CONFIG = 1715;
+
     // 运行时异常
     #[Language(['请求发送失败'])]
     public const REQUEST_FAILED = 1750;
@@ -81,4 +86,16 @@ class RpcException extends Exception {
 
     #[Language(['%s 非RPC类'])]
     public const NOT_RPC_CLASS = 1757;
+
+
+    #[Language(['连接异常, Code: %s, Message: %s'])]
+    public const INVALID_CONNECTION = 1799;
+
+
+    public static function render(Throwable $throwable, bool|null $simple = false, bool $html = false): string {
+        return match($throwable->getCode()) {
+            self::INVALID_CONNECTION => LogManager::exceptionRender($throwable, warn: true), // 对于异常断开，警告即可
+            default => parent::render($throwable),
+        };
+    }
 }

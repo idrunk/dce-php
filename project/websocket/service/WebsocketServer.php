@@ -7,23 +7,25 @@
 namespace websocket\service;
 
 use dce\base\Exception;
-use dce\Dce;
 use dce\log\LogManager;
+use dce\project\node\NodeManager;
 use dce\project\ProjectManager;
 use dce\project\request\RequestManager;
 use dce\project\session\Session;
 use dce\project\session\SessionManager;
+use dce\service\server\Connection;
 use dce\service\server\RawRequestConnection;
 use dce\service\server\ServerMatrix;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
 use Swoole\WebSocket\Frame;
 use Swoole\WebSocket\Server;
+use Swoole\Server as BaseServer;
 
 class WebsocketServer extends ServerMatrix {
     protected static string $localRpcHost = '/var/run/dce_websocket_api.sock';
 
-    /** @var string 定义RawRequest类名, (可在子类覆盖此属性使用自定义RawRequest类) */
+    /** @var class-string<RawRequestWebsocket> 定义RawRequest类名, (可在子类覆盖此属性使用自定义RawRequest类) */
     protected static string $rawRequestWebsocketClass = RawRequestWebsocket::class;
 
     private Server $server;
@@ -88,7 +90,7 @@ class WebsocketServer extends ServerMatrix {
         }
 
         $this->runApiService();
-        echo self::$langStarted->format('Websocket', $host, $port);
+        LogManager::dce(self::$langStarted->format('Websocket', $host, $port));
         $this->server->start();
     }
 
@@ -98,12 +100,18 @@ class WebsocketServer extends ServerMatrix {
      * @param Request $request
      */
     protected function takeoverOpen(Server $server, Request $request): void {
-        $session = Session::newBySid(Session::getSid($request) ?: true);
-        LogManager::connect($this, $request->fd, $session->getId());
-        Dce::$cache->var->set(['session', $request->fd], $session);
-        Dce::$cache->var->set(['cookie', $request->fd], $request->cookie);
-        SessionManager::inst()->connect($session->getId(), $request->fd, $this->apiHost, $this->apiPort, SessionManager::EXTRA_WS);
-        $this->eventOnOpen($server, $request);
+        Exception::catchRequest(function() use($server, $request) {
+            $session = Session::newBySid(Session::getSid($request) ?: true);
+            $initialNode = NodeManager::exists(static::$rawRequestWebsocketClass::ConnectionPath);
+            $conn = Connection::from($request->fd, $this)->setProps($initialNode, $session, $request);
+            SessionManager::inst()->connect($conn, SessionManager::EXTRA_WS);
+            if ($initialNode) {
+                RequestManager::route(static::$rawRequestWebsocketClass, $this, $conn);
+            } else {
+                LogManager::connect($conn);
+                $this->eventOnOpen($server, $request);
+            }
+        });
     }
 
     /**
@@ -132,7 +140,7 @@ class WebsocketServer extends ServerMatrix {
      * 取Websocket Server服务
      * @return Server
      */
-    final public function getServer(): Server {
+    final public function getServer(): BaseServer {
         return $this->server;
     }
 }

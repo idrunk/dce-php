@@ -7,9 +7,11 @@
 namespace dce\controller;
 
 use dce\project\Controller;
+use dce\project\node\Node;
 use dce\service\extender\MysqlModuloExtender;
 
 class ShardingController extends Controller {
+    #[Node('sharding/extend', 'cli', enableCoroutine: true)]
     public function extend() {
         MysqlModuloExtender::run($this);
     }

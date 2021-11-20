@@ -10,6 +10,7 @@ use dce\pool\PoolProductionConfig;
 use dce\pool\Pool;
 use dce\pool\PoolException;
 use Redis;
+use Throwable;
 
 class RedisPool extends Pool {
     /**
@@ -27,5 +28,9 @@ class RedisPool extends Pool {
 
     public static function inst(string ... $identities): static {
         return parent::getInstance(RedisPoolProductionConfig::class, ... $identities);
+    }
+
+    protected function retryable(Throwable $throwable): bool {
+        return false;
     }
 }

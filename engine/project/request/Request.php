@@ -18,7 +18,6 @@ use dce\project\Project;
 use dce\project\ProjectManager;
 use dce\project\session\Cookie;
 use dce\project\session\Session;
-use dce\rpc\DceRpcClient;
 use Swoole\Coroutine;
 use Throwable;
 
@@ -123,7 +122,7 @@ class Request {
      * @throws Throwable
      */
     public function route(): void {
-        Event::trigger(Event::BEFORE_REQUEST, $this->rawRequest);
+        Event::trigger(Event::BEFORE_ROUTE, $this->rawRequest);
         $this->node = $this->rawRequest->routeGetNode();
         // 当前项目赋值
         $this->project = ProjectManager::get($this->node->projectName);
@@ -143,6 +142,7 @@ class Request {
         $this->rawRequest->supplementRequest($this);
         $this->locale = new Locale($this);
         LogManager::request($this);
+        Event::trigger(Event::AFTER_ROUTE, $this);
         // 执行控制器方法
         $this->controller();
     }
@@ -151,10 +151,7 @@ class Request {
      * 项目引导预处理, (每个项目仅在第一次进入时执行)
      */
     private function prepare(): void {
-        DceRpcClient::prepare($this->project);
-        if ($this->config->prepare) {
-            call_user_func_array($this->config->prepare, [$this]);
-        }
+        $this->config->prepare && call_user_func_array($this->config->prepare, [$this]);
     }
 
     /**
@@ -165,24 +162,18 @@ class Request {
     private function controller(): void {
         // 解析控制器
         $controller = explode('->', $this->node->controller ?? '');
-        if (2 !== count($controller)) {
-            throw (new RequestException(RequestException::NODE_NO_CONTROLLER))->format($this->node->pathFormat);
-        }
+        2 !== count($controller) && throw (new RequestException(RequestException::NODE_NO_CONTROLLER))->format($this->node->pathFormat);
+
         [$className, $method] = $controller;
         $class = "\\{$this->project->name}\\controller\\{$className}";
-        if (! is_subclass_of($class, Controller::class)) {
-            throw (new RequestException(RequestException::NODE_CONTROLLER_INVALID))->format($class);
-        }
-        if (! method_exists($class, $method)) {
-            throw (new RequestException(RequestException::CONTROLLER_METHOD_INVALID))->format($method);
-        }
+        ! is_subclass_of($class, Controller::class) && throw (new RequestException(RequestException::NODE_CONTROLLER_INVALID))->format($class);
+        ! method_exists($class, $method) && throw (new RequestException(RequestException::CONTROLLER_METHOD_INVALID))->format($method);
+
         if (SwooleUtility::inSwoole()) {
-            if ($this->node->hookCoroutine) {
-                SwooleUtility::coroutineHook();
-            }
+            $this->node->hookCoroutine && SwooleUtility::coroutineHook();
             // 如果配置了开启协程, 且当前未在协程中, 则创建协程容器执行控制器 (在server的onRequest等回调中, 依靠server配置是否开启协程而不是node配置)
             if ($this->node->enableCoroutine && ! SwooleUtility::inCoroutine()) {
-                Coroutine\run(fn() => $this->runController($class, $method));
+                Coroutine\run(fn() => $this->runController($class, $method, true));
                 return;
             }
         } else if ($this->node->hookCoroutine || $this->node->enableCoroutine) {
@@ -195,13 +186,15 @@ class Request {
      * 执行控制器方法
      * @param string $class
      * @param string $method
+     * @param bool $coroutineNode
      * @throws Throwable
      */
-    private function runController(string $class, string $method): void {
+    private function runController(string $class, string $method, bool $coroutineNode = false): void {
         Event::trigger(Event::BEFORE_CONTROLLER, $this);
         $this->controller = new $class($this);
         Event::trigger(Event::ENTERING_CONTROLLER, $this->controller);
         $this->controller->call($method);
         Event::trigger(Event::AFTER_CONTROLLER, $this->controller);
+        $coroutineNode && SwooleUtility::eventExit();
     }
 }

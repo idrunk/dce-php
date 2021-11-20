@@ -7,6 +7,7 @@
 namespace drunk;
 
 use ArrayAccess;
+use dce\base\BaseException;
 
 final class Utility {
     /**
@@ -16,6 +17,26 @@ final class Utility {
      */
     public static function isArrayLike(mixed $value): bool {
         return is_array($value) || $value instanceof ArrayAccess;
+    }
+
+    /**
+     * 递归判断是否为空
+     * @param mixed $object
+     * @return bool
+     */
+    public static function isEmpty(mixed $object): bool {
+        return empty($object) || (is_array($object) && self::isEmptyArray($object));
+    }
+
+    /**
+     * 判断是否空数组（无元素、或仅有空数组的元素，视为空数组）
+     * @param array $array
+     * @return bool
+     */
+    private static function isEmptyArray(array $array): bool {
+        foreach ($array as $item)
+            if (! is_array($item) || ($item && ! self::isEmptyArray($item))) return false;
+        return true;
     }
 
     /**
@@ -45,5 +66,15 @@ final class Utility {
         static $noop;
         $noop ??= fn() => null;
         return $noop;
+    }
+
+    /**
+     * 限制静态方法必须在子类执行
+     * @param string $parentClass
+     * @param string $staticClass
+     * @throws BaseException
+     */
+    public static function staticConstraint(string $parentClass, string $staticClass): void {
+        $parentClass == $staticClass && throw new BaseException(BaseException::NEED_CHILD_STATIC);
     }
 }

@@ -6,11 +6,13 @@
 
 namespace dce\project\session;
 
+use dce\project\request\RequestManager;
 use dce\storage\redis\DceRedis;
 use Redis;
 
 class SessionRedis extends Session {
-    private const META_KEY = '&meta';
+    private const MetaKey = '&meta';
+    private const ReferenceKey = 'reference';
 
     /**
      * 更新session过期时间
@@ -19,8 +21,19 @@ class SessionRedis extends Session {
     protected function touch(mixed $redis = null): void {
         $rKey = $this->getId(true);
         // 如果是长存时间，则session需续长存时间，否则需续短存时间
-        $ttl = ($redis->hGet($rKey, self::META_KEY)['long_live'] ?? 0) && self::$config['long_ttl'] ? self::$config['long_ttl'] : (self::$config['ttl'] ?: 3600);
+        $meta = $redis->hGet($rKey, self::MetaKey);
+        $ttl = ($meta['long_live'] ?? 0) && self::$config['long_ttl'] ? self::$config['long_ttl'] : (self::$config['ttl'] ?: 3600);
         $redis->expire($rKey, $ttl);
+        if (
+            key_exists(self::ReferenceKey, (array) $meta)
+            && ([$requestId, $referenceSid] = $meta[self::ReferenceKey])
+            && $requestId !== RequestManager::currentId()
+            && $referenceSid !== $this->getId()
+        ) {
+            unset($meta[self::ReferenceKey]);
+            $redis->hSet($rKey, self::MetaKey, $meta);
+            self::newBySid($referenceSid)->destroy();
+        }
     }
 
     /** @inheritDoc */
@@ -61,7 +74,6 @@ class SessionRedis extends Session {
     public function delete(string $key): void {
         $redis = DceRedis::get(self::$config['index']);
         $redis->hDel($this->getId(true), $key);
-        $this->tryTouch($redis);
         DceRedis::put($redis);
     }
 
@@ -74,14 +86,30 @@ class SessionRedis extends Session {
 
     /** @inheritDoc */
     public function renew(bool $longLive = false): static {
-        $data = $this->getAll();
-        $data[self::META_KEY] = ['create_time' => time(), 'long_live' => $longLive];
-        $this->destroy();
-        $this->setId(self::genId());
+        $newSid = self::genId();
+        $requestId = RequestManager::currentId();
         $redis = DceRedis::get(self::$config['index']);
+        $data = $redis->hGetAll($this->getId(true));
+
+        if ($data) {
+            if ($requestId) {
+                $oldMeta = $data[self::MetaKey];
+                $oldMeta[self::ReferenceKey] = [$requestId, $newSid];
+                $redis->hSet($oldKey = $this->getId(true), self::MetaKey, $oldMeta);
+                $redis->expire($oldKey, self::$oldTtl);
+            } else {
+                $this->destroy();
+            }
+        }
+
+        $data[self::MetaKey] = ['create_time' => time(), 'long_live' => $longLive];
+        $requestId && $data && $data[self::MetaKey][self::ReferenceKey] = [$requestId, $this->getId()];
+
+        $this->setId($newSid);
         $redis->hMSet($this->getId(true), $data);
         $this->touched = false;
         $this->tryTouch($redis);
+
         DceRedis::put($redis);
         return $this;
     }
@@ -90,7 +118,7 @@ class SessionRedis extends Session {
     public function getMeta(): array {
         $redis = DceRedis::get(self::$config['index']);
         $rKey = $this->getId(true);
-        $meta = $redis->hGet($rKey, self::META_KEY) ?: [];
+        $meta = $redis->hGet($rKey, self::MetaKey) ?: [];
         $meta += ['expiry' => ($meta['long_live'] ?? 0) ? self::$config['long_ttl'] : self::$config['ttl'], 'ttl' => $redis->ttl($rKey)];
         DceRedis::put($redis);
         return $meta;

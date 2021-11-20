@@ -26,4 +26,8 @@ class BaseException extends Exception {
     public const MESSAGE_NOT_LANGUAGE = 1111;
     #[Constructor(self::MESSAGE_NOT_LANGUAGE)]
     private static Language|array $MESSAGE_NOT_LANGUAGE = ['异常消息非Language对象'];
+
+    public const NEED_CHILD_STATIC = 1112;
+    #[Constructor(self::NEED_CHILD_STATIC)]
+    private static Language|array $NEED_CHILD_STATIC = ['当前静态方法需通过子类调用'];
 }

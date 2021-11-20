@@ -10,6 +10,7 @@ use Closure;
 use dce\db\connector\DbConfig;
 use dce\i18n\Language;
 use dce\i18n\Locale;
+use dce\i18n\TextMapping;
 use dce\sharding\id_generator\DceIdGenerator;
 use dce\sharding\middleware\ShardingConfig;
 use drunk\Utility;
@@ -157,6 +158,7 @@ class DceConfig extends Config {
      *         'db_name' => 'default_db', // 库名
      *         'db_port' => 3306, // 数据库端口
      *         'max_connection' => 8, // 连接池容量
+     *         'max_retries' => 3, // 连接池超时断开最大自动重试次数，设为0则不自动重试
      *     ],
      *     '127.0.0.1' => [ // 分库1配置, 一个配置可以表示某个区间分库, 多个子配置表示该区间库有多个副本, 若有标志is_master则表示为主库, 若皆无标志则全部为主库 (default库亦适用)
      *        [
@@ -256,20 +258,20 @@ class DceConfig extends Config {
      */
     public array $shardingExtend;
 
-    /**
-     * @var array Rpc服务配置 (设置后在应用启动时, 将会自动连接Rpc服务, 并拦截处理Rpc请求方法)
-     * <pre>
-     * [
-     *    [
-     *        'hosts' => [ // 提供Rpc服务的服务器
-     *            ['host' => RpcUtility::DEFAULT_TCP_HOST, 'port' => RpcUtility::DEFAULT_TCP_PORT],
-     *        ],
-     *        'wildcards' => [RpcUtility::DEFAULT_NAMESPACE_WILDCARD,] // 所需拦截处理的通配符名字空间
-     *    ],
-     * ]
-     * </pre>
-     */
-    public array $rpcServers = [];
+    /** @var array Rpc连接配置，配置后会自动拦截rpc命名空间方法，进行远程调用 */
+    #[ArrayShape([[
+        'hosts' => [['host'=>'', 'port'=>0, 'token'=>''], ],
+        'wildcards' => ['rpc\\*', ]
+    ], ])]
+    public array $rpcConnection = [];
+
+    /** @var array Rpc服务配置，配置后将按需启动Rpc服务器，或者通过命令行主动启动Rpc服务器 */
+    #[ArrayShape([
+        'hosts' => [['host'=>'', 'port'=>0, 'password'=>'', 'ipWhiteList'=>['{{ip}}', ], 'needNative'=>false, 'needLocal'=>false], ],
+        'prepares' => [['wildcard'=>'rpc\\*', 'root'=>'{{rootDir}}'], ],
+        'preloads' => ['{{phpFile}}', ],
+    ])]
+    public array $rpcService = ['hosts' => [], 'prepares' => [], 'preloads' => []];
 
     /** @var array 内置Websocket服务配置 **/
     #[ArrayShape([
@@ -338,36 +340,58 @@ class DceConfig extends Config {
     ];
 
     /** @var array 日志记录器配置 */
-    #[ArrayShape([
-        'access' => [
-            'request' => 'bool', // console
-            'response' => 'bool', // console
-            'connect' => 'bool', // 包括disconnect等
-            'send' => 'bool', // 包括sentTo与push
-        ],
-        'exception' => [
-            'console' => 'bool',
-            'log_file' => 'string',
-            'log_name_format' => 'string',
-        ],
-        'db' => [
-            'console' => 'bool',
-        ],
-    ])]
     public array $log = [
+        'dce' => [
+            'console' => true,
+            'logfile_power' => false,
+            'logfile' => APP_RUNTIME . 'log/dce/%s.log',
+            'logfile_format' => 'Y',
+        ],
         'access' => [
+            'connect' => true,
             'request' => true,
             'response' => true,
-            'connect' => true,
             'send' => false,
+            'logfile_power' => false,
+            'logfile' => APP_RUNTIME . 'log/access/%s.log',
+            'logfile_format' => 'Y-W',
         ],
         'exception' => [
             'console' => true,
-            'log_file' => APP_RUNTIME . 'log/exception/%s.log',
-            'log_name_format' => 'Y-m',
+            'logfile_power' => true,
+            'logfile' => APP_RUNTIME . 'log/exception/%s.log',
+            'logfile_format' => 'Y-m',
         ],
         'db' => [ // 数据库日志
             'console' => false, // 是否在控制台输出日志
+            'logfile_power' => false, // mark not support yet
+            'logfile' => APP_RUNTIME . 'log/db/%s.log',
+            'logfile_format' => 'Y-W',
+        ],
+        'rpc' => [
+            'connect' => true,
+            'request' => true,
+            'response' => true,
+            'logfile_power' => false,
+            'logfile' => APP_RUNTIME . 'log/rpc/%s.log',
+            'logfile_format' => 'Y-W',
+        ],
+        'cron' => [
+            'console' => true,
+            'logfile_power' => true,
+            'logfile' => APP_RUNTIME . 'log/cron/%s.log',
+            'logfile_format' => 'Y-m',
+        ],
+    ];
+
+    /** @var array<string, array{minute: string, hour: string, day: string, month: string, week: string, command: string, enabled: bool, run_on_start: bool}> $cron */
+    public array $cron = [
+        // 键值分别表示任务ID与计划规则，不定义的单元将被自动填充为下方缺省值
+        'default' => [
+            'minute' => '*', 'hour' => '*', 'day' => '*', 'month' => '*', 'week' => '*', // 时间语法同crontab
+            'command' => null, // 计划执行的命令行脚本
+            'enabled' => true, // 是否开启
+            'run_on_start' => false, // 是否在启动服务后立即执行一次当前脚本
         ],
     ];
 

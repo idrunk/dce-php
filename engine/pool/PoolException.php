@@ -28,6 +28,18 @@ class PoolException extends Exception {
     #[Language(['目标实例非当前有效池实例, 无法获取映射表'])]
     public const INVALID_CHANNEL_INSTANCE = 1612;
 
+
+    #[Language(['连接异常断开，已重试 %s 次均未成功，重连失败'])]
+    public const DISCONNECTED_RETRIES_OVERFLOWED = 1630;
+
+    #[Language(['连接异常断开，事务中已有成功的请求，无法重试'])]
+    public const DISCONNECTED_TRANSACTION_ACTIVATED = 1631;
+
+
     #[Language(['生成连接实例失败, 无法连接到Redis服务'])]
     public const CONNECT_REDIS_FAILED = 1640;
+
+
+    #[Language(['%s 连接异常断开，将尝试重连'])]
+    public const WARNING_RETRY_CONNECT = 1649;
 }

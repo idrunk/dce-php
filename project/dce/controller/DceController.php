@@ -7,21 +7,26 @@
 namespace dce\controller;
 
 use dce\project\Controller;
+use dce\project\node\Node;
 
-class EmptyController extends Controller {
+class DceController extends Controller {
+    #[Node('dce', 'cli', omissiblePath: true)]
     public function cli() {
         $this->print("\n你正在cli模式以空路径请求Dce接口");
     }
 
+    #[Node('empty/connection', ['websocket', 'tcp', 'udp'])]
     public function connection() {
         $this->assign('info', '恭喜！服务端收到了你的消息并给你作出了回应');
         $this->response();
     }
 
+    #[Node('empty/http/ajax')]
     public function ajax() {
         $this->assign('info', '请求成功，祝你愉快 (*^▽^*)');
     }
 
+    #[Node('empty/http', ['get', 'post', 'put', 'delete', 'options', 'head'])]
     public function http() {
         $this->response('<!doctype html>
 <html lang="zh">

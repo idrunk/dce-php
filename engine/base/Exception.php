@@ -183,7 +183,7 @@ class Exception extends \Exception implements Decorator {
             call_user_func($callable, ... $params);
         } catch (Throwable $throwable) {
             is_callable($matched) && $matched = call_user_func($matched, $throwable);
-            $matched ? LogManager::exception($throwable, true, true) : throw $throwable;
+            $matched ? LogManager::warning($throwable) : throw $throwable;
         }
     }
 

@@ -6,10 +6,11 @@
 
 namespace dce\rpc;
 
+use dce\event\Daemon;
 use dce\loader\Loader;
-use Swoole\Process;
+use dce\log\LogManager;
 use Swoole\Coroutine\Server;
-use Swoole\Server as aServer;
+use Swoole\Server as AsyncServer;
 use Throwable;
 
 class RpcServer {
@@ -25,21 +26,19 @@ class RpcServer {
     /** @var array 预载文件 */
     private array $preloadFiles = [];
 
-    /** @var Server[]|aServer[] 服务器列表 */
+    /** @var Server[]|AsyncServer[] 服务器列表 */
     private array $servers = [];
-
-    /** @var Process 自动创建的进程 */
-    private Process $process;
 
     private function __construct() {}
 
     /**
      * 实例化方法, 代替构造函数, 方便连写
-     * @param RpcHost $rpcHost
+     * @param RpcHost|null $rpcHost
      * @return RpcServer
      */
-    public static function new(RpcHost $rpcHost): self {
-        return (new self)->addHost($rpcHost);
+    public static function new(RpcHost|null $rpcHost = null): self {
+        $inst = new self;
+        return $rpcHost ? $inst->addHost($rpcHost) : $inst;
     }
 
     /**
@@ -48,9 +47,9 @@ class RpcServer {
      * @param int $port 不支持传0作为随机端口, 当传入0时, 会将其视为unix sock, 会自动给host补上"unix:"前缀
      * @return RpcHost
      */
-    public static function host(string $host = RpcUtility::DEFAULT_TCP_HOST, int $port = RpcUtility::DEFAULT_TCP_PORT): RpcHost {
+    public static function host(string $host, int $port = RpcUtility::DEFAULT_TCP_PORT): RpcHost {
         return new RpcHost([
-            'host' => $host,
+            'host' => RpcUtility::uniqueSock($host),
             'port' => $port,
         ]);
     }
@@ -94,41 +93,14 @@ class RpcServer {
         return $this;
     }
 
-    /** 关闭服务 */
-    public function stop(): void {
-        if (isset($this->process)) {
-            // mark 此处无法正常关闭
-            Process::kill($this->process->pid);
-        } else {
-            foreach ($this->servers as $server) {
-                $server->shutdown();
-            }
-        }
-    }
-
     /**
      * 启动Rpc服务
-     * @param callable|bool $callback 新进程启动回调, 为布尔值时表示是否创建新进程
-     * @param bool $useAsyncServer 是否使用异步Tcp服务
+     * @param bool $useAsyncServer 是否使用异步Tcp服务（否则使用协程版）
      * @return $this
      */
-    public function start(callable|bool $callback = true, bool $useAsyncServer = false): self {
-        if ($callback) {
-            $process = new Process(function () use ($callback, $useAsyncServer) {
-                Process::signal(SIGTERM, fn() => $this->stop());
-                $this->prepareService();
-                if (is_callable($callback)) {
-                    call_user_func($callback);
-                }
-                $this->run($useAsyncServer);
-            }, false, SOCK_STREAM, $useAsyncServer ? false : true);
-            $process->start();
-            $this->process = $process;
-            usleep(200000);
-        } else {
-            $this->prepareService();
-            $this->run($useAsyncServer);
-        }
+    public function start(bool $useAsyncServer = false): self {
+        $this->prepareService();
+        $this->run($useAsyncServer);
         return $this;
     }
 
@@ -143,7 +115,7 @@ class RpcServer {
             // 若配置了rpc_servers且RcpClient与RpcServer在同一个生命周期执行, 可能会导致RpcServer环境对一个相同的命名空间即prepare了RPC Callback又prepare了root path,
             // 当RpcServer执行被调用的方法时会遍历这两个定义, 先执行callback, 再require类文件, 因为callback时会创建一个类, 该类会发起对RpcServer的远程call,
             // 这会导致了一个无限RpcCall嵌套, 使程序陷入死循环, 所以我们在这将root路径prepare到最前的定义, 使被调用时先从root路径下加载类文件解决前面那个问题
-            // 但是, 如果root路径下类文件不存在, 或者文件存在却没用定义该类, 还是会进入这个死循环, 所以使用远程服务时务必定义好远程类方法
+            // 但是, 如果root路径下类文件不存在或未定义该类, 还是会进入这个死循环, 所以使用远程服务时务必定义好远程类方法
             Loader::prepare($wildcard, $root, true);
         }
     }
@@ -153,6 +125,7 @@ class RpcServer {
      * @param bool $useAsyncServer
      */
     private function run(bool $useAsyncServer = false): void {
+        LogManager::dce(lang(['RPC 服务器已启动.', 'RPC server is started']));
         if ($useAsyncServer) {
             $this->runAsyncServer();
         } else {
@@ -166,39 +139,39 @@ class RpcServer {
     private function runAsyncServer(): void {
         $rpcHosts = array_slice($this->rpcHosts, 0);
         $rpcHost = array_shift($rpcHosts);
-        $this->servers[] = $server = new aServer($rpcHost->host, $rpcHost->port, SWOOLE_PROCESS, $rpcHost->isUnixSock ? SWOOLE_SOCK_UNIX_STREAM : SWOOLE_SOCK_TCP);
+        $this->servers[] = $server = new AsyncServer($rpcHost->host, $rpcHost->port, SWOOLE_PROCESS, $rpcHost->isUnixSock ? SWOOLE_SOCK_UNIX_STREAM : SWOOLE_SOCK_TCP);
         foreach ($rpcHosts as $rpcHost) {
             $server->listen($rpcHost->host, $rpcHost->port, $rpcHost->isUnixSock ? SWOOLE_SOCK_UNIX_STREAM : SWOOLE_SOCK_TCP);
         }
-        $server->on('receive', function (aServer $aServer, int $fd, int $reactorId, string $requestData) use ($rpcHost) {
-            try {
-                if (! $requestData) {
-                    return; // "0"视为ping, 无需处理
-                }
-                // 鉴权并提取信息
-                $clientInfo = $aServer->getClientInfo($fd);
-                [$className, $methodName, $arguments] = self::accept([
-                    'client_ip' => $clientInfo['remote_ip'],
-                ], $requestData, $this->matchRpcHostByServerFd($aServer, $clientInfo['server_fd']));
-                // 执行被请求的Rpc方法
-                $result = self::execute($className, $methodName, $arguments);
-                // 打包Rpc方法的执行结果并将其响应给客户端
-                $response = self::package($result);
-                $aServer->send($fd, $response);
-            } catch (RpcException $exception) {
-                echo RpcException::render($exception);
-            }
+        $server->on('WorkerStart', fn() => srand());
+        $server->on('connect', function(AsyncServer $server, int $fd, int $reactorId) {
+            $clientInfo = $server->getClientInfo($fd, $reactorId);
+            LogManager::rpcConnect($server->ports[0]->host, $clientInfo['server_port'], $clientInfo['remote_ip']);
         });
+        $server->on('close', function(AsyncServer $server, int $fd, int $reactorId) {
+            $clientInfo = $server->getClientInfo($fd, $reactorId);
+            LogManager::rpcConnect($server->ports[0]->host, $clientInfo['server_port'], $clientInfo['remote_ip'], false);
+        });
+        $server->on('receive', function (AsyncServer $aServer, int $fd, int $reactorId, string $requestData) use ($rpcHost) {
+            $responseData = self::catchCall(function() use($aServer, $fd, $reactorId, $requestData) {
+                if (! $requestData) return null; // "0"视为ping, 无需处理
+                $clientInfo = $aServer->getClientInfo($fd, $reactorId);
+                return [fn($data) => $aServer->send($fd, $data), ['client_ip' => $clientInfo['remote_ip']], $requestData,
+                    $this->matchRpcHostByServerFd($aServer, $clientInfo['server_fd'])];
+            });
+            is_string($responseData) && $aServer->send($fd, $requestData);
+        });
+        $server->addProcess(Daemon::runDaemon(null));
         $server->start();
     }
 
     /**
      * 根据ServerFd匹配RpcHost
-     * @param aServer $server
+     * @param AsyncServer $server
      * @param int $serverFd
      * @return RpcHost
      */
-    private function matchRpcHostByServerFd(aServer $server, int $serverFd): RpcHost {
+    private function matchRpcHostByServerFd(AsyncServer $server, int $serverFd): RpcHost {
         if (! isset($this->rpcHostsFdMapping)) {
             foreach ($server->ports as $port) {
                 foreach ($this->rpcHosts as $rpcHost) {
@@ -219,35 +192,53 @@ class RpcServer {
             go(function () use($rpcHost) {
                 $this->servers[] = $server = new Server(($rpcHost->isUnixSock ? 'unix:' : '') . $rpcHost->host, $rpcHost->port);
                 $server->handle(function (Server\Connection $connection) use ($rpcHost) {
-                    while (1) {
-                        try {
-                            $requestData = $connection->recv();
-                            $socket = $connection->exportSocket();
-                            if (! $requestData) {
-                                if ($socket->errCode > 0) {
-                                    $connection->close();
-                                    echo "{$socket->errMsg}, code: {$socket->errCode}, fd: {$socket->fd}\n";
-                                    break;
-                                }
-                                // 如果是"0", 则为ping
-                                continue;
+                    $socket = $connection->exportSocket();
+                    $clientInfo = $socket->getpeername();
+                    $serverInfo = $socket->getsockname();
+                    LogManager::rpcConnect($serverInfo['address'], $serverInfo['port'], $clientInfo['address']);
+                    // 连接错误时会返回false，退出循环停止监听
+                    while (false !== $responseData = self::catchCall(function() use($connection, $rpcHost, $socket, $clientInfo) {
+                        $requestData = $connection->recv();
+                        if (! $requestData) {
+                            $socket->checkLiveness(); // 若客户端异常断开，将导致服务端状态无法更新，此方法可更新服务端的状态
+                            if ($socket->errCode > 0) {
+                                $connection->close();
+                                throw (new RpcException(RpcException::INVALID_CONNECTION))->format($socket->errCode, $socket->errMsg);
                             }
-                            // 鉴权并提取信息
-                            [$className, $methodName, $arguments] = self::accept([
-                                'client_ip' => $socket->getsockname()['address'],
-                            ], $requestData, $rpcHost);
-                            // 执行被请求的Rpc方法
-                            $result = self::execute($className, $methodName, $arguments);
-                            // 打包Rpc方法的执行结果并将其响应给客户端
-                            $response = self::package($result);
-                            $connection->send($response);
-                        } catch (RpcException $exception) {
-                            echo RpcException::render($exception);
+                            return null; // 如果是"0", 则为ping
                         }
+                        return [fn($data) => $connection->send($data), ['client_ip' => $clientInfo['address']], $requestData, $rpcHost];
+                    })) {
+                        is_string($responseData) && $connection->send($responseData); // 这里只会send异常
                     }
+                    LogManager::rpcConnect($serverInfo['address'], $serverInfo['port'], $clientInfo['address'], false);
                 });
                 $server->start();
             });
+        }
+    }
+
+    /**
+     * @param callable():array{callable<string>, array, string, RpcHost}|false|null $executor
+     * @return string|false|null
+     * @throws RpcException
+     */
+    private static function catchCall(callable $executor): string|false|null {
+        try {
+            if (! $info = call_user_func($executor)) return $info;
+            [$sender, $clientInfo, $requestData, $rpcHost] = $info;
+
+            [$className, $methodName, $arguments] = self::accept($clientInfo, $requestData, $rpcHost);
+            LogManager::rpcRequest("$className::$methodName", $arguments, $clientInfo['client_ip']);
+            // 执行被请求的Rpc方法
+            $result = self::execute($className, $methodName, $arguments);
+            LogManager::rpcResponse("$className::$methodName", $result, $clientInfo['client_ip']);
+            // 打包Rpc方法的执行结果并将其响应给客户端（在这里发送正常内容而不统一在外面，是为了能一起捕获send可能发生的异常）
+            call_user_func($sender, self::package($result));
+            return null;
+        } catch (Throwable $throwable) {
+            LogManager::console(RpcException::render($throwable), prefix: '');
+            return $throwable instanceof RpcException && $throwable->getCode() === RpcException::INVALID_CONNECTION ? false : self::package($throwable);
         }
     }
 
@@ -279,27 +270,13 @@ class RpcServer {
      * @throws RpcException
      */
     private static function authentication(RpcHost $rpcHost, string $clientIp, string $authToken = ''): void {
-        if ($rpcHost->isUnixSock || '127.0.0.1' === $clientIp) {
-            // 凡是本机请求, 无视授权限制
-            return;
-        } else if ($rpcHost->needNative) {
-            throw new RpcException(RpcException::NEED_NATIVE);
-        }
-        if ($rpcHost->needLocal) {
-            if (! RpcUtility::isLocalIp($clientIp)) {
-                throw new RpcException(RpcException::NEED_LOCAL);
-            }
-        }
-        if ($rpcHost->ipWhiteList) {
-            if (! in_array($clientIp, $rpcHost->ipWhiteList)) {
-                throw new RpcException(RpcException::NOT_IN_WHITE_LIST);
-            }
-        }
-        if ($rpcHost->password) {
-            if (! RpcUtility::verifyToken($rpcHost->password, $authToken)) {
-                throw new RpcException(RpcException::VALID_FAILED);
-            }
-        }
+        // 凡是本机请求, 无视授权限制
+        if ($rpcHost->isUnixSock || '127.0.0.1' === $clientIp) return;
+
+        $rpcHost->needNative && throw new RpcException(RpcException::NEED_NATIVE);
+        $rpcHost->needLocal && ! RpcUtility::isLocalIp($clientIp) && throw new RpcException(RpcException::NEED_LOCAL);
+        $rpcHost->ipWhiteList && ! in_array($clientIp, $rpcHost->ipWhiteList) && throw new RpcException(RpcException::NOT_IN_WHITE_LIST);
+        $rpcHost->password && ! RpcUtility::verifyToken($rpcHost->password, $authToken) && throw new RpcException(RpcException::VALID_FAILED);
     }
 
     /**
@@ -311,16 +288,8 @@ class RpcServer {
      * @throws RpcException
      */
     private static function execute(string $className, string $methodName, array $arguments): mixed {
-        if (! is_subclass_of($className, RpcMatrix::class)) {
-            throw (new RpcException(RpcException::NOT_RPC_CLASS))->format($className);
-        }
-        try {
-            $result = call_user_func_array([$className, $methodName], $arguments);
-        } catch (Throwable $throwable) {
-            // 如果服务端发生了异常, 则抛到客户端
-            $result = $throwable;
-        }
-        return $result;
+        ! is_subclass_of($className, RpcMatrix::class) && throw (new RpcException(RpcException::NOT_RPC_CLASS))->format($className);
+        return call_user_func_array([$className, $methodName], $arguments);
     }
 
     /**

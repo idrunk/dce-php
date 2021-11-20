@@ -7,6 +7,7 @@
 namespace dce\base;
 
 use Swoole\Coroutine;
+use Swoole\Event;
 use Swoole\Table;
 
 final class SwooleUtility {
@@ -16,6 +17,14 @@ final class SwooleUtility {
             $inSwoole = extension_loaded('swoole');
         }
         return $inSwoole;
+    }
+
+    public static function inSwooleCli(): bool {
+        return self::inSwoole() && DCE_CLI_MODE;
+    }
+
+    public static function eventExit(): void {
+        Event::exit();
     }
 
     public static function inCoroutine(): bool {
@@ -109,6 +118,7 @@ final class SwooleUtility {
      */
     public static function processLock(string|null $identification = null, int $maximum = 1): bool {
         $identification ??= self::defaultIdentification();
+        $identification = self::legalizeKey($identification);
         $maximum = $maximum < 1 ? 1 : $maximum;
         $isGetLock = $initialLockState = self::processLocker($identification, $maximum);
         while (false === $isGetLock) {
@@ -125,7 +135,7 @@ final class SwooleUtility {
      */
     public static function processUnlock(string|null $identification = null): void {
         $identification ??= self::defaultIdentification();
-        self::processLocker($identification, 0);
+        self::processLocker(self::legalizeKey($identification), 0);
     }
 
     /**
@@ -134,7 +144,11 @@ final class SwooleUtility {
      */
     private static function defaultIdentification(): string {
         $context = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3)[2] ?? [];
-        return md5($context['file'] .':'. ($context['function'] ?? '/'));
+        return $context['file'] .':'. ($context['function'] ?? '/');
+    }
+    
+    private static function legalizeKey(string $key): string {
+        return strlen($key) > 40 ? hash('md5', $key) : $key;
     }
 
     /**
@@ -176,6 +190,7 @@ final class SwooleUtility {
      */
     public static function coroutineLock(string|null $identification = null, int $maximum = 1): bool {
         $identification ??= self::defaultIdentification();
+        $identification = self::legalizeKey($identification);
         $maximum = $maximum < 1 ? 1 : $maximum;
         $isGetLock = $initialLockState = self::coroutineLocker($identification, $maximum);
         while (false === $isGetLock) {
@@ -191,6 +206,7 @@ final class SwooleUtility {
      */
     public static function coroutineUnlock(string|null $identification = null): void {
         $identification ??= self::defaultIdentification();
+        $identification = self::legalizeKey($identification);
         self::coroutineLocker($identification, 0);
     }
 

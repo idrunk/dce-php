@@ -39,6 +39,7 @@ class InsertSchema extends SchemaAbstract {
                 $value = $datum[$column] ?? null;
                 if ($value instanceof RawBuilder) {
                     $placeholders[] = "$value";
+                    $this->mergeParams($value->getParams());
                 } else if ($value instanceof SelectStatement) {
                     $placeholders[] = "($value)";
                     $this->mergeParams($value->getParams());

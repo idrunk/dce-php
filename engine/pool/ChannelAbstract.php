@@ -6,6 +6,9 @@
 
 namespace dce\pool;
 
+use dce\base\SwooleUtility;
+use dce\loader\attr\Sington;
+
 abstract class ChannelAbstract{
     protected int $capacity;
 
@@ -36,5 +39,9 @@ abstract class ChannelAbstract{
 
     abstract public function isEmpty(): bool;
 
-    abstract public function getLength(): int;
+    abstract public function length(): int;
+
+    public static function autoNew(int $capacity = 0): static {
+        return Sington::new(SwooleUtility::inSwoole() ? CoroutineChannel::class : ArrayChannel::class, $capacity);
+    }
 }

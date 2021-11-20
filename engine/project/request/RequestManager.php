@@ -20,7 +20,7 @@ class RequestManager {
 
     /**
      * 实例化请求器并路由
-     * @param string $rawRequestClass
+     * @param class-string<RawRequest> $rawRequestClass
      * @param mixed ...$rawRequestParams
      * @return Request
      * @throws RequestException

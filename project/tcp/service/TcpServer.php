@@ -7,6 +7,7 @@
 namespace tcp\service;
 
 use dce\base\Exception;
+use dce\log\LogManager;
 use dce\project\ProjectManager;
 use dce\service\server\RawRequestConnection;
 use dce\service\server\ServerMatrix;
@@ -65,7 +66,7 @@ class TcpServer extends ServerMatrix {
         }
 
         $this->runApiService();
-        echo self::$langStarted->format('Tcp/Udp', $host, $port);
+        LogManager::dce(self::$langStarted->format('Tcp/Udp', $host, $port));
         $this->server->start();
     }
 

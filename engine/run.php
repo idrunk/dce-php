@@ -4,9 +4,10 @@
  * Date: 2016-11-27 2:02
  */
 
-define('DCE_CLI_MODE', stristr(php_sapi_name(), 'cli'));
 // dce框架基址
-define('DCE_ROOT', __DIR__ . '/../');
+const DCE_ROOT = __DIR__ . '/../';
+// 是否命令行模式
+define('DCE_CLI_MODE', stristr(php_sapi_name(), 'cli') !== false);
 // 应用根目录
 defined('APP_ROOT') or define('APP_ROOT', realpath(DCE_CLI_MODE ? dirname($_SERVER['PHP_SELF']): "{$_SERVER['DOCUMENT_ROOT']}/..") .'/');
 // 应用公共目录
