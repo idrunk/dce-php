@@ -13,7 +13,7 @@ class FilterValidator extends TypeFilter {
 
     protected string $regexp;
 
-    protected function getValue(): string|int|float|null {
+    protected function getValue(): mixed {
         $value = parent::getValue();
         if ($regexp = $this->getProperty('regexp')) {
             $value = preg_replace($regexp->value, '', $value);

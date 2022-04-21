@@ -13,4 +13,7 @@ use dce\i18n\Language;
 class ModelException extends Exception {
     #[Language(['未定义属性 %s 对应的getter方法'])]
     public const GETTER_UNDEFINED = 1500;
+
+    #[Language(['模型 %s 未定义 %s 属性'])]
+    public const PROPERTY_UNDEFINED = 1501;
 }

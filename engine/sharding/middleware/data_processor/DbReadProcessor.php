@@ -58,7 +58,9 @@ class DbReadProcessor extends DataProcessor {
     public function queryAll(string|null $indexColumn = null, string|null $columnColumn = null): array {
         $aggregateMap = self::takeAggregateMap($this->statementParser->shardingSelectColumns);
         if ($this->statementParser->groupBy) { // 分组计算
-            $groupColumns = array_map('strval', $this->statementParser->groupBy->conditions);
+
+            // 去掉可能包含查询字段的反引号以便后续合并计算时能与查询结果对应
+            $groupColumns = array_map(fn($c) => trim(strval($c), '`'), $this->statementParser->groupBy->conditions);
             $sourceData = self::groupMerge($this->sourceData, $groupColumns, $aggregateMap);
             $result = self::concatAndSortLimit($sourceData, $this->statementParser->orderBy, $this->statementParser->limitConditions);
         } else if ($aggregateMap) { // 聚合计算
@@ -81,34 +83,27 @@ class DbReadProcessor extends DataProcessor {
      * @return array
      */
     private static function filterSelectColumns(MysqlColumnParser $selectColumns, array $shardingColumns, array $result, string|null $indexColumn = null, string|null $columnColumn = null): array {
-        foreach ($shardingColumns as $k => $column) {
+        foreach ($shardingColumns as $k => $column)
             $shardingColumns[$k] = $column->getSelectColumnName();
-        }
         $columnAliasNameMap = [];
         foreach ($selectColumns as $column) {
             $field = $column->field->getSelectColumnName();
-            if ('*' === $field) {
-                // 如果是查询所有字段, 则不继续处理
-                break;
-            }
-            if (in_array($field, $shardingColumns)) {
-                $columnAliasNameMap[$column->alias ?: $field] = $field;
-            }
+            if ('*' === $field) break; // 如果是查询所有字段, 则不继续处理
+            in_array($field, $shardingColumns) && $columnAliasNameMap[$column->alias ?: $field] = $field;
         }
+        // 如果指定了提取字段，且为聚合函数，则将其格式化
+        $columnColumn && $columnColumn = (string) MysqlFunctionParser::from($columnColumn) ?: $columnColumn;
         $finalResult = [];
         foreach ($result as $k => $v) {
             if ($columnAliasNameMap) {
                 $log = [];
-                foreach ($columnAliasNameMap as $alias => $field) {
+                foreach ($columnAliasNameMap as $alias => $field)
                     $log[$alias] = $v[$field];
-                }
             } else {
                 $log = $v;
             }
             $k = $indexColumn ? $log[$indexColumn] : $k;
-            if ($columnColumn) {
-                $log = $log[$columnColumn];
-            }
+            $columnColumn && $log = $log[$columnColumn];
             $finalResult[$k] = $log;
         }
         return $finalResult;
@@ -123,9 +118,8 @@ class DbReadProcessor extends DataProcessor {
         // 聚合函数列集 (供下方做聚合计算)
         $aggregateMap = [];
         foreach ($shardingSelectColumns as $shardingSelectColumn) {
-            if ($shardingSelectColumn instanceof MysqlFunctionParser && $shardingSelectColumn->isAggregate) {
+            if ($shardingSelectColumn instanceof MysqlFunctionParser && $shardingSelectColumn->isAggregate)
                 $aggregateMap[(string) $shardingSelectColumn] = $shardingSelectColumn;
-            }
         }
         return $aggregateMap;
     }
@@ -145,19 +139,16 @@ class DbReadProcessor extends DataProcessor {
         foreach ($sourceData as $db => $rsList) {
             foreach ($rsList as $k => $log) {
                 $mapKey = [];
-                foreach ($groupColumns as $column) {
+                foreach ($groupColumns as $column)
                     $mapKey[] = $log[$column];
-                }
                 $mapKey = implode(';;', $mapKey);
                 $groupKeyDataMap[$mapKey][] = [$db, $k, $log];
             }
         }
 
         // 分组聚合计算
-        foreach ($groupKeyDataMap as $key => $groupData) {
-            if (count($groupData) < 2) {
-                continue; // 仅一条的已分组记录无需继续做合并计算处理
-            }
+        foreach ($groupKeyDataMap as $groupData) {
+            if (count($groupData) < 2) continue; // 仅一条的已分组记录无需继续做合并计算处理
             foreach ($groupData as $i => [$db, $k, $log]) {
                 unset($sourceData[$db][$k]); // 从原始数据中删除需分组处理的数据
                 $groupData[$i] = $log;
@@ -240,19 +231,13 @@ class DbReadProcessor extends DataProcessor {
             array_splice($sortedList, $insertIndex, 0, [$sortItem]);
             $nextItem = next($sourceData[$db]);
             if (! $nextItem || $insertIndex >= $compareIndexFrom) {
-                if (! next($sourceData)) {
-                    reset($sourceData);
-                }
-                if (! $nextItem) {
-                    unset($sourceData[$db]);
-                }
+                ! next($sourceData) && reset($sourceData);
+                if (! $nextItem) unset($sourceData[$db]);
             }
         }
         $limitConditionCount = count($limitConditions);
         if ($limitConditionCount > 0) {
-            if ($limitConditionCount < 2) {
-                array_unshift($limitConditions, 0);
-            }
+            $limitConditionCount < 2 && array_unshift($limitConditions, 0);
             [$offset, $limit] = $limitConditions;
             $sortedList = array_slice($sortedList, $offset, $limit);
         }
@@ -304,7 +289,7 @@ class DbReadProcessor extends DataProcessor {
      * 比较排序值与已排参照值大小
      * @param array $sortedReference
      * @param array $sortingValue
-     * @return int|null {null: 已排参照值与所排值不再同一个排序分组, -1: 所排值小于参照值, 0: 所拍值等于参照值, 1: 所拍值大于参照值}
+     * @return int|null {null: 已排参照值与所排值不再同一个排序分组, -1: 所排值小于参照值, 0: 所排值等于参照值, 1: 所排值大于参照值}
      */
     private static function sortConditionCompare(array $sortedReference, array $sortingValue): int|null {
         $result = null;
@@ -313,9 +298,7 @@ class DbReadProcessor extends DataProcessor {
         foreach ($sortingValue as $k=>$v) {
             $result = $v <=> $sortedReference[$k];
             if ($result) {
-                if ($index < $lastConditionIndex) {
-                    $result = null;
-                }
+                $index < $lastConditionIndex && $result = null;
                 break;
             }
             $index ++;

@@ -18,29 +18,28 @@ abstract class MysqlListParser extends MysqlParser implements Iterator {
      */
     public function extractAggregates(): array {
         $aggregates = [];
-        foreach ($this as $mysqlParser) {
+        foreach ($this as $mysqlParser)
             $aggregates = array_merge($aggregates, $mysqlParser->extractAggregates());
-        }
         return $aggregates;
     }
 
-    public function current() {
+    public function current(): MysqlParser {
         return $this->getQueue()[$this->queueOffset];
     }
 
-    public function next() {
+    public function next(): void {
         $this->queueOffset ++;
     }
 
-    public function key() {
+    public function key(): int {
         return $this->queueOffset;
     }
 
-    public function valid() {
+    public function valid(): bool {
         return $this->queueOffset < count($this->getQueue());
     }
 
-    public function rewind() {
+    public function rewind(): void {
         $this->queueOffset = 0;
     }
 

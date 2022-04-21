@@ -7,12 +7,17 @@
 namespace dce\db\entity;
 
 use dce\db\query\builder\RawBuilder;
-use dce\db\entity\schema\FieldType;
 
 abstract class Field {
     private string $fieldName;
 
     private FieldType $fieldType;
+
+    private int $length;
+
+    private int $precision;
+
+    private bool $unsignedBool;
 
     private bool $primaryKeyBool = false;
 
@@ -29,8 +34,11 @@ abstract class Field {
         return $this;
     }
 
-    public function setType(string|null $typeName, int $length = 0, bool $isUnsigned = true, int $precision = 0): static {
-        $this->fieldType = new FieldType($typeName, $length, $isUnsigned, $precision);
+    public function setType(FieldType $fieldType, int $length = 0, bool $isUnsigned = true, int $precision = 0): static {
+        $this->fieldType = $fieldType;
+        $this->length = $fieldType->getLength($length, $isUnsigned);
+        $this->unsignedBool = $isUnsigned;
+        $this->precision = $precision;
         return $this;
     }
 
@@ -59,14 +67,24 @@ abstract class Field {
         return $this;
     }
 
-
-
     public function getName(): string {
         return $this->fieldName;
     }
 
     public function getType(): FieldType {
         return $this->fieldType;
+    }
+
+    public function isUnsigned(): bool {
+        return $this->unsignedBool;
+    }
+
+    public function getLength(): int {
+        return $this->length;
+    }
+
+    public function getPrecision(): int {
+        return $this->precision;
     }
 
     public function isPrimaryKey(): bool {

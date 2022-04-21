@@ -18,34 +18,28 @@ class MysqlColumnParser extends MysqlListParser {
     public array $columns = [];
 
     protected function parse(): void {
-        if ($modifier = $this->preParseModifier()) {
-            $this->modifiers[] = $modifier;
-        }
+        ($modifier = $this->preParseModifier()) && $this->modifiers[] = $modifier;
 
         while ($this->offset < $this->statementLength) {
             $this->columns[] = MysqlColumnItemParser::build($this->statement, $this->offset);
             $nextSeparator = $this->preParseOperator();
-            if (! in_array($nextSeparator, self::$paramSeparators)) {
-                break;
-            }
+            if (! in_array($nextSeparator, self::$paramSeparators)) break;
         }
     }
 
+    /** @return MysqlColumnItemParser */
     public function current(): MysqlColumnItemParser {
         return parent::current();
     }
 
     public function addItem(MysqlParser $item): void {
-        if ($item instanceof MysqlColumnItemParser) {
-            $this->columns[] = $item;
-        }
+        $item instanceof MysqlColumnItemParser && $this->columns[] = $item;
     }
 
     public function toArray(): array {
         $columnsToArray = [];
-        foreach ($this->columns as $column) {
+        foreach ($this->columns as $column)
             $columnsToArray[] = $column->toArray();
-        }
         return [
             'type' => 'list',
             'class' => 'column',
@@ -57,9 +51,7 @@ class MysqlColumnParser extends MysqlListParser {
     public function __toString(): string {
         $modifiers = implode(' ', $this->modifiers);
         $columns = implode(',', $this->columns);
-        if ($modifiers) {
-            $columns = "{$modifiers} {$columns}";
-        }
+        $modifiers && $columns = "{$modifiers} {$columns}";
         return $columns;
     }
 

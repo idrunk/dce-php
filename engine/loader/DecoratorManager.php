@@ -7,6 +7,7 @@
 namespace dce\loader;
 
 use dce\base\BaseException;
+use dce\db\active\ActiveRecord;
 use dce\event\Event;
 use dce\i18n\Language;
 use dce\loader\attr\Constructor;
@@ -16,7 +17,6 @@ use dce\model\Model;
 use ReflectionClass;
 use ReflectionClassConstant;
 use ReflectionException;
-use ReflectionMethod;
 use ReflectionProperty;
 use ReflectionType;
 use ReflectionUnionType;
@@ -56,7 +56,6 @@ class DecoratorManager {
                 ($attrs = $refProperty->getAttributes(Constructor::class)) ||
                 is_subclass_of($typeClass, Constructor::class)
             )) {
-                $refProperty->setAccessible(true);
                 [$attrClass, $params] = $attrs ? [$attrs[0]->getName(), $attrs[0]->getArguments()] : [null, []];
                 $refProperty->hasDefaultValue() && array_unshift($params, $refProperty->getDefaultValue());
                 $refProperty->setValue(call_user_func($attrClass === Singleton::class ? [Singleton::class, 'gen'] : [Sington::class, $attrClass === Sington::class ? 'gen' : 'new'], $typeClass, ... $params));
@@ -71,11 +70,8 @@ class DecoratorManager {
      */
     private static function getTypeClass(ReflectionType $refType): string|null {
         if ($refType instanceof ReflectionUnionType) {
-            foreach ($refType->getTypes() as $refType) {
-                if (class_exists($refType->getName())) {
-                    return $refType;
-                }
-            }
+            foreach ($refType->getTypes() as $refType)
+                if (class_exists($refType->getName())) return $refType;
         } else if (class_exists($refType->getName())) {
             return $refType;
         }
@@ -91,9 +87,7 @@ class DecoratorManager {
         foreach ($refClass->getReflectionConstants(ReflectionClassConstant::IS_PUBLIC) as $refConst) {
             if ($langAttrs = $refConst->getAttributes(Language::class)) {
                 $args = $langAttrs[0]->getArguments();
-                if (! $args) {
-                    throw new BaseException(BaseException::LANGUAGE_MAPPING_ERROR);
-                }
+                ! $args && throw new BaseException(BaseException::LANGUAGE_MAPPING_ERROR);
                 new Language($args[0], $refConst->getValue());
             }
         }
@@ -106,9 +100,8 @@ class DecoratorManager {
      */
     private static function initModel(ReflectionClass $refClass): void {
         if ($refClass->isSubclassOf(Model::class)) {
-            $refMethod = $refClass->getMethod('initProperties');
-            $refMethod->setAccessible(ReflectionMethod::IS_PUBLIC);
-            $refMethod->invoke(null, $refClass); // 执行模型内置的初始化方法
+            $refClass->getMethod('initProperties')->invoke(null, $refClass); // 执行模型内置的初始化方法
+            $refClass->isSubclassOf(ActiveRecord::class) && $refClass->getMethod('initColumns')->invoke(null, $refClass);
         }
     }
 }

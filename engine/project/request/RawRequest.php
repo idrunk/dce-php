@@ -7,7 +7,6 @@
 namespace dce\project\request;
 
 use dce\project\node\Node;
-use JetBrains\PhpStorm\ArrayShape;
 
 abstract class RawRequest {
     /** @var string 请求方式 */

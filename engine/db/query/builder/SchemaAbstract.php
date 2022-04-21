@@ -26,9 +26,7 @@ abstract class SchemaAbstract implements SchemaInterface {
     }
 
     protected function logHasSubQuery(bool $isSubQuery): void {
-        if (! $this->subQueryBool && $isSubQuery) {
-            $this->subQueryBool = true;
-        }
+        ! $this->subQueryBool && $isSubQuery && $this->subQueryBool = true;
     }
 
     final public function getConditions(): array {
@@ -38,9 +36,7 @@ abstract class SchemaAbstract implements SchemaInterface {
     final protected function pushCondition(string|array|int|StatementAbstract|false $condition, bool|null $unshiftOrEmpty = null): void {
         if (false === $unshiftOrEmpty || false === $condition) {
             $this->conditions = [];
-            if (false === $condition) {
-                return;
-            }
+            if (false === $condition) return;
         }
         if ($unshiftOrEmpty) {
             array_unshift($this->conditions, $condition);
@@ -66,35 +62,25 @@ abstract class SchemaAbstract implements SchemaInterface {
     }
 
     protected static function tableNameParse(string $string): array|false {
-        if (!preg_match('/^\s*(?:(`?)(\w+)\1\.)?(`?)([\w]+|\*)\3(?: +(?:as +)?(`?)(\w+)\5)?\s*?($)/ui', $string, $parts)) {
+        if (! preg_match('/^\s*(?:(`?)(\w+)\1\.)?(`?)([\w]+|\*)\3(?: +(?:as +)?(`?)(\w+)\5)?\s*?($)/ui', $string, $parts))
             return false;
-        }
-        [, , $db_name, , $table_name, , $alias] = $parts;
-        return [$db_name, $table_name, $alias];
+        [, , $dbName, , $tableName, , $alias] = $parts;
+        return [$dbName, $tableName, $alias];
     }
 
     protected static function tableWrap(string|null $string, bool $isAllowAlias = false): string|false|null {
-        if (! is_string($string)) {
-            return null;
-        }
-        if (! $tableNameParts = self::tableNameParse($string)) {
-            return false;
-        }
-        [$db_name, $table_name, $alias] = $tableNameParts;
-        if ((! $isAllowAlias || '*' === $table_name) && $alias) {
-            return false;
-        }
-        return ($db_name ? "`$db_name`." : '') . sprintf($table_name === '*' ? '%s' : '`%s`', $table_name) . ($alias ? " AS `$alias`" : '');
+        if (! is_string($string)) return null;
+        if (! $tableNameParts = self::tableNameParse($string)) return false;
+        [$dbName, $tableName, $alias] = $tableNameParts;
+        if ((! $isAllowAlias || '*' === $tableName) && $alias) return false;
+        return ($dbName ? "`$dbName`." : '') . sprintf($tableName === '*' ? '%s' : '`%s`', $tableName) . ($alias ? " AS `$alias`" : '');
     }
 
     public static function tableWrapThrow(string|int|float|null $string, bool $isAllowAlias = false): string|int|float {
         if (is_numeric($string)) {
             $table = $string;
         } else {
-            $table = self::tableWrap($string, $isAllowAlias);
-            if (! $table) {
-                throw (new QueryException(QueryException::TABLE_OR_COLUMN_INVALID))->format($string);
-            }
+            ! $table = self::tableWrap($string, $isAllowAlias) && throw (new QueryException(QueryException::TABLE_OR_COLUMN_INVALID))->format($string);
         }
         return $table;
     }

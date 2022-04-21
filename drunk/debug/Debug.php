@@ -18,13 +18,10 @@ use Throwable;
 
 final class Debug {
     public const END_HTML = 'html';
-
     public const END_CLI = 'cli';
-
     public const END_LOG = 'log';
 
     public const STORAGE_FILE = 'file';
-
     public const STORAGE_HTTP = 'http';
 
     private DebugMatrix $endInst;

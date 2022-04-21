@@ -13,7 +13,7 @@ use dce\service\server\RawRequestConnection;
 use Swoole\WebSocket\Frame;
 
 class RawRequestWebsocket extends RawRequestConnection {
-    public const ConnectionPath = 'websocket/connecting';
+    public const CONNECTION_PATH = 'websocket/connecting';
 
     public string $method = 'websocket';
 

@@ -6,11 +6,8 @@ use dce\config\Config;
 use JetBrains\PhpStorm\ArrayShape;
 
 class ShardingConfig extends Config implements ConfigLibInterface {
-    /** @var string 按模分库 */
-    public const TYPE_MODULO = 'modulo';
-
-    /** @var string 按区间分库 */
-    public const TYPE_RANGE = 'range';
+    public const TYPE_MODULO = 'modulo'; // 按模分库
+    public const TYPE_RANGE = 'range'; // 按区间分库
 
     /** @var string 数据库类型 */
     public string $dbType = 'mysql';
@@ -73,12 +70,9 @@ class ShardingConfig extends Config implements ConfigLibInterface {
         $shardingMapping = [];
         foreach ($data as $alias => $config) {
             $config['type'] = strtolower($config['type'] ?? null);
-            if (! in_array($config['type'], [self::TYPE_MODULO, self::TYPE_RANGE])) {
+            if (! in_array($config['type'], [self::TYPE_MODULO, self::TYPE_RANGE]))
                 throw new MiddlewareException(MiddlewareException::CONFIG_SHARDING_TYPE_INVALID);
-            }
-            if (self::TYPE_MODULO === $config['type']) {
-                $config['modulus'] = count($config['mapping']);
-            }
+            self::TYPE_MODULO === $config['type'] && $config['modulus'] = count($config['mapping']);
             $config['flip_mapping'] = array_flip($config['mapping']);
             krsort($config['flip_mapping']);
             $config['cross_update'] = !! ($config['cross_update'] ?? false);

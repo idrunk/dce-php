@@ -47,9 +47,6 @@ class Node {
     /** @var bool 是否开启协程容器, 默认为否, 若在Swoole Server环境, 则是通过Server配置控制, 不受Node属性影响, {会被继承} */
     public bool $enableCoroutine;
 
-    /** @var bool 是否协程化IO操作, 当$enableCoroutine=true时此参数将默认为true, {会被继承} */
-    public bool $hookCoroutine;
-
     /** @var string 渲染方式, json/xml/jsonp, 或PHP模板文件路径, 相对于项目模板根目录(project/home/template/)路径, 如news/detail.php */
     public string $render;
 
@@ -137,14 +134,11 @@ class Node {
      * @throws NodeException
      */
     private function init(array $properties, string $projectName): array {
-        if (! isset($properties['path'])) {
+        if (! isset($properties['path']))
             throw (new NodeException(NodeException::NODE_PATH_MISSION))->format(Utility::printable($properties));
-        }
         $idGene = $properties['path_format'] = $properties['path'];
-        if (0 !== stripos($idGene, $projectName)) {
-            // 如果path缺少project部分, 则自动补上
-            $idGene = $properties['path_format'] = "{$projectName}/{$idGene}";
-        }
+        // 如果path缺少project部分, 则自动补上
+        0 !== stripos($idGene, $projectName) && $idGene = $properties['path_format'] = "{$projectName}/{$idGene}";
         if (isset($properties['methods'])) {
             ! is_array($properties['methods']) && $properties['methods'] = [$properties['methods']];
             foreach ($properties['methods'] as $method => $render) {
@@ -159,14 +153,11 @@ class Node {
             asort($argument_keys);
             $idGene .= ';'.implode('-', $argument_keys);
         }
-        if (isset($properties['url_suffix']) && is_string($properties['url_suffix'])) {
-            // 如果配置的后缀为单个的字符串, 则将其转为数组
+        // 如果配置的后缀为单个的字符串, 则将其转为数组
+        if (isset($properties['url_suffix']) && is_string($properties['url_suffix']))
             $properties['url_suffix'] = [$properties['url_suffix']];
-        }
-        if (! isset($properties['id'])) {
-            // 如果没有自定义节点ID, 则生成
-            $properties['id'] = (string) hexdec(hash('crc32', $idGene)); // generate hash id for node
-        }
+        // 如果没有自定义节点ID, 则生成
+        ! isset($properties['id']) && $properties['id'] = (string) hexdec(hash('crc32', $idGene));
         return $properties;
     }
 
@@ -190,9 +181,8 @@ class Node {
      * @return array
      */
     private static function initArguments (array $arguments): array {
-        foreach( $arguments as $j => $argument) {
+        foreach( $arguments as $j => $argument)
             $arguments[$j] = new NodeArgument($argument);
-        }
         return $arguments;
     }
 
@@ -203,9 +193,7 @@ class Node {
     public function arrayify(): array {
         $properties = $this->baseArrayify();
         $properties['urlArguments'] = $this->urlArgumentsArrayify();
-        if (isset($this->extra)) {
-            $properties['extra'] = $this->extra;
-        }
+        isset($this->extra) && $properties['extra'] = $this->extra;
         return $properties;
     }
 
@@ -215,9 +203,8 @@ class Node {
      */
     private function urlArgumentsArrayify(): array {
         $children = [];
-        foreach ($this->urlArguments as $child) {
+        foreach ($this->urlArguments as $child)
             $children[] = $child->arrayify();
-        };
         return $children;
     }
 
@@ -227,9 +214,8 @@ class Node {
      */
     private static function constructArgs(): array {
         static $args;
-        if (null === $args) {
+        if (null === $args)
             $args = array_column((new ReflectionClass(self::class))->getConstructor()->getParameters(), 'name');
-        }
         return $args;
     }
 
@@ -240,18 +226,13 @@ class Node {
      * @return array
      */
     public static function refToNodeArguments(ReflectionMethod $method, ReflectionAttribute $attribute): array {
-        $arguments = $attribute->getArguments();
-        foreach ($arguments as $k => $arg) {
-            if (is_int($k)) {
-                $arguments[self::constructArgs()[$k]] = $arg;
-                unset($arguments[$k]);
-            }
-        }
+        $arguments = [];
+        foreach ($attribute->getArguments() as $k => $arg)
+            $arguments[Char::snakelike(is_int($k) ? self::constructArgs()[$k] : $k)] = $arg;
         $class = $method->getDeclaringClass();
         // 不要将类魔术方法作为控制器方法
-        if (! str_starts_with($methodName = $method->getName(), '__')) {
+        if (! str_starts_with($methodName = $method->getName(), '__'))
             $arguments['controller'] = preg_replace('/^.+?\bcontroller\\\\(.+)$/', "$1->{$methodName}", $class->getName());
-        }
         return $arguments;
     }
 
@@ -272,8 +253,8 @@ class Node {
         }
         [, $dir, $method] = $matches;
         $dir = str_replace('\\', '/', $dir);
-        if ($controllerPath && $nodePath !== $controllerPath && ($node['controllerPath'] ?? null) !== false) {
-            $dir .= "{$controllerPath}/";
+        if ($controllerPath && $nodePath !== $controllerPath && ($node['controller_path'] ?? null) !== false) {
+            $dir .= "$controllerPath/";
         }
         $node['path'] = $dir . ($nodePath ?: $method);
     }

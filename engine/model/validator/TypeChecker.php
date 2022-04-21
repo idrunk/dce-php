@@ -19,8 +19,8 @@ abstract class TypeChecker extends ValidatorAbstract {
     }
 
     /**
-     * @param string|int|float|null|false $value
+     * @param mixed $value
      * @return ValidatorException|null
      */
-    abstract protected function check(string|int|float|null|false $value):? ValidatorException;
+    abstract protected function check(mixed $value):? ValidatorException;
 }

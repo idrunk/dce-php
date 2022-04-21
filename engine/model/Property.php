@@ -7,19 +7,28 @@
 namespace dce\model;
 
 use Attribute;
+use BackedEnum;
+use dce\base\StorableType;
 use dce\db\entity\Field;
+use drunk\Structure;
 use ReflectionProperty;
+use ReflectionUnionType;
 
 #[Attribute(Attribute::TARGET_PROPERTY)]
 class Property {
-    public ReflectionProperty $refProperty;
+    readonly public ReflectionProperty $refProperty;
 
-    public string $name;
+    readonly public string $name;
 
     /** @var Validator[] */
-    public array $validators = [];
+    readonly public array $validators;
 
-    public Field $field;
+    readonly public Field $field;
+
+    readonly public StorableType $valueType;
+
+    /** @var class-string<BackedEnum> */
+    readonly public string $valueClass;
 
     /**
      * Property constructor.
@@ -29,31 +38,79 @@ class Property {
         public string|null $alias = null,
     ) {}
 
-    public function applyProperties(string $modelClass, ReflectionProperty $refProperty, array $validators, Field|null $field): self {
+    /**
+     * 给Property对象绑定各种属性
+     * @param ReflectionProperty $refProperty
+     * @param array $validators
+     * @return $this
+     */
+    public function applyProperties(ReflectionProperty $refProperty, array $validators): self {
         $this->refProperty = $refProperty;
         $this->name = $refProperty->name;
         $this->validators = $validators;
-        if (! $this->alias) {
-            $this->alias = $this->name;
-        }
-        if ($field) {
-            $field->setName($modelClass::toDbKey($this->name));
-            $this->field = $field;
+        ! $this->alias && $this->alias = $this->name;
+        if ($type = $refProperty->getType()) { // 如果指定了属性类型，则记录之
+            $type instanceof ReflectionUnionType && $type = Structure::arraySearchItem(fn($t) => $t->isBuiltin(), $type->getTypes()) ?: $type->getTypes()[0];
+            $this->valueClass = $type->getName();
+            if ($type->isBuiltin()) {
+                $this->valueType = $this->valueClass === 'array' ? StorableType::Array : StorableType::Scalar;
+            } else if (class_exists($this->valueClass)) {
+                $this->valueType = is_subclass_of($this->valueClass, BackedEnum::class) ? StorableType::BackedEnum : StorableType::Serializable;
+            } else {
+                $this->valueType = StorableType::Unable;
+            }
+        } else {
+            $this->valueType = StorableType::Scalar;
         }
         return $this;
     }
 
+    public function setField(Field $field): void {
+        $this->field = $field;
+    }
+
+    /**
+     * 属性是否有初始值
+     * @param Model $model
+     * @return bool
+     */
     public function isInitialized(Model $model): bool {
         return $this->refProperty->isInitialized($model);
     }
 
     /**
+     * 将属性值设置到模型
+     * @param Model $model
+     * @param mixed $value
+     * @param bool $ignoreExists
+     */
+    public function setValue(Model $model, mixed $value, bool $ignoreExists): void {
+        if (! $ignoreExists || ! isset($model->{$this->name}))
+            $model->{$this->name} = match ($this->valueType) {
+                StorableType::Array => is_string($value) ? json_decode($value, true) : $value,
+                StorableType::BackedEnum => is_scalar($value) ? $this->valueClass::from($value) : $value,
+                StorableType::Serializable => is_string($value) ? unserialize($value) : $value,
+                default => $value,
+            };
+    }
+
+    /**
      * 取模型属性值, false表示属性未初始化
      * @param Model $model
-     * @param mixed $default
-     * @return string|int|float|false|null
+     * @param mixed|null $default
+     * @param bool $toStorable 是否转换为可储存串
+     * @return mixed
      */
-    public function getValue(Model $model, mixed $default = null): string|int|float|null|false {
-        return $this->isInitialized($model) ? $model->{$this->name} : $default;
+    public function getValue(Model $model, mixed $default = null, bool $toStorable = false): mixed {
+        if ($this->isInitialized($model)) {
+            $default = $model->{$this->name};
+            $toStorable && $default = match ($this->valueType) {
+                StorableType::Array => json_encode($default, JSON_UNESCAPED_UNICODE),
+                StorableType::BackedEnum => $default->value,
+                StorableType::Serializable => serialize($default),
+                default => $default,
+            };
+        }
+        return $default;
     }
 }

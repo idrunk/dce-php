@@ -11,6 +11,8 @@ use dce\pool\PoolException;
 use Redis;
 
 class RedisConnector {
+    private const CONNECT_TIMEOUT = 3;
+
     private Redis $redis;
 
     public function __construct(array|ArrayAccess $config, bool $persistent = true) {
@@ -20,8 +22,8 @@ class RedisConnector {
         }
         if (
             $persistent
-            ? ! $this->redis->pconnect($config['host'], $config['port'], 3)
-            : ! $this->redis->connect($config['host'], $config['port'], 3)
+            ? ! $this->redis->pconnect($config['host'], $config['port'], self::CONNECT_TIMEOUT)
+            : ! $this->redis->connect($config['host'], $config['port'], self::CONNECT_TIMEOUT)
         ) {
             throw new PoolException(PoolException::CONNECT_REDIS_FAILED);
         }

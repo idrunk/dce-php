@@ -8,8 +8,7 @@ namespace dce\project\session;
 
 use dce\Dce;
 use dce\project\request\Request;
-use dce\storage\redis\DceRedis;
-use JetBrains\PhpStorm\ArrayShape;
+use dce\storage\redis\RedisProxy;
 use Swoole\Http\Request as SwooleRequest;
 
 abstract class Session {
@@ -60,7 +59,7 @@ abstract class Session {
         }
         self::$config = Dce::$config->session;
         if (! self::$config['class']) {
-            self::$config['class'] = DceRedis::isAvailable() ? '\dce\project\session\SessionRedis' : '\dce\project\session\SessionFile';
+            self::$config['class'] = RedisProxy::isAvailable() ? '\dce\project\session\SessionRedis' : '\dce\project\session\SessionFile';
         }
     }
 

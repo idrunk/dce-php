@@ -24,6 +24,7 @@ class DceConfig extends Config {
     #[ArrayShape([
         'id' => 'int', // 应用ID, 用于多应用部署在同台机器时, 标识其依赖公共组件的用户身份
         'name' => 'Stringable', // 应用名
+        'homepage' => 'string', // 主页
         'lang' => 'string', // 默认语言码
         'country' => 'string', // 默认国家码
         'lang_parse' => 'callable(Request):string', // 语言码解析器, 返回语言码
@@ -331,6 +332,11 @@ class DceConfig extends Config {
     /** @var array 该配置将在引导时自动遍历作为参数给ini_set()调用 */
     public array $iniSet = [
         'date.timezone' => 'PRC',
+    ];
+
+    /** @var array Swoole\Coroutine::set参数, 若运行于swoole环境，则会自动以此设置调用该方法  */
+    public array $coroutineSet = [
+        'hook_flags' => 2147481599, // SWOOLE_HOOK_ALL
     ];
 
     /** @var array Debug配置  */

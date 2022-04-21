@@ -12,17 +12,13 @@ use drunk\Structure;
 
 final class RpcUtility {
     public const DEFAULT_NAMESPACE_WILDCARD = 'rpc\*';
-
     public const DEFAULT_TCP_HOST = '/var/run/rpc.sock';
-
     public const DEFAULT_TCP_PORT = 0;
 
     public const RESULT_TYPE_GENERAL = 0;
-
     public const RESULT_TYPE_OBJECT = 1;
 
     public const FORMATTER_DIRECT = 0;
-
     public const FORMATTER_LENGTH_DEFINE = 1;
 
     public const REQUEST_FORMATTER = [

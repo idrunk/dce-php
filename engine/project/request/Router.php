@@ -26,7 +26,7 @@ class Router {
     /**
      * Router constructor.
      * @param RawRequest $rawRequest
-     * @throws RouterException
+     * @throws RouterException|RequestException
      */
     public function __construct(RawRequest $rawRequest) {
         $this->rawRequest = $rawRequest;
@@ -82,9 +82,9 @@ class Router {
      * @param array $nodeIdElders
      * @param array $urlArguments
      * @return bool|null
-     * @throws RouterException
+     * @throws RouterException|RequestException
      */
-    private function location(NodeTree $nodeTree, array $components, array $nodeIdElders = [], array $urlArguments = []) {
+    private function location(NodeTree $nodeTree, array $components, array $nodeIdElders = [], array $urlArguments = []): bool|null {
         // 取已匹配到的父路径, 用于后续递归匹配
         $pathParent = self::locationPathByIds($nodeIdElders);
         $isProjectLevel = $pathParent === '';
@@ -128,12 +128,12 @@ class Router {
      * @return string
      */
     private static function locationPathByIds(array $nodeIdElders): string {
-        $path_parent = '';
+        $pathParent = '';
         if ($nodeIdElders) {
             $nodeTree = NodeManager::getTreeById(end($nodeIdElders));
-            $path_parent = $nodeTree->pathFormat .'/';
+            $pathParent = $nodeTree->pathFormat .'/';
         }
-        return $path_parent;
+        return $pathParent;
     }
 
     /**
@@ -211,7 +211,7 @@ class Router {
      * @return array|bool
      * @throws RouterException
      */
-    private static function locationMatchArguments(Node $node, array & $components) {
+    private static function locationMatchArguments(Node $node, array & $components): bool|array {
         $gottenArguments = [];
         if (empty($node->urlArguments)) {
             // 如果未配置参数, 则直接返回
@@ -263,10 +263,10 @@ class Router {
      * @param NodeArgument $nodeArgument
      * @param array $getArguments
      * @param bool $needMatchSeparator
-     * @return bool|false|mixed|string|null
+     * @return mixed
      * @throws RouterException
      */
-    private static function parseMatchArgument(array $param, NodeArgument $nodeArgument, array $getArguments, bool $needMatchSeparator) {
+    private static function parseMatchArgument(array|null $param, NodeArgument $nodeArgument, array $getArguments, bool $needMatchSeparator): mixed {
         if ($needMatchSeparator && ! is_null($param) && $param['separator'] !== $nodeArgument->separator ) {
             // 如果需匹配分隔符却不匹配, 则匹配失败
             return false;

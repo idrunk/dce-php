@@ -7,14 +7,9 @@
 namespace drunk;
 
 use ArrayAccess;
+use dce\base\TreeTraverResult;
 
 abstract class Tree {
-    public const TRAVERSAL_STOP_CHILD = 3;
-
-    public const TRAVERSAL_STOP_SIBLING = 2;
-
-    public const TRAVERSAL_STOP_ALL = 1;
-
     /**
      * 树ID
      * @var string|null
@@ -49,11 +44,8 @@ abstract class Tree {
     public function getChild(string|array $keys): self|null {
         $keys && ! is_array($keys) && $keys = [$keys];
         $child = $this;
-        foreach ($keys as $key) {
-            if (! $child = $child->children[$key] ?? null) {
-                break;
-            }
-        }
+        foreach ($keys as $key)
+            if (! $child = $child->children[$key] ?? null) break;
         return $child;
     }
 
@@ -66,9 +58,8 @@ abstract class Tree {
     public function getParents(self|null $until = null, bool $elderFirst = true): array {
         $elements = [$this];
         $parent = $this;
-        while ((! $until || $until !== $parent) && $parent = $parent->parent) {
+        while ((! $until || $until !== $parent) && $parent = $parent->parent)
             $elements[] = $parent;
-        }
         return $elderFirst ? array_reverse($elements) : $elements;
     }
 
@@ -109,11 +100,11 @@ abstract class Tree {
             $children = $parent->children;
             foreach ($children as $child) {
                 $result = call_user_func_array($callback, [$child]);
-                if (self::TRAVERSAL_STOP_ALL === $result) {
+                if (TreeTraverResult::StopAll === $result) {
                     break 2;
-                } else if (self::TRAVERSAL_STOP_SIBLING === $result) {
+                } else if (TreeTraverResult::StopSibling === $result) {
                     break;
-                } else if (self::TRAVERSAL_STOP_CHILD !== $result) {
+                } else if (TreeTraverResult::StopChild !== $result) {
                     $parents[] = $child;
                 }
             }
@@ -126,9 +117,8 @@ abstract class Tree {
      */
     protected function childrenArrayify(): array {
         $children = [];
-        foreach ($this->children as $k => $child) {
+        foreach ($this->children as $k => $child)
             $children[$k] = $child->arrayify();
-        }
         return $children;
     }
 
@@ -151,15 +141,12 @@ abstract class Tree {
             $parent->id = $pid;
         }
         foreach ($arrays as $k => $v) {
-            if ($v[$parentKey] != $parent->id) {
-                continue;
-            }
+            if ($v[$parentKey] != $parent->id) continue;
             unset($arrays[$k]);
             $child = new static($v);
             $child->id = $v[$primaryKey];
-            if (! $deep || $currentDeep < $deep) {
+            if (! $deep || $currentDeep < $deep)
                 $child->children = self::from($arrays, $child, $deep, $primaryKey, $parentKey, $pkAsIndex, $currentDeep + 1)->children;
-            }
             $parent->setChild($child, $pkAsIndex ? $child->id : null);
         }
         return $parent;

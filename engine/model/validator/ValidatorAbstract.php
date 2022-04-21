@@ -14,8 +14,8 @@ use ReflectionProperty;
 use Stringable;
 
 abstract class ValidatorAbstract {
-    /** @var string|int|float|false|null 待校验值 */
-    protected string|int|float|null|false $value;
+    /** @var mixed 待校验值 */
+    protected mixed $value;
 
     /** @var string 规则通用错误模板 */
     protected string $error;
@@ -70,7 +70,7 @@ abstract class ValidatorAbstract {
         return $this;
     }
 
-    protected function getValue(): string|int|float|null|false {
+    protected function getValue(): mixed {
         return $this->value;
     }
 
@@ -83,19 +83,19 @@ abstract class ValidatorAbstract {
 
     /**
      * 校验并返回校验处理过的值
-     * @param string|int|float|false|null $value
+     * @param mixed $value
      * @param string|null $propertyName
      * @param string|null $propertyAlias
      * @param Model|null $model
-     * @return string|int|float|false|null
+     * @return mixed
      * @throws ValidatorException
      */
     public function checkGetValue(
-        string|int|float|null|false $value,
+        mixed $value,
         string|null $propertyName = null,
         string|null $propertyAlias = null,
         Model|null $model = null
-    ): string|int|float|null|false {
+    ): mixed {
         $this->errors = [];
         $this->value = $value;
         $this->modelPropertyName = $propertyName;

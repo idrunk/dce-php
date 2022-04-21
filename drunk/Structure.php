@@ -7,8 +7,7 @@
 namespace drunk;
 
 use ArrayAccess;
-use ArrayObject;
-use SplFixedArray;
+use Iterator;
 
 final class Structure {
     /**
@@ -33,9 +32,8 @@ final class Structure {
                 $array[$k] = $toMerge;
             }
         }
-        foreach ($arrays as $toMerge) {
+        foreach ($arrays as $toMerge)
             $array = self::arrayMerge($array, $toMerge); // 递归合并所有数组
-        }
         return $array;
     }
 
@@ -49,12 +47,25 @@ final class Structure {
     public static function arraySearch(callable $needle, array $haystack, bool $lazyMode = true): array|string|int|false {
         $indexes = [];
         foreach ($haystack as $i => $item) {
-            if (call_user_func($needle, $item)) {
+            if (call_user_func($needle, $item, $i)) {
                 if ($lazyMode) return $i;
                 $indexes[] = $i;
             }
         }
         return $indexes ?: false;
+    }
+
+    /**
+     * 用回调函数在数组中查找匹配值集
+     * @param callable $needle
+     * @param array $haystack
+     * @param bool $lazyMode
+     * @return mixed
+     */
+    public static function arraySearchItem(callable $needle, array $haystack, bool $lazyMode = true): mixed {
+        $indexes = self::arraySearch($needle, $haystack, $lazyMode);
+        if (false === $indexes) return false;
+        return $lazyMode ? $haystack[$indexes] : array_reduce($indexes, fn($carry, $index) => array_merge($carry, [$index => $haystack[$index]]), []);
     }
 
     /**
@@ -70,11 +81,8 @@ final class Structure {
         $keysIntersect = array_intersect(array_keys($needle), array_keys($haystackItem));
         $indexes = [];
         foreach ($haystack as $k => $item) {
-            foreach ($keysIntersect as $key) {
-                if ($needle[$key] != $item[$key]) {
-                    continue 2;
-                }
-            }
+            foreach ($keysIntersect as $key)
+                if ($needle[$key] != $item[$key]) continue 2;
             if ($lazyMode) return $k;
             $indexes[] = $k;
         }
@@ -101,17 +109,11 @@ final class Structure {
      * @return array|false
      */
     public static function arrayAssign(array $array, array $keyArray, mixed $value): array|false {
-        if (empty($keyArray) || ! is_array($keyArray)) {
-            return false;
-        }
+        if (! $keyArray) return false;
         $result = & $array;
         foreach ($keyArray as $key) {
-            if (! is_array($array)) {
-                return false; // 如果值非数组, 则无法设置子值, 返回假
-            }
-            if (! array_key_exists($key, $array)) {
-                $array[$key] = []; // 如果无子值, 则初始化为数组
-            }
+            if (! is_array($array)) return false; // 如果值非数组, 则无法设置子值, 返回假
+            if (! key_exists($key, $array)) $array[$key] = []; // 如果无子值, 则初始化为数组
             $array = & $array[$key];
         }
         $array = $value;
@@ -125,13 +127,9 @@ final class Structure {
      * @return mixed
      */
     public static function arrayIndexGet(array $array, array $keyArray): mixed {
-        if (empty($keyArray) || ! is_array($keyArray)) {
-            return null;
-        }
+        if (! $keyArray) return null;
         foreach ($keyArray as $key) {
-            if (! is_array($array) || ! array_key_exists($key, $array)) {
-                return null; // 如果值非数组或无子值, 则返回null
-            }
+            if (! is_array($array) || ! key_exists($key, $array)) return null; // 如果值非数组或无子值, 则返回null
             $array = $array[$key];
         }
         return $array;
@@ -144,14 +142,10 @@ final class Structure {
      * @return null|bool
      */
     public static function arrayIndexDelete(array & $array, array $keyArray): null|bool {
-        if (empty($keyArray) || ! is_array($keyArray)) {
-            return null;
-        }
+        if (! $keyArray) return null;
         $lastKey = count($keyArray) - 1;
         foreach ($keyArray as $k=> $key) {
-            if (!is_array($array) || !array_key_exists($key, $array)) {
-                break; // 如果值非数组或无子值, 则返回null
-            }
+            if (! is_array($array) || ! key_exists($key, $array)) break; // 如果值非数组或无子值, 则返回null
             if ($lastKey === $k) {
                 unset($array[$key]);
                 return true;
@@ -167,26 +161,44 @@ final class Structure {
      * @return bool
      */
     public static function arrayIsList(array|null $array): bool{
-        if (null === $array) {
-            return false;
-        }
+        if (null === $array) return false;
         $keys = array_keys($array);
         $keysShouldBe = range(0, count($keys) - 1);
         return $keys === $keysShouldBe;
     }
 
     /**
+     * 取键值组集
+     * @param array|ArrayAccess|Iterator $iterator
+     * @return list<array{int|string, mixed}>
+     */
+    public static function arrayEntries(array|ArrayAccess|Iterator $iterator): array {
+        $entries = [];
+        foreach ($iterator as $k => $v) $entries[] = [$k, $v];
+        return $entries;
+    }
+
+    /**
+     * @template O
+     * @param array<O>|ArrayAccess<O>|Iterator<O> $iterator
+     * @param callable(O, string|int): null|false $callback 此回调若返回false，则将退出循环
+     */
+    public static function forEach(array|ArrayAccess|Iterator $iterator, callable $callback): void {
+        foreach ($iterator as $k => $v)
+            if (Loop::Break === call_user_func_array($callback, [& $v, $k])) break;
+    }
+
+    /**
      * 按照矩阵列值集为参考，将矩阵按该参考值列表排序（常用语in查询时，查询结果与in元素顺序不一致，此时可以用此方法方便的排序）
      * @param array[]|ArrayAccess[] $matrix 待排序的矩阵
-     * @param string $column 排序参考列
+     * @param callable<mixed, int> $supplier 排序参值获取器
      * @param array $refValues 排序参考值集
      * @return array
      */
-    public static function sortByColumnRef(array $matrix, string $column, array $refValues): array {
+    public static function sortByColumnRef(array $matrix, callable $supplier, array $refValues): array {
         $valueOrderMapping = array_flip($refValues);
-        $refOrderValues = [];
-        foreach ($matrix as $array)
-            $refOrderValues[] = $valueOrderMapping[$array[$column]] ?? 65535; // 没取到则往后排
+        // 没取到的则往后排，所以65535
+        $refOrderValues = array_map(fn($item) => $valueOrderMapping[call_user_func($supplier, $item)] ?? 65535, $matrix);
         array_multisort($refOrderValues, SORT_ASC, SORT_NUMERIC, $matrix);
         return $matrix;
     }

@@ -63,7 +63,7 @@ class MysqlValueParser extends MysqlParser {
     public static function buildByWord(string $statement, int|null & $offset, string $value): self|null {
         $instance = new self($statement, $offset);
         if ($instance->detectByWord($value)) {
-            $instance->parse(+ $value);
+            $instance->parse($value);
             $instance->isNumeric = true;
             return $instance;
         }

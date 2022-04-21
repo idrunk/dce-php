@@ -16,28 +16,26 @@ use ReflectionException;
 use ReflectionMethod;
 
 final class NodeManager {
-    /** @var NodeTree|false 所有项目根节点树 */
-    private static NodeTree|false $nodeTree;
+    /** @var NodeTree|null 所有项目根节点树 */
+    private static NodeTree|null $nodeTree;
 
-    /** @var array|false 路径节点树映射表 */
-    private static array|false $pathTreeMapping;
+    /** @var array 路径节点树映射表 */
+    private static array $pathTreeMapping;
 
-    /** @var array|false ID节点树映射表 */
-    private static array|false $idTreeMapping;
+    /** @var array ID节点树映射表 */
+    private static array $idTreeMapping;
 
     /**
      * 扫描并初始化所有项目节点数据
      */
     public static function scanInit(): void {
         // 一般情况下都是从缓存取, 所以在这直接先尝试取, 不影响性能, 降低逻辑复杂度
-        self::$nodeTree = Dce::$cache->get('dce_node_tree');
-        self::$pathTreeMapping = Dce::$cache->get('dce_path_tree_mapping');
-        self::$idTreeMapping = Dce::$cache->get('dce_id_tree_mapping');
+        self::$nodeTree = Dce::$cache->get('dce_node_tree') ?: null;
+        self::$pathTreeMapping = Dce::$cache->get('dce_path_tree_mapping') ?: [];
+        self::$idTreeMapping = Dce::$cache->get('dce_id_tree_mapping') ?: [];
 
-        if (self::$idTreeMapping && Dce::$config->node['cache']) {
-            // 如果缓存有效且开启了节点缓存, 则直接返回
-            return;
-        }
+        // 如果缓存有效且开启了节点缓存, 则直接返回
+        if (self::$idTreeMapping && Dce::$config->node['cache']) return;
         $nodesFiles = $nodesFileList = [];
         foreach (ProjectManager::getAll() as $project) {
             if (is_file($nodesFile = "{$project->path}config/nodes.php")) {
@@ -47,10 +45,8 @@ final class NodeManager {
                 $nodesFileList = array_merge($nodesFileList, $nodesFiles[$project->name]);
             }
         }
-        if (self::$idTreeMapping && ! Dce::$cache::fileIsModified($nodesFileList)) {
-            // 如果文件无变化, 则返回
-            return;
-        }
+        // 如果文件无变化, 则返回
+        if (self::$idTreeMapping && ! Dce::$cache::fileIsModified($nodesFileList)) return;
 
         $rootTree = new NodeTree([
             'node_name' => 'root',
@@ -78,10 +74,9 @@ final class NodeManager {
      */
     private static function listControllerFiles(Project $project): array {
         $files = [];
-        for ($i = 0; $i < Dce::$config->node['deep']; $i ++) {
+        for ($i = 0; $i < Dce::$config->node['deep']; $i ++)
             // GLOB_BRACE 在某些操作系统无效, 所以递归来实现吧
             $files = array_merge($files, glob("{$project->path}controller/*".str_repeat('/*', $i).'.php') ?: []);
-        }
         return $files;
     }
 
@@ -94,9 +89,8 @@ final class NodeManager {
     private static function parseAttrNodes(array $controllerFiles): array {
         $nodes = [];
         foreach ($controllerFiles as $file) {
-            if (! preg_match('/(\w+)\/controller\/.*?(?=.php$)/ui', $file, $className)) {
+            if (! preg_match('/(\w+)\/controller\/.*?(?=.php$)/ui', $file, $className))
                 continue;
-            }
             $controllerPath = '';
             $fileNodesOffset = count($nodes);
             [$className, $projectName] = $className;
@@ -105,15 +99,14 @@ final class NodeManager {
             foreach (array_filter($refClass->getMethods(ReflectionMethod::IS_PUBLIC), fn($m) => $m->class === $refClass->name) as $method) {
                 foreach ($method->getAttributes(Node::class) as $attribute) {
                     $nodes[] = $node = Node::refToNodeArguments($method, $attribute);
-                    if ($node['controllerPath'] ?? false) {
-                        unset($node['controllerPath']);
+                    if ($node['controller_path'] ?? false) {
+                        unset($node['controller_path']);
                         $controllerPath = $node['path'] ?? '';
                     }
                 }
             }
-            for ($i = count($nodes) - 1; $i >= $fileNodesOffset; $i --) {
+            for ($i = count($nodes) - 1; $i >= $fileNodesOffset; $i --)
                 Node::fillControllerNodePath($nodes[$i], $controllerPath, $projectName);
-            }
         }
         return $nodes;
     }
@@ -128,17 +121,13 @@ final class NodeManager {
         $paths = array_flip(array_column($nodes, 'path'));
         foreach ($paths as $path => $v) {
             $elderParts = explode('/', $path, -1);
-            if (! $elderParts) {
-                // 若无父辈, 则无需继续补全
-                continue;
-            }
+            // 若无父辈, 则无需继续补全
+            if (! $elderParts) continue;
             $elderPath = '';
             foreach ($elderParts as $part) {
                 $elderPath .= ($elderPath === '' ? '' : '/') . $part;
-                if (key_exists($elderPath, $paths)) {
-                    // 若该父辈存在, 则无需补全
-                    continue;
-                }
+                // 若该父辈存在, 则无需补全
+                if (key_exists($elderPath, $paths)) continue;
                 // 记录父辈入下标
                 $paths[$elderPath] = 1;
                 // 补到节点集
@@ -161,17 +150,13 @@ final class NodeManager {
         $nodeTrees = [];
         foreach ($nodes as $v) {
             $node = new Node($v, $projectName);
-            if ($node->path === $projectName) {
-                $hasRoot = 1;
-            }
+            $node->path === $projectName && $hasRoot = 1;
             $pathInfo = $node->genPathInfo();
             $nodeTrees[$node->pathFormat] = $nodeTree = $nodeTrees[$node->pathFormat] ?? new NodeTree($pathInfo);
             $nodeTree->addNode($node, $node->id);
         }
-        if (! $hasRoot) {
-            // 如果未定义项目根节点, 则定义
-            $nodeTrees[$projectName] = self::initRootTree($projectName);
-        }
+        // 如果未定义项目根节点, 则定义
+        ! $hasRoot && $nodeTrees[$projectName] = self::initRootTree($projectName);
         $rootTrees = [$rootTree];
         while ($parentTree = array_pop($rootTrees)) {
             foreach ($nodeTrees as $path => $nodeTree) {
@@ -207,6 +192,7 @@ final class NodeManager {
         $nodeTree->traversal(function(NodeTree $child) {
             $isDir = !! $child->children;
             $familyPaths = $child->getParentIds();
+
             // 记录路径索引
             self::$pathTreeMapping[$child->pathFormat] = $familyPaths;
             $parentNode = $child->parent->nodes[key($child->parent->nodes)] ?? null;
@@ -215,6 +201,7 @@ final class NodeManager {
                 self::$idTreeMapping[$node->id] = $familyPaths;
                 // 如果节点为隐藏路径节点, 且父树中未记录该节点, 则添加到父树隐藏路径节点集中
                 $node->omissiblePath && ! $child->parent->hasHiddenChild($child->pathFormat) && $child->parent->addHiddenChild($child, $child->pathFormat);
+
                 ! isset($node->corsOrigins) && $node->corsOrigins = $parentNode->corsOrigins ?? [];
                 ! isset($node->methods) && $node->methods = $parentNode->methods ?? ['get' => null, 'head' => null];
                 if (! isset($node->render)) {
@@ -226,8 +213,6 @@ final class NodeManager {
                 ! isset($node->templateLayout) && $node->templateLayout = $parentNode->templateLayout ?? '';
                 // 继承enableCoroutine属性, 或初始化为false, 即不自动开启协程容器
                 ! isset($node->enableCoroutine) && $node->enableCoroutine = $parentNode->enableCoroutine ?? false;
-                // 继承hookCoroutine属性, 或根据enableCoroutine初始化
-                ! isset($node->hookCoroutine) && $node->hookCoroutine = $node->enableCoroutine;
                 ! isset($node->extra) && $node->extra = $parentNode->extra ?? [];
                 $node->isDir = $isDir;
             }
@@ -248,9 +233,7 @@ final class NodeManager {
      * @return NodeTree|null
      */
     public static function getTreeByPath(string $path): NodeTree|null {
-        if (! key_exists($path, self::$pathTreeMapping)) {
-            return null;
-        }
+        if (! key_exists($path, self::$pathTreeMapping)) return null;
         $paths = self::$pathTreeMapping[$path];
         return self::getTreeByPaths($paths);
     }
@@ -261,9 +244,7 @@ final class NodeManager {
      * @return NodeTree|null
      */
     public static function getTreeById(string $id): NodeTree|null {
-        if (! key_exists($id, self::$idTreeMapping)) {
-            return null;
-        }
+        if (! key_exists($id, self::$idTreeMapping)) return null;
         $paths = self::$idTreeMapping[$id];
         return self::getTreeByPaths($paths);
     }
@@ -275,10 +256,7 @@ final class NodeManager {
      */
     public static function getNode(string $id): Node|null {
         $nodeTree = self::getTreeById($id);
-        if ($nodeTree) {
-            return $nodeTree->getNode($id);
-        }
-        return null;
+        return $nodeTree?->getNode($id);
     }
 
     /**
@@ -288,9 +266,8 @@ final class NodeManager {
      */
     private static function getTreeByPaths(array $paths): NodeTree {
         $nodeTree = self::$nodeTree;
-        foreach ($paths as $path) {
+        foreach ($paths as $path)
             $nodeTree = $nodeTree->getChild($path);
-        }
         return $nodeTree;
     }
 
@@ -316,9 +293,8 @@ final class NodeManager {
             $hostTreeMapping = [];
             foreach (self::getRootTree()->children as $child) {
                 foreach ($child->nodes as $node) {
-                    foreach ($node->projectHosts ?? [] as $nodeHost) {
+                    foreach ($node->projectHosts ?? [] as $nodeHost)
                         $hostTreeMapping[$nodeHost] = $child;
-                    }
                 }
             }
         }

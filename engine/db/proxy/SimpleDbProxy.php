@@ -31,9 +31,7 @@ final class SimpleDbProxy extends DbProxy {
     public static function inst(string|null $dbAlias = null, bool $useDb = true): self {
         $dbAlias ??= DbConfig::DEFAULT_DB;
         static $mapping = [];
-        if (! key_exists($dbAlias, $mapping)) {
-            $mapping[$dbAlias] = self::new($dbAlias, $useDb);
-        }
+        ! key_exists($dbAlias, $mapping) && $mapping[$dbAlias] = self::new($dbAlias, $useDb);
         return $mapping[$dbAlias];
     }
 
@@ -45,9 +43,7 @@ final class SimpleDbProxy extends DbProxy {
      */
     public static function new(string $dbAlias, bool $useDb = true): self {
         $config = self::getDbConfig($dbAlias);
-        if (! $useDb) {
-            $config->dbName = null;
-        }
+        ! $useDb && $config->dbName = null;
         return new self($config);
     }
 
@@ -58,10 +54,8 @@ final class SimpleDbProxy extends DbProxy {
      */
     private static function getDbConfig(string $dbAlias): DbConfig {
         $config = Dce::$config->mysql->getConfig($dbAlias, true);
-        if (Utility::isArrayLike($config[0] ?? 0)) {
-            // 非分库配置, 无视主从库冗余库等, 取第一个主库配置即可
-            $config = $config[0];
-        }
+        // 非分库配置, 无视主从库冗余库等, 取第一个主库配置即可
+        Utility::isArrayLike($config[0] ?? 0) && $config = $config[0];
         return $config;
     }
 
@@ -78,9 +72,7 @@ final class SimpleDbProxy extends DbProxy {
             $connectorMapping[$hostKey] = new PdoDbConnector();
             $connectorMapping[$hostKey]->connect($this->config->dbName, $this->config->host, $this->config->dbUser, $this->config->dbPassword, $this->config->dbPort);
         }
-        if ($statement) {
-            $this->logStatement($statement, $params);
-        }
+        $statement && $this->logStatement($statement, $params);
         // 尝试开启事务
         SimpleTransaction::tryBegin($this, $connectorMapping[$hostKey]);
         return $connectorMapping[$hostKey];

@@ -92,8 +92,9 @@ final class LogManager {
     public static function response(RawRequest $rawRequest, mixed $data): void {
         if (! Dce::$config->log['access']['response'] && ! Dce::$config->log['access']['logfile_power']) return;
 
+        $request = RequestManager::current();
         $topic = sprintf('[%s] (应 %s) %s/%s', date('Y-m-d H:i:s'), $rawRequest->getClientInfo()['request'],
-            $rawRequest->getClientInfo()['ip'], RequestManager::current()->session->getId() ?? '');
+            $rawRequest->getClientInfo()['ip'], isset($request->session) ? $request->session->getId() : '');
         self::consoleFileLog($topic, Dce::$config->log['access']['response'], self::standardConfigLogfile(Dce::$config->log['access']),
             is_string($data) ? $data : json_encode($data, JSON_UNESCAPED_UNICODE));
     }

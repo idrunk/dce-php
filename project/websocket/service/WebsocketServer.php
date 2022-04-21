@@ -102,7 +102,7 @@ class WebsocketServer extends ServerMatrix {
     protected function takeoverOpen(Server $server, Request $request): void {
         Exception::catchRequest(function() use($server, $request) {
             $session = Session::newBySid(Session::getSid($request) ?: true);
-            $initialNode = NodeManager::exists(static::$rawRequestWebsocketClass::ConnectionPath);
+            $initialNode = NodeManager::exists(static::$rawRequestWebsocketClass::CONNECTION_PATH);
             $conn = Connection::from($request->fd, $this)->setProps($initialNode, $session, $request);
             SessionManager::inst()->connect($conn, SessionManager::EXTRA_WS);
             if ($initialNode) {

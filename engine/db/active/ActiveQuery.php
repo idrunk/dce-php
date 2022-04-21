@@ -6,31 +6,25 @@
 
 namespace dce\db\active;
 
-use drunk\Char;
-
+/**
+ * @template T of ActiveRecord
+ */
 abstract class ActiveQuery {
-    protected DbActiveRecord $activeRecord;
-
-    protected bool $arrayify = false;
-
-    protected array $relationNames = [];
+    /** @var list<ActiveRelation> */
+    readonly protected array $withRelations;
 
     /**
      * 设置即时加载关联数据
      * @param string ...$relationNames
      * @return $this
+     * @throws ActiveException
      */
     public function with(string ... $relationNames): static {
-        $this->relationNames = array_map(fn($relationName) => Char::camelize($relationName, true), $relationNames);
-        return $this;
-    }
-
-    /**
-     * 设置按数组返回查询结果而非活动记录对象
-     * @return $this
-     */
-    public function arrayify(): static {
-        $this->arrayify = true;
+        $this->withRelations = array_map(function($name) {
+            $relation = static::getActiveRecordClass()::getActiveRelation(static::getActiveRecordClass()::toModelKey($name));
+            ! $relation && throw (new ActiveException(ActiveException::RELATION_NAME_INVALID))->format($name);
+            return $relation;
+        }, $relationNames);
         return $this;
     }
 
@@ -46,26 +40,25 @@ abstract class ActiveQuery {
      *      relationMatch(new ArrayClass(['a'=>null, 'c'=>2]), new ArrayClass(['a'=>null, 'b'=>1]), ['a'=>'a'], ), // false
      *  );
      * ```
-     * @param array|\ArrayAccess $array1
-     * @param array|\ArrayAccess $array2
-     * @param array $relation
+     * @param ActiveRecord $foreignRecord
+     * @param ActiveRecord $primaryRecord
+     * @param array $relationColumns
      * @return bool
      */
-    protected static function relationMatch($array1, $array2, array $relation): bool {
-        foreach ($relation as $k1=>$k2) {
-            // notice 不能用null值比较关联, 无意义, 所以有null则为不匹配
-            if (! isset($array1[$k1]) || ! isset($array2[$k2]) || $array1[$k1] != $array2[$k2]) {
-                return false;
-            }
-        }
+    protected static function relationRecordMatch(ActiveRecord $foreignRecord, ActiveRecord $primaryRecord, array $relationColumns): bool {
+        foreach ($relationColumns as ['modelPrimary' => $modelPrimary, 'modelForeign' => $modelForeign])
+            if (($foreignRecord->$modelForeign ?? null) !== ($primaryRecord->$modelPrimary ?? null)) return false;
         return true;
     }
 
-    abstract public function __construct(DbActiveRecord $activeRecord);
+    /**
+     * @param class-string<T> $activeRecordClass
+     */
+    abstract public function __construct(string $activeRecordClass);
 
     /**
-     * 取活动记录实例
-     * @return ActiveRecord
+     * 取活动记录类名
+     * @return class-string<T>
      */
-    abstract public function getActiveRecord(): ActiveRecord;
+    abstract public function getActiveRecordClass(): string;
 }

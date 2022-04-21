@@ -51,7 +51,7 @@ class Loader {
             $mappedFile = self::autoloadFile($prefix, $relativeClass);
             if ($mappedFile) {
                 self::triggerOnLoad($className);
-                return $mappedFile;
+                return true;
             }
             $prefix = rtrim($prefix, '\\');
         }
@@ -94,24 +94,19 @@ class Loader {
         $className = $prefix . $relativeClass;
         foreach (self::$mapping as $pattern => $dirBases) {
             $pattern = str_replace('\\', '\\\\', $pattern);
-            if (! fnmatch($pattern, $className)) {
+            if (! fnmatch($pattern, $className))
                 continue; // 模式匹配map中符合规则的库目录地址
-            }
             foreach ($dirBases as $dirBase) {
                 if ($dirBase instanceof Closure) {
-                    if (! class_exists($className)) {
-                        // 因为自动加载会尝试通配符下所有类, 而这对于用户自定义方法来说都是同一个方法, 没有意义, 所以我们可以判断当类已存在时无需再回调
-                        call_user_func($dirBase, $className);
-                    }
+                    // 因为自动加载会尝试通配符下所有类, 而这对于用户自定义方法来说都是同一个方法, 没有意义, 所以我们可以判断当类已存在时无需再回调
+                    ! class_exists($className) && call_user_func($dirBase, $className);
                 } else {
                     $path = $dirBase . str_replace('\\', '/', $relativeClass) . '.php';
-                    if (! self::once($path)) {
+                    if (! self::once($path) && ! self::once(preg_replace('/\w+(?=\.php$)/', 'units', $path)))
                         continue;
-                    }
                 }
-                if (class_exists($className)) {
+                if (class_exists($className))
                     return true;
-                }
             }
         }
         return false;
@@ -125,12 +120,8 @@ class Loader {
      */
     public static function prepare(string $namespaceWildcard, string|Closure $dirBase, bool $isPrepend = false): void {
         $namespaceWildcard = ltrim($namespaceWildcard, '\\');
-        if (! $dirBase instanceof Closure) {
-            $dirBase = rtrim($dirBase, '\\/') . '/';
-        }
-        if (! key_exists($namespaceWildcard, self::$mapping)) {
-            self::$mapping[$namespaceWildcard] = [];
-        }
+        ! $dirBase instanceof Closure && $dirBase = rtrim($dirBase, '\\/') . '/';
+        ! key_exists($namespaceWildcard, self::$mapping) && self::$mapping[$namespaceWildcard] = [];
         if (! in_array($dirBase, self::$mapping[$namespaceWildcard])) {
             if ($isPrepend) {
                 array_unshift(self::$mapping[$namespaceWildcard], $dirBase);
@@ -147,9 +138,7 @@ class Loader {
      */
     public static function preload(string $className, string|Closure $classPath): void {
         $className = ltrim($className, '\\');
-        if (! key_exists($className, self::$classMapping)) {
-            self::$classMapping[$className] = $classPath;
-        }
+        ! key_exists($className, self::$classMapping) && self::$classMapping[$className] = $classPath;
     }
 
     /**
@@ -158,13 +147,11 @@ class Loader {
      * @return bool
      */
     public static function dirOnce(string $dir): bool {
-        if (! file_exists($dir)) {
+        if (! file_exists($dir))
             return false;
-        }
         $lists = glob($dir . '*.php') ?: [];
-        foreach ($lists as $file) {
+        foreach ($lists as $file)
             self::once($file);
-        }
         return !! $lists;
     }
 
@@ -174,9 +161,8 @@ class Loader {
      * @return bool
      */
     public static function once(string $path): bool {
-        if (! file_exists($path)) {
+        if (! file_exists($path))
             return false;
-        }
         require_once($path);
         return true;
     }

@@ -35,9 +35,7 @@ final class IdgServer {
      */
     public static function new(IdgStorage $storage, string $configDir): self {
         static $inst;
-        if (null === $inst) {
-            $inst = new self($storage, $configDir);
-        }
+        null === $inst && $inst = new self($storage, $configDir);
         return $inst;
     }
 
@@ -95,13 +93,10 @@ final class IdgServer {
         static $configs = [];
         if (! key_exists($tag, $configs)) {
             $configPath = $this->configDir . "/{$tag}.php";
-            if (! is_file($configPath)) {
-                throw (new IdgException(IdgException::CONFIG_ITEM_MISSING))->format($configPath);
-            }
+            ! is_file($configPath) && throw (new IdgException(IdgException::CONFIG_ITEM_MISSING))->format($configPath);
             $configs[$tag] = IdgBatch::new()->setProperties(include($configPath));
-            if (! in_array($configs[$tag]->type ?? 0, [IdgBatch::TYPE_INCREMENT, IdgBatch::TYPE_TIME])) {
+            if (! in_array($configs[$tag]->type ?? 0, [IdgBatch::TYPE_INCREMENT, IdgBatch::TYPE_TIME]))
                 throw (new IdgException(IdgException::PROPERTY_MAY_TYPE_ERROR))->format($configPath);
-            }
         }
         return $configs[$tag];
     }

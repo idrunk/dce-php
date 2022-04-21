@@ -8,7 +8,6 @@ namespace dce\pool;
 
 use dce\log\LogManager;
 use drunk\Utility;
-use Swoole\Coroutine\Barrier;
 use Swoole\Coroutine\WaitGroup;
 use Throwable;
 
@@ -34,12 +33,8 @@ abstract class Pool {
     private int $retries = 0;
 
     private function __construct(string $configClass) {
-        if (! is_subclass_of($configClass, PoolProductionConfig::class)) {
-            throw new PoolException(PoolException::INVALID_CONFIG_CLASS);
-        }
-        if (! is_subclass_of(self::$channelClass, ChannelAbstract::class)) {
-            throw new PoolException(PoolException::INVALID_CHANNEL);
-        }
+        ! is_subclass_of($configClass, PoolProductionConfig::class) && throw new PoolException(PoolException::INVALID_CONFIG_CLASS);
+        ! is_subclass_of(self::$channelClass, ChannelAbstract::class) && throw new PoolException(PoolException::INVALID_CHANNEL);
         $this->productMapping = PoolProduct::new();
         $this->configClass = $configClass;
     }
@@ -49,9 +44,7 @@ abstract class Pool {
      * @param string $channelClass
      */
     public static function setChannelClass(string $channelClass) {
-        if (is_subclass_of($channelClass, ChannelAbstract::class)) {
-            self::$channelClass = $channelClass;
-        }
+        is_subclass_of($channelClass, ChannelAbstract::class) && self::$channelClass = $channelClass;
     }
 
     /**
@@ -64,9 +57,7 @@ abstract class Pool {
     final protected static function getInstance(string $configClass, string ... $identities): static {
         array_push($identities, $configClass);
         $identity = implode('-', $identities);
-        if (! key_exists($identity, self::$instMapping)) {
-            self::$instMapping[$identity] = new static($configClass);
-        }
+        ! key_exists($identity, self::$instMapping) && self::$instMapping[$identity] = new static($configClass);
         return self::$instMapping[$identity];
     }
 
@@ -78,10 +69,8 @@ abstract class Pool {
      */
     public function setConfigs(array $configs, bool $forceReplace = false): static {
         // mark 若后续做热更新, 则也需同时处理InstanceMapping的记录
-        if (! $forceReplace && $this->configs) {
-            // 如果无需强制更新配置, 且当前已有配置, 则不继续操作
-            return $this;
-        }
+        // 如果无需强制更新配置, 且当前已有配置, 则不继续操作
+        if (! $forceReplace && $this->configs) return $this;
         // 支持单池配置
         if (! Utility::isArrayLike(current($configs))) {
             $configs = [$configs];
@@ -157,11 +146,8 @@ abstract class Pool {
      * @return int|null
      */
     protected function getConfigIndex(array $config): int|null {
-        foreach ($this->configs as $i => $configInstance) {
-            if ($configInstance->match($config)) {
-                return $i;
-            }
-        }
+        foreach ($this->configs as $i => $configInstance)
+            if ($configInstance->match($config)) return $i;
         return null;
     }
 
@@ -253,10 +239,20 @@ abstract class Pool {
      * 重试容器，容器中代码执行时，若连接异常断开，则可被自动重新执行以便连接池重连
      * @param callable $callback
      * @param ChannelAbstract $thrownChannel
-     * @param Barrier|null $barrier
+     * @param WaitGroup|null $waitGroup
+     * @return int
      */
-    final public function retryableContainer(callable $callback, ChannelAbstract $thrownChannel, Barrier $barrier = null): void {
-        $barrier !== null ? go(fn($barrier) => $this->tryCall($callback, $thrownChannel), $barrier) : $this->tryCall($callback, $thrownChannel);
+    final public function retryableContainer(callable $callback, ChannelAbstract $thrownChannel, WaitGroup $waitGroup = null): int {
+        if ($waitGroup) {
+            $waitGroup->add();
+            $cid = go(function() use($callback, $thrownChannel, $waitGroup) {
+                $this->tryCall($callback, $thrownChannel);
+                $waitGroup->done();
+            });
+        } else {
+            $this->tryCall($callback, $thrownChannel);
+        }
+        return $cid ?? 0;
     }
 
     private function tryCall(callable $callback, ChannelAbstract $thrownChannel): void {

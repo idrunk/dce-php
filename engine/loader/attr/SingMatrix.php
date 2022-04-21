@@ -7,7 +7,7 @@
 namespace dce\loader\attr;
 
 abstract class SingMatrix {
-    protected static $mapping = [];
+    protected static array $mapping = [];
 
     public function __construct(mixed ... $args) {}
 

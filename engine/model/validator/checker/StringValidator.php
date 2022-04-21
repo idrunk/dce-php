@@ -15,10 +15,10 @@ class StringValidator extends TypeChecker {
     protected int $max;
 
     /**
-     * @param string|int|float|null|false $value
+     * @param mixed $value
      * @return ValidatorException|null
      */
-    protected function check(string|int|float|null|false $value):ValidatorException|null {
+    protected function check(mixed $value):ValidatorException|null {
         if (! is_string($value)) {
             $this->addError($this->getGeneralError(null, lang(ValidatorException::INVALID_STRING)));
         } else {

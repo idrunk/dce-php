@@ -7,13 +7,12 @@
 namespace dce\db\entity;
 
 use Attribute;
-use dce\db\query\builder\RawBuilder;
 
 #[Attribute(Attribute::TARGET_PROPERTY)]
 class DbField extends Field {
     /**
      * DbField constructor.
-     * @param string|null $type 字段类型, 已在FieldType类定义为常量
+     * @param FieldType|null $type 字段类型, 已在FieldType类定义为常量
      * @param int $length 字符串或Decimal字段最大字符数或数值字段最大字节
      * @param string|int|float|false $default 默认值
      * @param string $comment 字段注释
@@ -22,10 +21,9 @@ class DbField extends Field {
      * @param bool $increment 是否自增
      * @param bool $unsigned 是否无符号
      * @param int $precision 允许小数位
-     * @throws \dce\db\query\QueryException
      */
     public function __construct(
-        string|null $type = null,
+        FieldType|null $type = null,
         int $length = 0,
         string|int|float|false $default = false,
         string $comment = '',
@@ -35,23 +33,11 @@ class DbField extends Field {
         bool $unsigned = true,
         int $precision = 0,
     ) {
-        if (false !== $default) {
-            $this->setDefault($default);
-        }
-        if ('' !== $comment) {
-            $this->setComment($comment);
-        }
-        if ($type) {
-            $this->setType($type, $length, $unsigned, $precision);
-        }
-        if ($primary) {
-            $this->setPrimary();
-        }
-        if ($null) {
-            $this->setNull();
-        }
-        if ($increment) {
-            $this->setIncrement();
-        }
+        false !== $default && $this->setDefault($default);
+        '' !== $comment && $this->setComment($comment);
+        $type && $this->setType($type, $length, $unsigned, $precision);
+        $primary && $this->setPrimary();
+        $null && $this->setNull();
+        $increment && $this->setIncrement();
     }
 }

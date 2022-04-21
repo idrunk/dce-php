@@ -10,7 +10,7 @@ use dce\Dce;
 use dce\rpc\RpcClient;
 use dce\service\server\Connection;
 use dce\service\server\ConnectionException;
-use dce\storage\redis\DceRedis;
+use dce\storage\redis\RedisProxy;
 use drunk\Structure;
 use rpc\dce\service\RpcServerApi;
 use Throwable;
@@ -39,13 +39,11 @@ abstract class SessionManager {
 
     /** 初始化处理Session配置 */
     private static function initConfig(): void {
-        if (isset(self::$config)) {
+        if (isset(self::$config))
             return;
-        }
         self::$config = Dce::$config->session;
-        if (! self::$config['manager_class']) {
-            self::$config['manager_class'] = DceRedis::isAvailable() ? '\dce\project\session\SessionManagerRedis' : '\dce\project\session\SessionManagerFile';
-        }
+        if (! self::$config['manager_class'])
+            self::$config['manager_class'] = RedisProxy::isAvailable() ? '\dce\project\session\SessionManagerRedis' : '\dce\project\session\SessionManagerFile';
     }
 
     /**
@@ -139,9 +137,8 @@ abstract class SessionManager {
      * @param mixed $value
      */
     public function setSession(int $mid, string $key, mixed $value): void {
-        foreach ($this->getSessionInstances($mid) as $session) {
+        foreach ($this->getSessionInstances($mid) as $session)
             $session->set($key, $value);
-        }
     }
 
     /**
@@ -150,9 +147,8 @@ abstract class SessionManager {
      * @param string $key
      */
     public function deleteSession(int $mid, string $key): void {
-        foreach ($this->getSessionInstances($mid) as $session) {
+        foreach ($this->getSessionInstances($mid) as $session)
             $session->delete($key);
-        }
     }
 
     /**
@@ -160,9 +156,8 @@ abstract class SessionManager {
      * @param int $mid
      */
     public function destroySession(int $mid): void {
-        foreach ($this->getSessionInstances($mid) as $session) {
+        foreach ($this->getSessionInstances($mid) as $session)
             $session->destroy();
-        }
     }
 
     /**

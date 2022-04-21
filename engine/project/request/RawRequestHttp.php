@@ -29,6 +29,8 @@ abstract class RawRequestHttp extends RawRequest {
 
     private array $locatedArguments = [];
 
+    private bool $pathInQueryString;
+
     /**
      * 取请求头信息
      * @param string|null $key {string: 某个头, null: 全部头信息}
@@ -100,13 +102,13 @@ abstract class RawRequestHttp extends RawRequest {
      * @return string
      */
     protected function getPath(): string {
-        $path = str_starts_with($this->queryString, '/') ? $this->queryString : $this->requestUri;
+        $this->pathInQueryString = str_starts_with($this->queryString, '/');
+        $path = $this->pathInQueryString ? $this->queryString : $this->requestUri;
         $nodeTree = NodeManager::getTreeByHost($this->host);
         if ($nodeTree) {
             $slash = str_starts_with($path, '/') ? '/' : '';
-            if (! str_starts_with($path, "{$slash}{$nodeTree->projectName}")) {
+            if (! str_starts_with($path, "{$slash}{$nodeTree->projectName}"))
                 $path = "{$nodeTree->projectName}{$path}";
-            }
         }
         return $path;
     }
@@ -153,15 +155,11 @@ abstract class RawRequestHttp extends RawRequest {
         // 补充Http请求参数
         $post = $this->supplementHttpRequest($request);
         // 删除Dce节点路径信息相关Url参数
-        $key = key($request->get);
-        if ('' === ($request->get[$key] ?? null)) {
-            unset($request->get[$key]);
-        }
-        $request->get += $this->locatedArguments;
+        if ($this->pathInQueryString)
+            unset($request->get[key($request->get)]);
+        $request->get = $this->locatedArguments + $request->get;
         $request->request = $request->get + $post;
-        if (isset($this->rawData)) {
-            $request->rawData = $this->rawData;
-        }
+        if (isset($this->rawData)) $request->rawData = $this->rawData;
     }
 
     /**

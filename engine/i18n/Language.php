@@ -22,7 +22,6 @@ class Language implements Stringable, Constructor {
      * https://zh.wikipedia.org/wiki/ISO_639-1
      */
     public const ZH  = 'zh';
-
     public const EN = 'en';
 
     /** @var int[] 语言码索引映射表  */

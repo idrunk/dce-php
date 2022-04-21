@@ -23,8 +23,8 @@ class ActiveException extends ModelException {
     #[Language(['关系名 %s 无效'])]
     public const RELATION_NAME_INVALID = 1411;
 
-    #[Language(['%s 关联getter方法未包含 %s 为键的数据'])]
-    public const NO_FOREIGN_IN_VIA_GETTER = 1412;
+    #[Language(['主活动记录中缺少与 %s 关系数据关联的字段 %s'])]
+    public const PRIMARY_RECORD_NO_FOREIGN_COLUMN = 1412;
 
     #[Language(['未设置有效的映射关系'])]
     public const NO_RELATION_MAPPING = 1420;

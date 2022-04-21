@@ -6,6 +6,7 @@
 
 namespace dce\sharding\parser\mysql\statement;
 
+use dce\base\ParserTraverResult;
 use dce\sharding\parser\mysql\MysqlFunctionParser;
 use dce\sharding\parser\mysql\MysqlStatementParser;
 use dce\sharding\parser\MysqlParser;
@@ -33,7 +34,7 @@ class MysqlCaseParser extends MysqlStatementParser {
             } else if ('ELSE' === $wordUpper) {
                 $this->else = $this->parseWithOffset(null);
             } else if ('END' === $wordUpper) {
-                return self::TRAVERSE_CALLBACK_BREAK;
+                return ParserTraverResult::Break;
             } else {
                 throw (new StatementParserException(StatementParserException::INVALID_STATEMENT_CASE_UNCLOSE))->format($word);
             }

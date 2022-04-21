@@ -12,16 +12,13 @@ use dce\project\request\RawRequest;
 use dce\project\request\RequestException;
 
 abstract class RawRequestConnection extends RawRequest {
+    protected const PATH_SEPARATOR = ';'; // 路径内容分隔符
+    protected const REQUEST_SEPARATOR = ':'; // 路径与请求ID分隔符
+
     /** @var bool 是否正建立连接 */
     public bool $isConnecting = false;
     /** @var Connection 当前连接 */
     public Connection $connection;
-
-    /** @var string 路径内容分隔符 */
-    protected const PATH_SEPARATOR = ';';
-
-    /** @var string 路径与请求ID分隔符 */
-    protected const REQUEST_SEPARATOR = ':';
 
     /** @var int 连接描述符 */
     protected int $fd;
@@ -43,7 +40,7 @@ abstract class RawRequestConnection extends RawRequest {
 
     /** @inheritDoc */
     public function getClientInfo(): array {
-        $clientInfo = $this->getServer()->getServer()->getClientInfo($this->fd);
+        $clientInfo = $this->getServer()->getServer()->getClientInfo($this->fd) ?: ['remote_ip' => '', 'remote_port' => 0];
         $clientInfo['request'] = "$this->method {$clientInfo['remote_ip']}/$this->path:" . ($this->requestId ?? '');
         $clientInfo['ip'] = $clientInfo['remote_ip'];
         $clientInfo['port'] = $clientInfo['remote_port'];

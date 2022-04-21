@@ -12,15 +12,11 @@ use dce\project\request\RawRequest;
 use dce\project\request\Request;
 
 abstract class Renderer {
-    private const TYPE_RAW = 'raw';
-
+    public const TYPE_RAW = 'raw';
     public const TYPE_JSON = 'json';
-
     public const TYPE_JSONP = 'jsonp';
-
     public const TYPE_XML = 'xml';
-
-    private const TYPE_TEMPLATE = 'template';
+    public const TYPE_TEMPLATE = 'template';
 
     // 后续若需要可通过动态维护这个映射表来使用用户自定义渲染器
     private static array $renderMapping = [
@@ -40,9 +36,8 @@ abstract class Renderer {
      * @throws RenderException
      */
     final public static function extend(string $typeName, string $renderClass): void {
-        if (! is_subclass_of($renderClass, self::class)) {
+        if (! is_subclass_of($renderClass, self::class))
             throw (new RenderException(RenderException::RENDERER_EXTENDS_ERROR))->format(self::class);
-        }
         self::$renderMapping[strtolower($typeName)] = $renderClass;
     }
 
@@ -54,9 +49,8 @@ abstract class Renderer {
      */
     final public static function inst(Controller $controller, bool $isResponseMode): static {
         ! key_exists($render = self::getRender($controller->request), self::$renderMapping) && $render = self::TYPE_TEMPLATE;
-        if (! key_exists($render, self::$instanceMapping)) {
+        if (! key_exists($render, self::$instanceMapping))
             self::$instanceMapping[$render] = new self::$renderMapping[$render];
-        }
         self::$instanceMapping[$render]->prepare($controller, $isResponseMode);
         return self::$instanceMapping[$render];
     }
@@ -106,14 +100,12 @@ abstract class Renderer {
      */
     final public function render(Controller $controller, bool $isResponseMode, mixed $data = false, string|false|null $path = null): void {
         if ($isResponseMode) {
-            if ($controller->rendered) {
+            if ($controller->rendered)
                 return;
-            }
             $this->setContentType($controller->request->rawRequest);
             $dataId = $this->beforeRender($controller);
-            if ($controller->rendered) {
+            if ($controller->rendered)
                 return;
-            }
             $content = $this->rendering($controller, $data);
             $controller->response($content);
             $this->afterRender($controller, $dataId, $content);
@@ -132,9 +124,8 @@ abstract class Renderer {
         if ($controller->request->node->renderCache & 4) {
             $dataId = md5(serialize($controller->getAllAssignedStatus()));
             $cachedDataId = Dce::$cache->shmDefault->get(['api_data_id', $controller->request->node->pathFormat]);
-            if ($dataId === $cachedDataId && $cachedPage = Dce::$cache->shmDefault->get(['page_data', $controller->request->node->pathFormat])) {
+            if ($dataId === $cachedDataId && $cachedPage = Dce::$cache->shmDefault->get(['page_data', $controller->request->node->pathFormat]))
                 $controller->response($cachedPage);
-            }
         }
         return $dataId;
     }
@@ -146,9 +137,8 @@ abstract class Renderer {
      * @param string $content
      */
     private function afterRender(Controller $controller, string $dataId, string $content): void {
-        if ($controller->request->node->renderCache & 1) {
+        if ($controller->request->node->renderCache & 1)
             Dce::$cache->shmDefault->set(['api_data', $controller->request->node->pathFormat], $controller->getAllAssignedStatus());
-        }
         if ($controller->request->node->renderCache & 4) {
             Dce::$cache->shmDefault->set(['api_data_id', $controller->request->node->pathFormat], $dataId);
             Dce::$cache->shmDefault->set(['page_data', $controller->request->node->pathFormat], $content);

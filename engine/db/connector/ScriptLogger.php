@@ -15,7 +15,7 @@ abstract class ScriptLogger {
     }
 
     private static function genUniqueId(): string {
-        return (microtime(1) * 10000 << 14) + mt_rand(0, 16383);
+        return (floor(microtime(1) * 10000) << 14) + mt_rand(0, 16383);
     }
 
     public static function trigger(mixed ... $args): string {

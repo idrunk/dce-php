@@ -10,9 +10,12 @@ use dce\pool\PoolProductionConfig;
 use dce\pool\Pool;
 use dce\pool\PoolException;
 use Redis;
+use RedisException;
 use Throwable;
 
 class RedisPool extends Pool {
+    private const REGEXP_CONNECTION_LOST = '/Connection\s+lost|Operation\s+timed\s+out|error\s+on\s+connection/i';
+
     /**
      * @param PoolProductionConfig $config
      * @return Redis
@@ -31,6 +34,6 @@ class RedisPool extends Pool {
     }
 
     protected function retryable(Throwable $throwable): bool {
-        return false;
+        return $throwable instanceof RedisException && preg_match(self::REGEXP_CONNECTION_LOST, $throwable->getMessage());
     }
 }

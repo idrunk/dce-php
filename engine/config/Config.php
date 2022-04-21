@@ -202,27 +202,27 @@ class Config implements ArrayAccess {
      * @throws ConfigException
      * @throws \ReflectionException
      */
-    public function __set(string $key, $value) {
+    public function __set(string $key, mixed $value) {
         $this->set($key, $value);
     }
 
     /** @inheritDoc */
-    public function offsetExists($offset) {
+    public function offsetExists(mixed $offset): bool {
         return key_exists($offset, $this->arrayify());
     }
 
     /** @inheritDoc */
-    public function offsetGet($offset) {
+    public function offsetGet(mixed $offset): mixed {
         return $this->get($offset);
     }
 
     /** @inheritDoc */
-    public function offsetSet($offset, $value) {
+    public function offsetSet(mixed $offset, mixed $value): void {
         $this->set($offset, $value);
     }
 
     /** @inheritDoc */
-    public function offsetUnset($offset) {
+    public function offsetUnset(mixed $offset): void {
         $this->del($offset);
     }
 }

@@ -7,16 +7,6 @@
 namespace dce\sharding\parser;
 
 abstract class SqlParser extends StatementParser {
-    protected const TRAVERSE_CALLBACK_EXCEPTION = 0;
-
-    protected const TRAVERSE_CALLBACK_RETURN = 1;
-
-    protected const TRAVERSE_CALLBACK_BREAK = 2;
-
-    protected const TRAVERSE_CALLBACK_CONTINUE = 3;
-
-    protected const TRAVERSE_CALLBACK_STEP = 4;
-
     protected const BACKSLASH = '\\'; // 反斜杠
 
     protected static array $openBrackets = ['(',];
@@ -132,6 +122,11 @@ abstract class SqlParser extends StatementParser {
         return $compoundOperator ?: $operator;
     }
 
+    /**
+     * 是否分割型符号（分割元素的符号，除了下划线外的单字节符号都属于分割型符号）
+     * @param string $char
+     * @return bool
+     */
     protected function isBoundary(string $char): bool {
         $ord = ord($char);
         return $char === ''

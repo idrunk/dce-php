@@ -10,6 +10,7 @@ use Closure;
 use dce\base\SwooleUtility;
 use dce\db\connector\DbConnector;
 use dce\db\connector\DbPool;
+use dce\db\connector\PdoDbConnector;
 use dce\db\proxy\TransactionException;
 use dce\db\Query;
 use dce\db\query\builder\StatementInterface;
@@ -20,8 +21,8 @@ use dce\pool\ChannelAbstract;
 use dce\sharding\id_generator\IdgException;
 use dce\sharding\middleware\data_processor\DbReadProcessor;
 use dce\sharding\middleware\data_processor\DbWriteProcessor;
+use drunk\Structure;
 use Iterator;
-use Swoole\Coroutine\Barrier;
 use Swoole\Coroutine\WaitGroup;
 
 class DbMiddleware extends Middleware {
@@ -45,32 +46,34 @@ class DbMiddleware extends Middleware {
      * @throws MiddlewareException
      * @throws QueryException
      * @throws TransactionException
-     * @throws \Swoole\Exception
+     * @throws IdgException
      */
     protected function route(): void {
         $isWrite = $this->directiveParser->isWrite();
         if ($this->directiveParser->isSharding()) {
             $this->config = $this->directiveParser->getSharding();
             $dbMapping = $this->shardingRoute();
-            $barrier = SwooleUtility::inSwoole() ? Barrier::make() : null;
+            $waitGroup = SwooleUtility::inSwoole() ? new WaitGroup : null;
             $thrownChannel = ChannelAbstract::autoNew(64);
             // Swoole环境则并发查询分库 (不做什么分离设计了, 直接放这直观方便)
             foreach ($dbMapping as $dbAlias => $statementSet) {
                 $connectorPool = DbPool::inst($dbAlias, $isWrite)->setConfigs(Dce::$config->mysql->getConfig($dbAlias, $isWrite), false);
                 // warn 容器必须放在这层，若放在外层，可能因多次执行导致数据混淆，放在内层则会导致同库并发顺序问题
-                $connectorPool->retryableContainer(function() use ($statementSet, $dbAlias, $connectorPool) {
-                    // 同库不并发 (除了跨库更新的情况外, 当前查询不会拆为多条, 可以避免可能出现的并发问题)
-                    foreach ($statementSet as $statement) $this->directDistribute($statement, $dbAlias, $connectorPool);
-                }, $thrownChannel, $barrier);
+                // 同库不并发 (除了跨库更新的情况外, 当前查询不会拆为多条, 可以避免可能出现的并发问题)
+                $cid = $connectorPool->retryableContainer(
+                    fn() => Structure::forEach($statementSet, fn($statement) => $this->directDistribute($statement, $dbAlias, $connectorPool)), $thrownChannel, $waitGroup);
+
+                // 注册协程自动释放，解决未知原因导致长时间闲置连接导致断开时，PDO::prepare()可能需等待960秒才能释放协程抛出连接已断开的异常的问题
+                PdoDbConnector::registerCoroutineAutoReleaseOrHandle($cid);
             }
-            $barrier && Barrier::wait($barrier);
+            $waitGroup && $waitGroup->wait();
             ! $thrownChannel->isEmpty() && throw $thrownChannel->pop();
         } else {
             // 将非分库查询全部打发给default连接器处理, 直接返回其查询结果
             $dbConfigs = Dce::$config->mysql->getConfig($this->dbProxy->dbAlias, $isWrite);
             $connectorPool = DbPool::inst($this->dbProxy->dbAlias, $isWrite)->setConfigs($dbConfigs, false);
             // 若打开了事务开关, 则尝试开启事务
-            $transaction = ShardingTransaction::tryBegin(ShardingTransaction::NO_SHARDING_ALIAS, $this->dbProxy->dbAlias, $connectorPool);
+            $transaction = ShardingTransaction::tryBegin(ShardingTransaction::ALIAS_NO_SHARDING, $this->dbProxy->dbAlias, $connectorPool);
             $this->inTransaction = $transaction instanceof ShardingTransaction;
             $this->connector = $this->inTransaction ? $transaction->getConnector() : $transaction;
         }
@@ -109,7 +112,7 @@ class DbMiddleware extends Middleware {
      * 分库路由, 根据待插入数据或者查询条件定位到待操作数据库, 并将库与查询语句关联返回
      * @return array
      * @throws QueryException
-     * @throws MiddlewareException
+     * @throws MiddlewareException|IdgException
      */
     private function shardingRoute(): array {
         $dbMapping = [];
@@ -251,6 +254,7 @@ class DbMiddleware extends Middleware {
      * 根据筛选条件定位并列出结果记录所在的分库名
      * @param array $conditions
      * @return array
+     * @throws IdgException
      */
     private function navigationByCondition(array $conditions): array {
         $dbSet = [];
@@ -289,7 +293,9 @@ class DbMiddleware extends Middleware {
     /**
      * 根据分库条件定位目标分库
      * @param WhereConditionSchema $condition
+     * @param string|null $shardingTag
      * @return array
+     * @throws IdgException
      */
     private function locatingDbByCondition(WhereConditionSchema $condition, string|null $shardingTag): array {
         $values = $condition->value;

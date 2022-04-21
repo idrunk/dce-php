@@ -138,6 +138,10 @@ class Exception extends \Exception implements Decorator {
         return false;
     }
 
+    private static function getRequest(Throwable $throwable): Request|null {
+        return $throwable->request ?? RequestManager::current();
+    }
+
     public static function catchRequest(callable $callable, mixed ... $params): void {
         try {
             call_user_func($callable, ... $params);
@@ -150,7 +154,7 @@ class Exception extends \Exception implements Decorator {
 
             LogManager::exception($throwable, $isSimple); // 打印及记录日志
 
-            if (($request = $throwable->request ?? null) && $request instanceof Request) {
+            if (($request = self::getRequest($throwable)) && $request instanceof Request) {
                 // 否则如果是http异常或开发模式，则响应异常内容，否则响应http500
                 $exception = $isSimple || Dce::isDevEnv() ? $throwable : new RequestException(RequestException::INTERNAL_SERVER_ERROR);
                 if ($request->rawRequest instanceof RawRequestHttp) {

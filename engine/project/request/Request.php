@@ -170,13 +170,12 @@ class Request {
         ! method_exists($class, $method) && throw (new RequestException(RequestException::CONTROLLER_METHOD_INVALID))->format($method);
 
         if (SwooleUtility::inSwoole()) {
-            $this->node->hookCoroutine && SwooleUtility::coroutineHook();
             // 如果配置了开启协程, 且当前未在协程中, 则创建协程容器执行控制器 (在server的onRequest等回调中, 依靠server配置是否开启协程而不是node配置)
             if ($this->node->enableCoroutine && ! SwooleUtility::inCoroutine()) {
                 Coroutine\run(fn() => $this->runController($class, $method, true));
                 return;
             }
-        } else if ($this->node->hookCoroutine || $this->node->enableCoroutine) {
+        } else if ($this->node->enableCoroutine) {
             throw new RequestException(RequestException::COROUTINE_NEED_SWOOLE);
         }
         $this->runController($class, $method);

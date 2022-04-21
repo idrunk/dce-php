@@ -40,11 +40,8 @@ class RequestManager {
         self::$requestMapping[self::currentId()] = WeakReference::create($request);
         // 每隔一定轮数清理一次过期请求的残留映射记录
         if (! (count(self::$requestMapping) % self::CLEAR_MOD)) {
-            foreach (self::$requestMapping as $k => $requestRef) {
-                if (! $requestRef->get()) {
-                    unset(self::$requestMapping[$k]);
-                }
-            }
+            foreach (self::$requestMapping as $k => $requestRef)
+                if (! $requestRef->get()) unset(self::$requestMapping[$k]);
         }
     }
 
@@ -58,9 +55,8 @@ class RequestManager {
     public static function currentId(): int {
         $requestId = 0;
         if (SwooleUtility::inSwoole() && ($requestId = Coroutine::getCid()) > 0) {
-            while (($pcid = Coroutine::getPcid($requestId)) > 0) {
+            while (($pcid = Coroutine::getPcid($requestId)) > 0)
                 $requestId = $pcid;
-            }
         }
         return $requestId;
     }

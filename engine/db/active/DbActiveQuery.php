@@ -14,36 +14,22 @@ use dce\db\query\builder\Statement\SelectStatement;
 use dce\model\Model;
 use dce\model\ModelException;
 use Iterator;
-use JetBrains\PhpStorm\ArrayShape;
 
-/**
- * @template T
- */
+/** @template T of DbActiveRecord */
 class DbActiveQuery extends ActiveQuery {
-    /** @var T $activeRecord */
-    protected DbActiveRecord $activeRecord;
-
     private Query $query;
 
-    #[ArrayShape([[
-        'relation_queue' => 'array',
-        'relation_data' => 'array'
-    ]])]
-    private array $relationData = [];
-
+    /** @param class-string<T|DbActiveRecord> $activeRecordClass */
     public function __construct(
-        DbActiveRecord $activeRecord,
+        readonly protected string $activeRecordClass,
     ) {
-        $this->activeRecord = $activeRecord;
-        $this->query = new Query($this->activeRecord::getProxy());
-        $this->query->table($this->activeRecord::getTableName());
+        $this->query = new Query($this->getActiveRecordClass()::getProxy());
+        $this->query->table($this->getActiveRecordClass()::getTableName());
     }
 
-    /**
-     * @return T
-     */
-    public function getActiveRecord(): DbActiveRecord {
-        return $this->activeRecord;
+    /** @return class-string<T|DbActiveRecord> */
+    public function getActiveRecordClass(): string {
+        return $this->activeRecordClass;
     }
 
     /**
@@ -81,125 +67,71 @@ class DbActiveQuery extends ActiveQuery {
     }
 
     /**
+     * 取查询字段集
+     * @return array
+     */
+    private function getColumns(): array {
+        return array_map(fn($f) => $f->getName(), $this->getActiveRecordClass()::getFields());
+    }
+
+    /**
      * 多记录查询实例化结果集并返回
      * @param string|RawBuilder|null $indexColumn
-     * @return list<T>|list<DbActiveRecord>
-     * @throws ActiveException
-     */
-    public function select(string|RawBuilder|null $indexColumn = null): array {
-        $data = $this->query->select('*', $indexColumn);
-        $data = $this->loadAllRelationData($data);
-        if ($this->arrayify) {
-            // 如果要取数组式的结果, 则不加载关系数据, 因为必须一次性取出, 造成不必要的io浪费
-            return $data;
-        }
-        foreach ($data as $k => $datum) {
-            /** @var ActiveRecord $activeRecord */
-            $activeRecord = new ($this->activeRecord::class);
-            $activeRecord->setQueriedProperties($datum);
-            foreach ($datum as $property => $value) {
-                // 从普通properties中剔除出属于getterValues的属性赋值到getterValues
-                if ($value && in_array($property, $this->relationNames)) {
-                    $activeRecord->setGetterValue($property, $value);
-                    unset($datum[$property]);
-                }
-            }
-            $data[$k] = $activeRecord;
-        }
-        return $data;
-    }
-
-    /**
-     * 将批量查出的 with 的关联数据按映射关系分配绑定到主体数据
-     * @param array $data
-     * @return array
-     * @throws ActiveException
-     */
-    private function loadAllRelationData(array $data): array {
-        if (! $this->relationNames || ! $data) return $data;
-
-        // 遍历关系名, 批量查询出所有关联关系数据
-        foreach ($this->relationNames as $relationName) {
-            $this->loadRelationData($relationName, $data);
-            ['relation_queue' => $viaRelationQueue] = $this->relationData[$relationName];
-            // 遍历主体数据, 将关系数据挂靠于子元素中
-            foreach ($data as $key => $datum) {
-                // 关系数据可能已经在下面的中间表赋值, 所以若当前关系已赋值, 则无需再重复处理
-                if (key_exists($relationName, $datum)) {
-                    break;
-                }
-                // 由于对应关系可能是一对多对多, 所以此处将其转为矩阵, 可以通用化处理多对多的关系数据
-                $relationData = [ $datum ];
-                /**
-                 * 遍历中间关系队列, 主用于获取有中间关联表的关系数据
-                 * @var string $viaRelationName
-                 * @var ActiveRelation $viaActiveQueryRelation
-                 */
-                foreach ($viaRelationQueue as [$viaRelationName, $viaActiveQueryRelation]) {
-                    $viaRelationData = $this->relationData[$viaRelationName]['relation_data'];
-                    $relationMapping = $viaActiveQueryRelation->getMapping();
-                    $matchedRelationData = [];
-                    foreach ($viaRelationData as $viaRelationDatum) {
-                        foreach ($relationData as $relationDatum) {
-                            // 如果关联数据与主体数据匹配, 则记录关联数据, 用于后续子数据匹配的主体数据
-                            if (self::relationMatch($viaRelationDatum, $relationDatum, $relationMapping)) {
-                                $matchedRelationData[] = $viaRelationDatum;
-                            }
-                        }
-                    }
-                    if (in_array($viaRelationName, $this->relationNames)) {
-                        $datum[$viaRelationName] = $viaActiveQueryRelation->isHasOne() ? ($matchedRelationData[0] ?? null): $matchedRelationData;
-                    }
-                    // 更新依赖关系映射表以便递归查询下一级数据
-                    $relationData = $matchedRelationData;
-                }
-                $data[$key] = $datum;
-            }
-        }
-        return $data;
-    }
-
-    /**
-     * 批量查出载入所有 with 的关系数据
-     * @param string $relationName
-     * @param array $data
-     * @param array $viaRelationQueue
-     * @return ActiveRecord[]
+     * @return list<DbActiveRecord>|list<T>
      * @throws ActiveException|ModelException
      */
-    private function loadRelationData(string $relationName, array $data, array &$viaRelationQueue = []): array {
-        // 需加载的数据可能已在之前作为中间数据加载过, 所以若已加载过则直接取出返回即可
-        if (key_exists($relationName, $this->relationData)) {
-            return $this->relationData[$relationName];
-        }
-        $activeQueryRelation = $this->activeRecord->callGetter($relationName);
-        if (! $activeQueryRelation instanceof ActiveRelation) {
-            throw (new ActiveException(ActiveException::RELATION_NAME_INVALID))->format($relationName);
-        }
-        // 将靠近主体的关系压入表头, 方便推出多级关联数据
-        array_unshift($viaRelationQueue, [$relationName, $activeQueryRelation]);
-        $viaRelationName = $activeQueryRelation->getVia();
-        // 如果需从关联关系筛选数据, 则递归载入关联关系数据, 否则以主体数据作为关联关系数据
-        if ($viaRelationName) {
-            $conditionRelationData = $this->loadRelationData($viaRelationName, $data, $viaRelationQueue);
-        } else {
-            $conditionRelationData = $data;
-        }
-        // 这里在为单一条件时没问题, 在为多条件时会多查出单条件匹配但可能多条件不匹配的数据, 但对于最终正确结果的匹配无影响
-        $relationMapping = $activeQueryRelation->getMapping();
-        foreach ($relationMapping as $foreignKey => $relationKey) {
-            $relationWhereParams = array_column($conditionRelationData, $activeQueryRelation->getActiveQuery()->activeRecord::toDbKey($relationKey));
-            // todo 需过滤无效的空条件，且关系条件为空时不应抛出异常，但不查库，直接返回空集即可
-            if (! $relationWhereParams) {
-                throw (new ActiveException(ActiveException::NO_FOREIGN_IN_VIA_GETTER))->format($relationName, $foreignKey);
+    public function select(string|RawBuilder|null $indexColumn = null): array {
+        $data = $this->query->select(self::getColumns(), $indexColumn, isAutoRaw: false);
+        $data = array_map(fn($datum) => (new ($this->getActiveRecordClass()))->setQueriedProperties($datum), $data);
+        return $this->loadWithRelationData($data);
+    }
+
+    /**
+     * 批量查询 with 关系数据并按映射关系分配绑定到主体数据
+     * @param list<T|DbActiveRecord> $recordList
+     * @return array
+     * @throws ActiveException|ModelException
+     */
+    private function loadWithRelationData(array $recordList): array {
+        if (! isset($this->withRelations) || ! $recordList) return $recordList;
+
+        /** @var array<string, list<ActiveRecord>> $withViaRelationDataMapping 关系数据映射缓存表，以便节省数据库IO及遍历赋值 */
+        $withViaRelationDataMapping = [];
+        // 遍历关系名, 批量查询出所有关联关系数据
+        foreach ($this->withRelations as $withRelation) {
+            // 关系数据若已查询加载过则无需继续处理
+            if (key_exists($withRelation->getName(), $withViaRelationDataMapping)) continue;
+
+            $withRelation->loadWithActiveRecordList($recordList, $withViaRelationDataMapping);
+            $withViaRelationDataMappingCopy = $withViaRelationDataMapping;
+
+            // 遍历主体对象, 将关系数据挂靠于对象getter属性上
+            foreach ($recordList as $record) {
+                // 由于对应关系可能是一对多对多, 所以此处将主活动记录集成员转为矩阵, 可以通用化匹配处理多对多的关系数据
+                $primaryData = [ $record ];
+                foreach ($withRelation->getReversedVias() as $viaRelation) {
+                    $viaRelationName = $viaRelation->getName();
+                    $viaRelationColumns = $viaRelation->getRelationColumns();
+                    $viaRelationRecordList = & $withViaRelationDataMappingCopy[$viaRelationName];
+
+                    // 筛选与主数据匹配的关联数据集，此数据集即关联关系数据，亦作为下级关联数据的映射依据数据
+                    $viaRelationDataMatched = array_reduce($primaryData, function($carry, $primaryDatum) use(& $viaRelationRecordList, $viaRelationColumns) {
+                        foreach ($viaRelationRecordList as $k => $foreignDatum) {
+                            if (! self::relationRecordMatch($foreignDatum, $primaryDatum, $viaRelationColumns)) continue;
+                            $carry[] = $foreignDatum;
+                            unset($viaRelationRecordList[$k]); // 命中则可以删掉以减少循环提升性能
+                            // PHP嵌套循环比对比较耗时，时间复杂度为sum(primary.size * foreign.size)，似乎已无法简单有效的优化方法，后续若有很强的优化需求，可考虑引入索引
+                        }
+                        return $carry;
+                    }, []);
+
+                    $record->setPropertyValue($viaRelationName, $viaRelation->isHasOne() ? ($viaRelationDataMatched[0] ?? null): $viaRelationDataMatched);
+                    // 更新依赖关系映射表以便递归查询下一级数据（下个循环）
+                    $primaryData = $viaRelationDataMatched;
+                }
             }
-            // 取一条关联关系数据时允许用户设置limit:1以提升性能, 但如果通过with批量查的, 则不能limit了, 需要清除limit条件
-            $activeQueryRelation->getActiveQuery()->where($foreignKey, 'in', array_unique($relationWhereParams))->limit(0);
         }
-        // 根据依赖关系批量查出所有关联数据
-        $relationData = $activeQueryRelation->getActiveQuery()->select();
-        $this->relationData[$relationName] = ['relation_queue' => $viaRelationQueue, 'relation_data' => $relationData];
-        return $relationData;
+        return $recordList;
     }
 
     /**
@@ -208,32 +140,18 @@ class DbActiveQuery extends ActiveQuery {
      * @throws ActiveException
      */
     public function each(): Iterator {
-        if ($this->relationNames) {
-            throw new ActiveException(ActiveException::EACH_NO_SUPPORT_WITH);
-        }
-        $iterator = $this->query->each('*', false, function ($data) {
-            if ($this->arrayify) {
-                return $data;
-            }
-            /** @var DbActiveRecord $activeRecord */
-            $activeRecord = new ($this->activeRecord::class);
-            $activeRecord->setQueriedProperties($data);
-            return $activeRecord;
-        });
-        return $iterator;
+        $this->withRelations && throw new ActiveException(ActiveException::EACH_NO_SUPPORT_WITH);
+        return $this->query->each(self::getColumns(), false,
+            fn($datum) => $datum ? (new ($this->getActiveRecordClass()))->setQueriedProperties($datum) : false, false);
     }
 
     /**
      * 筛选一条数据库数据, 转为活动记录对象并返回
-     * @return T|array|false
+     * @return T|false
      */
-    public function find(): ActiveRecord|array|false {
-        $data = $this->query->find();
-        if ($this->arrayify || empty($data)) {
-            return $data;
-        }
-        $this->activeRecord->setQueriedProperties($data);
-        return $this->activeRecord;
+    public function find(): ActiveRecord|false {
+        $data = $this->query->find(self::getColumns(), false);
+        return $data ? (new ($this->getActiveRecordClass()))->setQueriedProperties($data) : false;
     }
 
     /**
@@ -251,13 +169,11 @@ class DbActiveQuery extends ActiveQuery {
      * @return int|string
      */
     public function insert(array $data, bool|null $ignoreOrReplace = null): int|string {
-        $current = current($data);
-        if ($current instanceof Model) {
-            foreach ($data as $k => $datum) {
-                // 因为insert方法支持批量插入，而插入的数据有时为了方便需传递活动记录对象组，若为活动记录则需转为数据库式蛇底的数组下标字段名
-                $data[$k] = $datum->extract();
-            }
-        }
+        // 因为insert方法支持批量插入，而插入的数据有时为了方便需传递活动记录对象组，若为活动记录则需转为数据库式蛇底的数组下标字段名
+        current($data) instanceof Model && $data = array_map(function(Model $m) {
+            $m->valid();
+            return $m->extract(true, false);
+        }, $data);
         return $this->query->insert($data, $ignoreOrReplace);
     }
 

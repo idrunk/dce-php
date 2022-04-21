@@ -9,8 +9,11 @@ namespace dce\project\request;
 use dce\log\LogManager;
 use dce\project\session\CookieCgi;
 use dce\project\session\Session;
+use drunk\Structure;
 
 class RawRequestHttpCgi extends RawRequestHttp {
+    private array $headers;
+
     /** @inheritDoc */
     protected function initProperties(): void {
         $this->method = strtolower($_SERVER['REQUEST_METHOD']);
@@ -43,19 +46,15 @@ class RawRequestHttpCgi extends RawRequestHttp {
 
     /** @inheritDoc */
     public function getRawData(): string {
-        if (! isset($this->rawData)) {
-            $this->rawData = file_get_contents('php://input');
-        }
+        if (! isset($this->rawData)) $this->rawData = file_get_contents('php://input');
         return $this->rawData;
     }
 
     /** @inheritDoc */
     public function getHeader(string|null $key = null): string|array|null {
-        static $headers;
-        null === $headers && array_map(function($k) use(& $headers) {
-            $headers[strtolower(str_ireplace('HTTP_', '', $k))] = $_SERVER[$k];
-        }, array_filter(array_keys($_SERVER), fn($k) => preg_match('/^http_/ui', $k)));
-        return ! $key ? $headers : $headers[$key] ?? null;
+        $this->headers ??= array_reduce(array_filter(Structure::arrayEntries($_SERVER), fn($kv) => preg_match('/^http_/ui', $kv[0])),
+            fn($carry, $kv) => $carry + [strtolower(str_ireplace('HTTP_', '', $kv[0])) => $kv[1]], []);
+        return ! $key ? $this->headers : $this->headers[$key] ?? null;
     }
 
     /** @inheritDoc */

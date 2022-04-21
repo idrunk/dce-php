@@ -4,7 +4,7 @@
  * Date: 2019/10/23 14:34
  */
 
-namespace dce\db;
+namespace dce\db\entity;
 
 use dce\base\Exception;
 use dce\i18n\Language;

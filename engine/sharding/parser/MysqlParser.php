@@ -7,6 +7,7 @@
 namespace dce\sharding\parser;
 
 use Closure;
+use dce\base\ParserTraverResult;
 use dce\sharding\parser\mysql\MysqlFunctionParser;
 use dce\sharding\parser\mysql\MysqlFieldParser;
 use dce\sharding\parser\mysql\MysqlStatementParser;
@@ -69,9 +70,9 @@ abstract class MysqlParser extends SqlParser {
 
     /**
      * 遍历语句, 供回调解析及处理
-     * @param Closure|null $operatorCall    操作符回调   call($operator)
-     * @param Closure|null $wordCall        单词回调    call($word)
-     * @param Closure|null $followupCall    尾缀回调    call()
+     * @param null|Closure(string):int $operatorCall    操作符回调
+     * @param null|Closure(string):int $wordCall        单词回调
+     * @param null|Closure():int $followupCall          尾缀回调
      * @throws StatementParserException
      */
     protected function traverse(Closure|null $operatorCall, Closure|null $wordCall, Closure|null $followupCall = null): void {
@@ -81,25 +82,23 @@ abstract class MysqlParser extends SqlParser {
             if ($this->isBoundary($char)) {
                 // 此处解析了符号, 所以前移了偏移, 所以后续的回调中的parseString就无需再将偏移前移一位了
                 $operator = $this->parseOperator($char);
-                if (in_array($operator, self::$partSeparators)) {
+                if (in_array($operator, self::$partSeparators))
                     continue;
-                }
                 $result = call_user_func_array($operatorCall, [$operator]);
             } else {
                 $word = $this->parseWord($char);
                 $result = call_user_func_array($wordCall, [$word]);
             }
 
-            if (self::TRAVERSE_CALLBACK_CONTINUE === $result) {
+            if (ParserTraverResult::Continue === $result) {
                 continue;
-            } else if (self::TRAVERSE_CALLBACK_BREAK === $result) {
+            } else if (ParserTraverResult::Break === $result) {
                 break;
             }
             $result = call_user_func_array($followupCall, []);
-            if (self::TRAVERSE_CALLBACK_EXCEPTION === $result) {
-//                test_dump($char, $offset, '语句异常, 无法解析');
+            if (ParserTraverResult::Exception === $result) {
                 throw new StatementParserException(StatementParserException::INVALID_STATEMENT);
-            } else if (self::TRAVERSE_CALLBACK_BREAK === $result) {
+            } else if (ParserTraverResult::Break === $result) {
                 break;
             }
         }
@@ -144,9 +143,8 @@ abstract class MysqlParser extends SqlParser {
     protected function preParseModifier(): string|false {
         $offsetBak = $this->offset;
         $word = $this->preParseWord();
-        if ($word && in_array(strtoupper($word), self::$selectModifiers)) {
+        if ($word && in_array(strtoupper($word), self::$selectModifiers))
             return $word;
-        }
         $this->offset = $offsetBak;
         return false;
     }
@@ -162,20 +160,20 @@ abstract class MysqlParser extends SqlParser {
 
         $this->traverse(function ($operator) use (& $alias) {
             if (in_array($operator, self::$partSeparators)) {
-                return self::TRAVERSE_CALLBACK_STEP;
+                return ParserTraverResult::Step;
             } else if (in_array($operator, self::$nameQuotes)) {
                 $alias = $this->parseString($operator);
-                return self::TRAVERSE_CALLBACK_BREAK;
+                return ParserTraverResult::Break;
             }
             $this->offset --; // 如果为其他符号, 则表示非别名相关符号, 则回退偏移并退出循环, 留给后续程序处理
-            return self::TRAVERSE_CALLBACK_BREAK;
+            return ParserTraverResult::Break;
         }, function ($word) use (& $alias, & $as) {
             if ('AS' === strtoupper($word)) {
                 $as = 'AS';
-                return self::TRAVERSE_CALLBACK_STEP;
+                return ParserTraverResult::Step;
             } else {
                 $alias = $word; // mark 这里还有问题, 当别名用于子查询或者join的时候, 这里还应该排除掉mysql指令词
-                return self::TRAVERSE_CALLBACK_BREAK;
+                return ParserTraverResult::Break;
             }
         });
 

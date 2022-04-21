@@ -81,9 +81,7 @@ class DbDirectiveParser extends DirectiveParser {
                         if ($this->insertBool) {
                             $this->dataToSave = $statement->getInsertSchema()->getConditions();
                         } else {
-                            if ($this->updateBool) {
-                                $this->dataToSave = $statement->getUpdateSchema()->getConditions()[0];
-                            }
+                            $this->updateBool && $this->dataToSave = $statement->getUpdateSchema()->getConditions()[0];
                             $this->whereConditions = $statement->getWhereSchema()->getConditions();
                         }
                     } else if ($shardingConfig->allowJoint) {
@@ -92,9 +90,7 @@ class DbDirectiveParser extends DirectiveParser {
                         throw new MiddlewareException(MiddlewareException::ALLOW_JOINT_NOT_OPEN);
                     }
                 }
-                if (! $statement instanceof SelectStatement) {
-                    $this->writeBool = true;
-                }
+                ! $statement instanceof SelectStatement && $this->writeBool = true;
             }
         } else {
             $pattern = '/^\s*(?:SET|INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|TRUNCATE|LOAD|COPY|ALTER|RENAME|GRANT|REVOKE|LOCK|UNLOCK|REINDEX)\b/i';
@@ -158,9 +154,7 @@ class DbDirectiveParser extends DirectiveParser {
             if ($aggregates) {
                 // 如果有聚合函数, 则提取出来, 供后续做源数据合并时使用 (聚合函数内如果有其他函数或计算, 我们无需处理, 因为我们只合并结果集, 而不做数据库层的数据处理)
                 foreach ($aggregates as $aggregate) {
-                    if ('AVG' === $aggregate->name) {
-                        $avgAggregates[] = $aggregate;
-                    }
+                    'AVG' === $aggregate->name && $avgAggregates[] = $aggregate;
                     $selectColumnItems[] = $aggregate;
                     $selectFieldsString[] = $selectAggregatesString[] = (string) $aggregate;
                 }
@@ -174,12 +168,9 @@ class DbDirectiveParser extends DirectiveParser {
         if (! $groupSchema->isEmpty()) {
             $this->groupBy = MysqlGroupByParser::build($groupSchema);
             // group by中不会有聚合函数
-            foreach ($this->groupBy->conditions as $condition) {
-                if (! in_array((string) $condition, $selectFieldsString)) {
-                    // 将没在查询条件中包含的分组条件加入查询条件, 供后续合并时做分组依据
-                    $selectColumnItems[] = $condition;
-                }
-            }
+            foreach ($this->groupBy->conditions as $condition)
+                // 将没在查询条件中包含的分组条件加入查询条件, 供后续合并时做分组依据
+                ! in_array((string) $condition, $selectFieldsString) && $selectColumnItems[] = $condition;
         }
 
         // 处理排序列, 扩充查询列
@@ -190,20 +181,14 @@ class DbDirectiveParser extends DirectiveParser {
                 $orderFields = [];
                 if ($aggregates) {
                     foreach ($aggregates as $aggregate) {
-                        if ('AVG' === $aggregate->name) {
-                            $avgAggregates[] = $aggregate;
-                        }
+                        'AVG' === $aggregate->name && $avgAggregates[] = $aggregate;
                         $orderFields[] = $aggregate;
                     }
                 } else {
                     $orderFields[] = $condition->field;
                 }
-                foreach ($orderFields as $field) {
-                    if (! in_array((string) $field, $selectFieldsString)) {
-                        // 将没在查询条件中包含的排序条件加入查询条件, 供后续合并时排序
-                        $selectColumnItems[] = $field;
-                    }
-                }
+                foreach ($orderFields as $field) // 将没在查询条件中包含的排序条件加入查询条件, 供后续合并时排序
+                    ! in_array((string) $field, $selectFieldsString) && $selectColumnItems[] = $field;
             }
         }
 
@@ -212,12 +197,8 @@ class DbDirectiveParser extends DirectiveParser {
             $noNameFunction = substr($avgAggregate, 3);
             $sumAggregate = MysqlFunctionParser::build($noNameFunction, $offset, 'SUM');
             $countAggregate = MysqlFunctionParser::build($noNameFunction, $offset2, 'COUNT');
-            if (! in_array((string) $sumAggregate, $selectAggregatesString)) {
-                $selectColumnItems[] = $sumAggregate;
-            }
-            if (! in_array((string) $countAggregate, $selectAggregatesString)) {
-                $selectColumnItems[] = $countAggregate;
-            }
+            ! in_array((string) $sumAggregate, $selectAggregatesString) && $selectColumnItems[] = $sumAggregate;
+            ! in_array((string) $countAggregate, $selectAggregatesString) && $selectColumnItems[] = $countAggregate;
         }
 
         // 组装真实落库的查询列

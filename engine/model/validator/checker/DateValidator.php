@@ -11,11 +11,8 @@ use dce\model\validator\ValidatorException;
 
 class DateValidator extends TypeChecker {
     public const TYPE_MONTH = 'month';
-
     public const TYPE_DATE = 'date';
-
     public const TYPE_TIME = 'time';
-
     public const TYPE_DATETIME = 'datetime';
 
     protected string $type = self::TYPE_DATE;
@@ -34,10 +31,10 @@ class DateValidator extends TypeChecker {
     ];
 
     /**
-     * @param string|int|float|null|false $value
+     * @param mixed $value
      * @return ValidatorException|null
      */
-    protected function check(string|int|float|null|false $value): ValidatorException|null {
+    protected function check(mixed $value): ValidatorException|null {
         $formatSet = $this->getProperty('formatSet');
         $type = $this->getProperty('type', lang(ValidatorException::FORMATSET_OR_TYPE_REQUIRED));
         if ($formatSet) {

@@ -6,23 +6,16 @@
 
 namespace dce\model;
 
-use ArrayAccess;
+use dce\base\CoverType;
 use dce\loader\Decorator;
 use drunk\Char;
 use ReflectionClass;
 use ReflectionProperty;
 use Throwable;
 
-abstract class Model implements ArrayAccess, Decorator {
-    public const COVER_TYPE_UNSET = 'unset_default'; // todo 镜像升8.1后换成enum
-    public const COVER_TYPE_REPLACE = 'replace_value';
-    public const COVER_TYPE_IGNORE = 'ignore_existed';
-
+abstract class Model implements Decorator {
     /** @var string 默认场景名 */
     public const SCENARIO_DEFAULT = 'default';
-
-    /** @var string 字段类名, 用于实现注解字段 */
-    protected static string $fieldClass;
 
     /** @var Property[][] 模型属性实例映射表 */
     private static array $properties = [];
@@ -43,42 +36,49 @@ abstract class Model implements ArrayAccess, Decorator {
 
     /**
      * 应用模型属性值
-     * @param array|ArrayAccess $properties 待赋值属性键值表
-     * @param string $coverType
+     * @param array|self $properties 待赋值属性键值表
+     * @param CoverType $coverType
      * @return $this
      */
-    public function apply(array|ArrayAccess $properties, string $coverType = self::COVER_TYPE_REPLACE): static {
+    public function apply(array|self $properties, CoverType $coverType = CoverType::Replace): static {
         $passedKeys = array_keys(is_array($properties)
             ? $properties = array_reduce(array_keys($properties), fn($ps, $k) => array_merge($ps, [static::toModelKey($k) => $properties[$k]]), [])
             : array_filter(get_object_vars($properties), fn($v) => $v !== null));
 
-        if ($coverType === self::COVER_TYPE_IGNORE) {
-            foreach ($passedKeys as $key) $this->$key ??= $properties[$key];
-        } else {
-            foreach ($passedKeys as $key) $this->$key = $properties[$key];
-            if ($coverType === self::COVER_TYPE_UNSET) {
-                foreach (static::getProperties() as $property) {
-                    if ($property->refProperty->hasDefaultValue() && ! in_array($property->name, $passedKeys)) {
-                        // 如果需要清空默认值，且属性有默认值也未被传入值覆盖，则清除掉
-                        unset($this->{$property->name});
-                    }
-                }
-            }
-        }
+        $isIgnore = $coverType === CoverType::Ignore;
+        foreach ($passedKeys as $key) $this->setPropertyValue($key, $properties[$key], $isIgnore);
+
+        if ($coverType === CoverType::Unset)
+            foreach (static::getProperties() as $property)
+                if ($property->refProperty->hasDefaultValue() && ! in_array($property->name, $passedKeys))
+                    unset($this->{$property->name}); // 如果需要清空默认值，且属性有默认值也未被传入值覆盖，则清除掉
+
         return $this;
     }
 
     /**
+     * 设置属性值
+     * @param string $key
+     * @param mixed $value
+     * @param bool $ignoreExists
+     */
+    public function setPropertyValue(string $key, mixed $value, bool $ignoreExists = false): void {
+        $property = $this->getProperty($key);
+        // 此处本不应设置getterValue，但为了ActiveRecord::setQueriedProperties及DbActiveQuery::select等能高效方便的将关系数据储存到新建对象中，方才自动处理
+        $property ? $property->setValue($this, $value, $ignoreExists) : $this->setGetterValue($key, $value);
+    }
+
+    /**
      * 提取模型属性键值表
-     * @param bool $toDbKey
+     * @param bool|null $toStorableOrKeep {true: toDbKey and toStorable, null: toDbKey, false: return as is key and value}
      * @param mixed $null
      * @return array
      */
-    public function extract(bool $toDbKey = false, mixed $null = null): array {
+    public function extract(bool|null $toStorableOrKeep = false, mixed $null = null): array {
         $mapping = [];
         foreach (static::getProperties() as $property) {
-            if ($null !== $value = $property->getValue($this, $null)) {
-                $mappingKey = $toDbKey ? static::toDbKey($property->name) : $property->name;
+            if ($null !== $value = $property->getValue($this, $null, true === $toStorableOrKeep)) {
+                $mappingKey = false === $toStorableOrKeep ? $property->name : static::toDbKey($property->name);
                 $mapping[$mappingKey] = $value;
             }
         }
@@ -150,8 +150,9 @@ abstract class Model implements ArrayAccess, Decorator {
     }
 
     /**
-     * 初始化模型属性实例表 (本方法在ClassDecoratorManager中调用)
+     * 初始化模型属性实例表 (本方法在ClassDecoratorManager中自动调用)
      * @param ReflectionClass $refClass
+     * @throws validator\ValidatorException
      */
     private static function initProperties(ReflectionClass $refClass): void {
         $staticClass = $refClass->getName();
@@ -160,11 +161,9 @@ abstract class Model implements ArrayAccess, Decorator {
             if ($attributes = $refProperty->getAttributes(Property::class)) {
                 $properties[$refProperty->name] = $propertyInstance = $attributes[0]->newInstance();
                 $validatorInstances = [];
-                foreach ($refProperty->getAttributes(Validator::class) as $ruleProperty) {
+                foreach ($refProperty->getAttributes(Validator::class) as $ruleProperty)
                     $validatorInstances[] = $ruleProperty->newInstance()->setProperty($propertyInstance);
-                }
-                $fieldInstance = isset($staticClass::$fieldClass) && ($fieldAttrs = $refProperty->getAttributes($staticClass::$fieldClass)) ? $fieldAttrs[0]->newInstance() : null;
-                $propertyInstance->applyProperties($staticClass, $refProperty, $validatorInstances, $fieldInstance);
+                $propertyInstance->applyProperties($refProperty, $validatorInstances);
 
                 // 按场景分组校验器
                 foreach ($validatorInstances as $validator)
@@ -188,10 +187,11 @@ abstract class Model implements ArrayAccess, Decorator {
     /**
      * 根据属性名取属性实例
      * @param string $name
+     * @param callable|null $thrownSupplier
      * @return Property|null
      */
-    public function getProperty(string $name): Property|null {
-        return self::getProperties()[$name] ?? null;
+    public function getProperty(string $name, callable $thrownSupplier = null): Property|null {
+        return self::getProperties()[$name] ?? ($thrownSupplier ? call_user_func($thrownSupplier) : null);
     }
 
     /**
@@ -202,14 +202,23 @@ abstract class Model implements ArrayAccess, Decorator {
      */
     public function __get(string $name): mixed {
         // 若有缓存则直接返回
-        if ($this->hasGetterValue($name)) {
+        if ($this->hasGetterValue($name))
             return $this->getGetterValue($name);
-        }
         $returnValue = $this->callGetter($name, true);
         // 执行子级可能定义的路由方法
         $returnValue = $this->handleGetter($name, $returnValue);
         $this->setGetterValue($name, $returnValue);
         return $returnValue;
+    }
+
+    /** 魔术方法，判断是否存在getter属性 */
+    public function __isset(string $name): bool {
+        return isset($this->getterValues[$name]);
+    }
+
+    /** 魔术方法，删除getter属性 */
+    public function __unset(string $name): void {
+        unset($this->getterValues[$name]);
     }
 
     /**
@@ -219,11 +228,10 @@ abstract class Model implements ArrayAccess, Decorator {
      * @return mixed
      * @throws ModelException
      */
-    public function callGetter(string $name, bool $throwable = false): mixed {
+    protected function callGetter(string $name, bool $throwable = false): mixed {
         $methodName = 'get' . Char::camelize($name, true);
-        if ($throwable && ! method_exists($this, $methodName)) {
+        if ($throwable && ! method_exists($this, $methodName))
             throw (new ModelException(ModelException::GETTER_UNDEFINED))->format($name);
-        }
         return $this->$methodName();
     }
 
@@ -241,11 +249,9 @@ abstract class Model implements ArrayAccess, Decorator {
      * 缓存getter值
      * @param string $name
      * @param mixed $value
-     * @return $this
      */
-    public function setGetterValue(string $name, mixed $value): static {
+    private function setGetterValue(string $name, mixed $value): void {
         $this->getterValues[$name] = $value;
-        return $this;
     }
 
     /**
@@ -253,7 +259,7 @@ abstract class Model implements ArrayAccess, Decorator {
      * @param string $name
      * @return mixed
      */
-    protected function getGetterValue(string $name): mixed {
+    private function getGetterValue(string $name): mixed {
         return $this->getterValues[$name] ?? null;
     }
 
@@ -262,7 +268,7 @@ abstract class Model implements ArrayAccess, Decorator {
      * @param string $name
      * @return bool
      */
-    protected function hasGetterValue(string $name): bool {
+    private function hasGetterValue(string $name): bool {
         return key_exists($name, $this->getterValues);
     }
 
@@ -275,36 +281,14 @@ abstract class Model implements ArrayAccess, Decorator {
         return $this;
     }
 
-    public function offsetSet(mixed $offset, mixed $value) {
-        $offset = static::toModelKey($offset);
-        $this->$offset = $value;
-    }
-
-    public function offsetGet(mixed $offset) {
-        $offset = static::toModelKey($offset);
-        return $this->$offset;
-    }
-
-    public function offsetExists(mixed $offset): bool {
-        $offset = static::toModelKey($offset);
-        return isset($this->$offset);
-    }
-
-    public function offsetUnset(mixed $offset) {
-        $offset = static::toModelKey($offset);
-        unset($this->$offset);
-    }
-
     /**
      * 以属性键值对实例化一个模型对象
      * @param array $properties
-     * @param string $coverType
+     * @param CoverType $coverType
      * @param mixed ...$ctorArgs
      * @return $this
      */
-    public static function from(array $properties, string $coverType = self::COVER_TYPE_UNSET, mixed ... $ctorArgs): static {
-        $instance = new static(... $ctorArgs);
-        $instance->apply($properties, $coverType);
-        return $instance;
+    public static function from(array $properties, CoverType $coverType = CoverType::Replace, mixed ... $ctorArgs): static {
+        return (new static(... $ctorArgs))->apply($properties, $coverType);
     }
 }

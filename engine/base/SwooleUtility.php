@@ -13,9 +13,7 @@ use Swoole\Table;
 final class SwooleUtility {
     public static function inSwoole(): bool {
         static $inSwoole;
-        if (null === $inSwoole) {
-            $inSwoole = extension_loaded('swoole');
-        }
+        null === $inSwoole && $inSwoole = extension_loaded('swoole');
         return $inSwoole;
     }
 
@@ -33,10 +31,10 @@ final class SwooleUtility {
 
     /**
      * 开启协程钩子
-     * @param int $hookFlags
+     * @param array $config
      */
-    public static function coroutineHook(int $hookFlags = SWOOLE_HOOK_ALL): void {
-        Coroutine::set(['hook_flags' => $hookFlags]);
+    public static function coroutineSet(array $config): void {
+        self::inSwoole() && Coroutine::set($config);
     }
 
     /**
@@ -44,9 +42,8 @@ final class SwooleUtility {
      * @param int $maxCoroutine
      */
     public static function coroutineValve(int $maxCoroutine = 1000): void {
-        while (Coroutine::stats()['coroutine_num'] > $maxCoroutine) {
+        while (Coroutine::stats()['coroutine_num'] > $maxCoroutine)
             Coroutine::sleep(0.01);
-        }
     }
 
     /**
@@ -168,9 +165,7 @@ final class SwooleUtility {
             if ($counter >= $maximum) {
                 return false;
             } else {
-                if (false === $counter) {
-                    $lockerMap[$identification] = ['maximum' => $maximum, 'counter' => 0];
-                }
+                false === $counter && $lockerMap[$identification] = ['maximum' => $maximum, 'counter' => 0];
                 $lockerMap[$identification]['lock_time'] = time();
                 $lockerMap[$identification]['counter'] ++;
                 return true;
@@ -212,6 +207,7 @@ final class SwooleUtility {
 
     /**
      * 根进程校验, 在需在根进程中调用的方法调用此方法, 以限制该方法必须在根进程中调用, 否则抛异常
+     * （此方法已在缓存初始化时首次调用以储存主进程ID值）
      * @throws Exception
      */
     public static function rootProcessConstraint(): void {

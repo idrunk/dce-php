@@ -6,6 +6,7 @@
 
 namespace dce\service\cron;
 
+use dce\base\CoverType;
 use dce\base\Exception;
 use dce\base\SwooleUtility;
 use dce\Dce;
@@ -13,7 +14,6 @@ use dce\i18n\Language;
 use dce\loader\attr\Singleton;
 use dce\loader\Decorator;
 use dce\log\LogManager;
-use dce\model\Model;
 use drunk\Structure;
 
 abstract class Crontab implements Decorator {
@@ -26,10 +26,10 @@ abstract class Crontab implements Decorator {
 
     protected function __construct() {
         $rules = Dce::$config->cron;
-        $default = Cron::from($rules[Cron::DEFAULT_ID_PROP], Model::COVER_TYPE_REPLACE)->extract();
+        $default = Cron::from($rules[Cron::DEFAULT_ID_PROP])->extract();
         unset($rules[Cron::DEFAULT_ID_PROP]);
         $this->tasks = array_reduce(array_keys($rules), function($m, $k) use($rules, $default) {
-            $t = Cron::from($rules[$k], Model::COVER_TYPE_REPLACE)->apply($default, Model::COVER_TYPE_IGNORE);
+            $t = Cron::from($rules[$k])->apply($default, CoverType::Ignore);
             $t->id = $k;
             $t->parse();
             return array_merge($m, $t->enabled ? [$k => $t] : []);
@@ -60,8 +60,8 @@ abstract class Crontab implements Decorator {
     }
 
     private static function match(Cron $task, int $minute, int $hour, int $day, int $month, int $week): bool {
-        return self::matchRule($task->minute, $minute) && self::matchRule($task->hour, $hour)
-            && self::matchRule($task->day, $day) && self::matchRule($task->month, $month) && self::matchRule($task->week, $week);
+        return self::matchRule($task->minuteRange, $minute) && self::matchRule($task->hourRange, $hour)
+            && self::matchRule($task->dayRange, $day) && self::matchRule($task->monthRange, $month) && self::matchRule($task->weekRange, $week);
     }
 
     private static function matchRule(array $rules, int $time): bool {

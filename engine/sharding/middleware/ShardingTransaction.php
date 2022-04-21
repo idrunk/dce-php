@@ -14,9 +14,9 @@ use dce\db\proxy\TransactionException;
 use dce\project\request\RequestManager;
 
 class ShardingTransaction extends Transaction {
-    public const NO_SHARDING_ALIAS = 'no_sharding';
+    public const ALIAS_NO_SHARDING = 'no_sharding';
 
-    /** @var int 使用次数，事务中已经发起得查询数 */
+    /** @var int 使用次数，事务中已经发起的查询数 */
     public int $uses = 0;
 
     private int $requestId;

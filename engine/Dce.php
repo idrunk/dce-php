@@ -8,6 +8,7 @@ namespace dce;
 
 use dce\base\Exception;
 use dce\base\Lock;
+use dce\base\SwooleUtility;
 use dce\cache\CacheManager;
 use dce\config\ConfigManager;
 use dce\config\DceConfig;
@@ -21,6 +22,7 @@ use dce\project\ProjectManager;
 use dce\project\request\RawRequestHttpCgi;
 use dce\project\request\RawRequestCli;
 use dce\project\request\RequestManager;
+use drunk\Structure;
 
 final class Dce {
     private const DEV_PROJECT_NAME = 'developer';
@@ -64,9 +66,8 @@ final class Dce {
 
     /** PHP环境初始化 */
     private static function phpInit(): void {
-        foreach (self::$config->iniSet as $k => $v) {
-            ini_set($k, $v);
-        }
+        Structure::forEach(self::$config->iniSet, fn($v, $k) => ini_set($k, $v));
+        SwooleUtility::coroutineSet(self::$config->coroutineSet);
     }
 
     /**
@@ -88,9 +89,7 @@ final class Dce {
 
     /** 仅初始化Dce */
     public static function initOnly(): void {
-        if (self::$initState > 0) {
-            return;
-        }
+        if (self::$initState > 0) return;
         self::$initState = 1;
 
         self::prepare();
@@ -100,9 +99,7 @@ final class Dce {
 
     /** 初始化Dce及项目节点 */
     public static function scan(): void {
-        if (self::$initState > 0) {
-            return;
-        }
+        if (self::$initState > 0) return;
         self::$initState = 2;
 
         self::prepare();
@@ -124,9 +121,7 @@ final class Dce {
     /** 引导路由 */
     public static function boot(): void {
         self::scan();
-        if (2 !== self::$initState) {
-            return;
-        }
+        if (2 !== self::$initState) return;
         self::$initState = 3;
 
         LogManager::dce(new Language(['正在引导请求处理器...', 'Request handler is booting...']));

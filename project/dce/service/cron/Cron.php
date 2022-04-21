@@ -26,19 +26,19 @@ class Cron extends Model {
     public string $id;
 
     #[Property, Validator(Validator::RULE_REQUIRED_EMPTY), Validator(Validator::RULE_REGULAR, regexp: self::REGULAR_TIME)]
-    public array|string $minute;
+    public string $minute;
 
     #[Property, Validator(Validator::RULE_REQUIRED_EMPTY), Validator(Validator::RULE_REGULAR, regexp: self::REGULAR_TIME)]
-    public array|string $hour;
+    public string $hour;
 
     #[Property, Validator(Validator::RULE_REQUIRED), Validator(Validator::RULE_REGULAR, regexp: self::REGULAR_TIME)]
-    public array|string $day;
+    public string $day;
 
     #[Property, Validator(Validator::RULE_REQUIRED), Validator(Validator::RULE_REGULAR, regexp: self::REGULAR_TIME_ONLY)]
-    public array|string $month;
+    public string $month;
 
     #[Property, Validator(Validator::RULE_REQUIRED), Validator(Validator::RULE_REGULAR, regexp: self::REGULAR_TIME_ONLY)]
-    public array|string $week;
+    public string $week;
 
     #[Property, Validator(Validator::RULE_REQUIRED)]
     public string|null $command;
@@ -49,6 +49,16 @@ class Cron extends Model {
     #[Property]
     public bool $runOnStart;
 
+    readonly public array $minuteRange;
+
+    readonly public array $hourRange;
+
+    readonly public array $dayRange;
+
+    readonly public array $monthRange;
+
+    readonly public array $weekRange;
+
     public int $loopInterval = 0;
 
     public string $status = self::STATUS_WAITING;
@@ -57,11 +67,11 @@ class Cron extends Model {
 
     public function parse(): void {
         $this->valid();
-        preg_match(self::REGULAR_TIME, $this->minute, $parts) && $this->minute = $this->parseUnit($parts[1], $parts[2] ?? 0, self::UNIT_MINUTE);
-        preg_match(self::REGULAR_TIME, $this->hour, $parts) && $this->hour = $this->parseUnit($parts[1], $parts[2] ?? 0, self::UNIT_HOUR);
-        preg_match(self::REGULAR_TIME, $this->day, $parts) && $this->day = $this->parseUnit($parts[1], $parts[2] ?? 0, self::UNIT_DAY);
-        preg_match(self::REGULAR_TIME, $this->month, $parts) && $this->month = $this->parseUnit($parts[1], 0, self::UNIT_MONTH);
-        preg_match(self::REGULAR_TIME, $this->week, $parts) && $this->week = $this->parseUnit($parts[1], 0, self::UNIT_WEEK);
+        preg_match(self::REGULAR_TIME, $this->minute, $parts) && $this->minuteRange = $this->parseUnit($parts[1], $parts[2] ?? 0, self::UNIT_MINUTE);
+        preg_match(self::REGULAR_TIME, $this->hour, $parts) && $this->hourRange = $this->parseUnit($parts[1], $parts[2] ?? 0, self::UNIT_HOUR);
+        preg_match(self::REGULAR_TIME, $this->day, $parts) && $this->dayRange = $this->parseUnit($parts[1], $parts[2] ?? 0, self::UNIT_DAY);
+        preg_match(self::REGULAR_TIME, $this->month, $parts) && $this->monthRange = $this->parseUnit($parts[1], 0, self::UNIT_MONTH);
+        preg_match(self::REGULAR_TIME, $this->week, $parts) && $this->weekRange = $this->parseUnit($parts[1], 0, self::UNIT_WEEK);
     }
 
     private function parseUnit(string $time, int $interval, string $unit): array {
@@ -82,8 +92,8 @@ class Cron extends Model {
     }
 
     public function format(): string {
-        return sprintf('%s %s;%s;%s;%s;%s/%s %s %s', $this->id, $this->formatUnit($this->minute), $this->formatUnit($this->hour),
-            $this->formatUnit($this->day), $this->formatUnit($this->month), $this->formatUnit($this->week), $this->loopInterval,
+        return sprintf('%s %s;%s;%s;%s;%s/%s %s %s', $this->id, $this->formatUnit($this->minuteRange), $this->formatUnit($this->hourRange),
+            $this->formatUnit($this->dayRange), $this->formatUnit($this->monthRange), $this->formatUnit($this->weekRange), $this->loopInterval,
             $this->status, $this->command);
     }
 

@@ -11,13 +11,27 @@ use dce\db\proxy\DbProxy;
 use dce\db\query\builder\RawBuilder;
 use dce\db\query\builder\schema\WhereSchema;
 use dce\db\query\builder\SchemaAbstract;
+use dce\db\query\QueryException;
 
 abstract class DbActiveRecord extends ActiveRecord {
     /** @inheritDoc */
     protected static string $fieldClass = DbField::class;
 
-    /** @var array 数据表主键名集 */
-    private static array $primaryKeysMapping = [];
+    /**
+     * 指定目标库或设定查询代理器
+     * @return string|DbProxy|null
+     */
+    public static function getProxy(): string|DbProxy|null {
+        return null;
+    }
+
+    /**
+     * 取一个新的DbActiveQuery实例
+     * @return DbActiveQuery<class-string<static>>
+     */
+    public static function query(): DbActiveQuery {
+        return new DbActiveQuery(static::class);
+    }
 
     /**
      * 筛选一条数据库数据, 转为活动记录对象并返回
@@ -25,30 +39,19 @@ abstract class DbActiveRecord extends ActiveRecord {
      * @return false|static
      */
     public static function find(int|string|array|RawBuilder|WhereSchema $whereCondition): static|false {
-        $instance = new static;
         if (is_scalar($whereCondition)) {
             $pks = static::getPkNames();
-            if (count($pks) > 1) {
-                return false;
-            }
+            if (count($pks) > 1) return false;
             $whereCondition = [[$pks[0], '=', $whereCondition]];
         }
-        return $instance->getActiveQuery()->where($whereCondition)->find();
-    }
-
-    /** @inheritDoc */
-    protected function getActiveQuery(): DbActiveQuery {
-        if (! $this->activeQuery) {
-            $this->activeQuery = new DbActiveQuery($this);
-        }
-        return $this->activeQuery;
+        return self::query()->where($whereCondition)->find();
     }
 
     /** @inheritDoc */
     public function insert(bool $needLoadNew = false, bool|null $ignoreOrReplace = null): int|string {
         $this->valid();
         $data = $this->extract(true, false);
-        $insertId = $this->getActiveQuery()->insert($data, $ignoreOrReplace);
+        $insertId = self::query()->insert($data, $ignoreOrReplace);
         $pk = static::getPkNames();
         if ($insertId && count($pk) === 1) {
             if ($needLoadNew) {
@@ -63,11 +66,13 @@ abstract class DbActiveRecord extends ActiveRecord {
     }
 
     /** @inheritDoc */
-    public function update(): int {
+    public function update(array $columns = []): int {
         $this->valid();
         $data = $this->extract(true, false);
+        if ($columns && ($columns = array_map([static::class, 'toDbKey'], $columns)))
+            $data = array_filter($data, fn($column) => in_array($column, $columns), ARRAY_FILTER_USE_KEY);
         $where = $this->genPropertyConditions();
-        return $this->getActiveQuery()->where($where)->update($data);
+        return self::query()->where($where)->update($data);
     }
 
     /**
@@ -75,46 +80,16 @@ abstract class DbActiveRecord extends ActiveRecord {
      * @param string|array $fieldName
      * @param int|float $increment 正数自增/负数自减
      * @return int
+     * @throws QueryException
      */
     public function updateCounter(string|array $fieldName, int|float $increment = 1): int {
         $counters = is_array($fieldName) ? $fieldName : [$fieldName => $increment];
         $data = [];
         foreach ($counters as $fieldName => $increment) {
             $increment = (float) $increment;
-            $data[SchemaAbstract::tableWrapThrow($fieldName)] = new RawBuilder("{$fieldName} + {$increment}", false);
+            $data[SchemaAbstract::tableWrapThrow($fieldName)] = new RawBuilder("$fieldName + $increment", false);
         }
         $where = $this->genPropertyConditions();
-        return $this->getActiveQuery()->where($where)->update($data);
-    }
-
-    /**
-     * 指定目标库或设定查询代理器
-     * @return string|DbProxy|null
-     */
-    public static function getProxy(): string|DbProxy|null {
-        return null;
-    }
-
-    /**
-     * @return DbActiveQuery<static>
-     */
-    public static function query(): DbActiveQuery {
-        return (new static)->getActiveQuery();
-    }
-
-    /**
-     * 取数据表主键集
-     * @return array
-     */
-    public static function getPkNames(): array {
-        if (! key_exists(static::class, self::$primaryKeysMapping)) {
-            self::$primaryKeysMapping[static::class] = [];
-            foreach (static::getFields() as $field) {
-                if ($field->isPrimaryKey()) {
-                    self::$primaryKeysMapping[static::class][] = $field->getName();
-                }
-            }
-        }
-        return self::$primaryKeysMapping[static::class];
+        return self::query()->where($where)->update($data);
     }
 }

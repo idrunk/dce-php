@@ -109,4 +109,7 @@ class QueryException extends Exception {
 
     #[Language(['ID %s 无法匹配到对应的分库, 数据无法完成插入'])]
     public const ID_CANNOT_MATCH_DB = 1380;
+
+    #[Language(['PDO::prepare() 超时'])]
+    public const PDO_PREPARE_TIMEOUT = 1395;
 }

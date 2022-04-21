@@ -10,9 +10,7 @@ use dce\Dce;
 
 class SessionManagerFile extends SessionManager {
     private const FDID_MAPPING_KEY = 'session-manager-fdid';
-
     private const SID_MAPPING_KEY = 'session-manager-sid';
-
     private const MID_MAPPING_KEY = 'session-manager-mid';
 
     /** @inheritDoc */

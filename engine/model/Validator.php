@@ -18,56 +18,23 @@ use Throwable;
 
 #[Attribute(Attribute::TARGET_PROPERTY | Attribute::IS_REPEATABLE)]
 class Validator {
-    /** @var string 默认值校验器, 填充默认属性值 */
-    public const RULE_DEFAULT = 'default';
-
-    /** @var string 过滤校验器, 过滤筛选字符 */
-    public const RULE_FILTER = 'filter';
-
-    /** @var string 日期校验器 */
-    public const RULE_DATE = 'date';
-
-    /** @var string 日期时间校验器 */
-    public const RULE_DATETIME = 'datetime';
-
-    /** @var string 邮箱校验器 */
-    public const RULE_EMAIL = 'email';
-
-    /** @var string IP4校验器 */
-    public const RULE_IP = 'ip';
-
-    /** @var string IP6校验器 */
-    public const RULE_IP6 = 'ip6';
-
-    /** @var string 数值校验器 */
-    public const RULE_NUMBER = 'number';
-
-    /** @var string 整数校验器 */
-    public const RULE_INTEGER = 'integer';
-
-    /** @var string 正则校验器 */
-    public const RULE_REGULAR = 'regular';
-
-    /** @var string 集合校验器 */
-    public const RULE_SET = 'set';
-
-    /** @var string 位集校验器 */
-    public const RULE_BITSET = 'bitset';
-
-    /** @var string 字符串校验器 */
-    public const RULE_STRING = 'string';
-
-    /** @var string URL校验器 */
-    public const RULE_URL = 'url';
-
-    /** @var string 必填校验器 */
-    public const RULE_REQUIRED = 'required';
-
-    /** @var string 必传校验器 (允许传空值) */
-    public const RULE_REQUIRED_EMPTY = 'required_empty';
-
-    /** @var string 唯一校验器 (活动记录专用) */
-    public const RULE_UNIQUE = 'unique';
+    public const RULE_DEFAULT = 'default'; // 默认值校验器, 填充默认属性值
+    public const RULE_FILTER = 'filter'; // 过滤校验器, 过滤筛选字符
+    public const RULE_DATE = 'date'; // 日期校验器
+    public const RULE_DATETIME = 'datetime'; // 日期时间校验器
+    public const RULE_EMAIL = 'email'; // 邮箱校验器
+    public const RULE_IP = 'ip'; // IP4校验器
+    public const RULE_IP6 = 'ip6'; // IP6校验器
+    public const RULE_NUMBER = 'number'; // 数值校验器
+    public const RULE_INTEGER = 'integer'; // 整数校验器
+    public const RULE_REGULAR = 'regular'; // 正则校验器
+    public const RULE_SET = 'set'; // 集合校验器
+    public const RULE_BITSET = 'bitset'; // 位集校验器
+    public const RULE_STRING = 'string'; // 字符串校验器
+    public const RULE_URL = 'url'; // URL校验器
+    public const RULE_REQUIRED = 'required'; // 必填校验器
+    public const RULE_REQUIRED_EMPTY = 'required_empty'; // 必传校验器 (允许传空值)
+    public const RULE_UNIQUE = 'unique'; // 唯一校验器 (活动记录专用)
 
     private static array $validatorMap = [
         self::RULE_DEFAULT => 'dce\model\validator\assignment\DefaultValidator',
@@ -220,12 +187,12 @@ class Validator {
 
     /**
      * 验证队列
-     * @param Model|string|int|float|bool|null $modelValue
+     * @param Model|mixed $modelValue
      * @param self[] $validators
      * @throws Throwable
      * @throws ValidatorException
      */
-    private static function validQueue(Model|string|int|float|bool|null & $modelValue, array $validators) {
+    private static function validQueue(mixed & $modelValue, array $validators) {
         $model = $modelValue instanceof Model ? $modelValue : null;
         foreach ($validators as $validator) {
             $value = $model ? $validator->property->getValue($model, false) : $modelValue;

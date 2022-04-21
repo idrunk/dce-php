@@ -12,7 +12,7 @@ use dce\model\validator\ValidatorException;
 class RequiredValidator extends TypeEnding {
     protected bool $allowEmpty = false;
 
-    protected function check(string|int|float|null|false $value):ValidatorException|null {
+    protected function check(mixed $value):ValidatorException|null {
         if (empty($value)) {
             $allowEmpty = $this->getProperty('allowEmpty');
             if (! $allowEmpty->value) {

@@ -21,10 +21,10 @@ class SetValidator extends TypeChecker {
     protected int $type;
 
     /**
-     * @param string|int|float|null|false $value
+     * @param mixed $value
      * @return ValidatorException|null
      */
-    protected function check(string|int|float|null|false $value):ValidatorException|null {
+    protected function check(mixed $value):ValidatorException|null {
         $set = $this->getProperty('set', lang(ValidatorException::SET_REQUIRED));
         $type = $this->getProperty('type');
         if ($set && ! (($type->value ?? 0) & self::TYPE_KEY_EXISTS ? key_exists($value, $set->value) : in_array($value, $set->value))) {

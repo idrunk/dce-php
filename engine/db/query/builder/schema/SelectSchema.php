@@ -44,9 +44,7 @@ class SelectSchema extends SchemaAbstract {
      * @return mixed
      */
     public function columnToKey(string|RawBuilder $column) {
-        if (! is_string($column) || ! $columnParts = self::tableNameParse($column)) {
-            return $column;
-        }
+        if (! is_string($column) || ! $columnParts = self::tableNameParse($column)) return $column;
         [, $columnName, $alias] = $columnParts;
         return $alias ?: $columnName;
     }

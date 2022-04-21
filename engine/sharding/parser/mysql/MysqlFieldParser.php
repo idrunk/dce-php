@@ -6,6 +6,7 @@
 
 namespace dce\sharding\parser\mysql;
 
+use dce\base\ParserTraverResult;
 use dce\sharding\parser\MysqlParser;
 use dce\sharding\parser\StatementParserException;
 
@@ -52,18 +53,18 @@ class MysqlFieldParser extends MysqlParser {
                     $frontIsConnector = false;
                 } else if (! $frontIsConnector || ! in_array($operator, self::$partSeparators)) {
                     $this->offset -= mb_strlen($operator);
-                    return self::TRAVERSE_CALLBACK_BREAK;
+                    return ParserTraverResult::Break;
                 }
-                return self::TRAVERSE_CALLBACK_STEP;
+                return ParserTraverResult::Step;
             },
             function ($word) use (& $frontIsConnector, & $parts) {
                 if ($frontIsConnector) {
                     $parts[] = ['value' => $word];
                     $frontIsConnector = false;
-                    return self::TRAVERSE_CALLBACK_STEP;
+                    return ParserTraverResult::Step;
                 } else {
                     $this->offset -= mb_strlen($word);
-                    return self::TRAVERSE_CALLBACK_BREAK;
+                    return ParserTraverResult::Break;
                 }
             }
         );
