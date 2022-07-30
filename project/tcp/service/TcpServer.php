@@ -24,9 +24,8 @@ class TcpServer extends ServerMatrix {
      * @throws TcpException
      */
     final public function start(array $param): void {
-        if (! is_subclass_of(static::$rawRequestTcpClass, RawRequestConnection::class)) {
+        if (! is_subclass_of(static::$rawRequestTcpClass, RawRequestConnection::class))
             throw new TcpException(TcpException::RAW_REQUEST_TCP_CLASS_ERROR);
-        }
 
         $this->projectConfig = ProjectManager::get('tcp')->getConfig();
         $tcpConfig = $this->projectConfig->tcp;
@@ -46,10 +45,9 @@ class TcpServer extends ServerMatrix {
         $this->server = new Server($host, $port, $mode, $sockType | $sslBit);
         // 拓展自定义Swoole Server配置
         $this->server->set($swooleTcpConfig);
-        foreach ($extraPorts as ['host' => $extraHost, 'port' => $extraPort, 'sock_type' => $extraSockType]) {
-            // 同时监听额外的端口
+        // 同时监听额外的端口
+        foreach ($extraPorts as ['host' => $extraHost, 'port' => $extraPort, 'sock_type' => $extraSockType])
             $this->server->listen($extraHost, $extraPort, $extraSockType);
-        }
         $this->eventBeforeStart($this->server);
 
         $this->server->on('connect', fn(Server $server, int $fd, int $reactorId) => Exception::catchRequest(fn() => $this->takeoverConnect($server, $fd, $reactorId)));
@@ -61,12 +59,11 @@ class TcpServer extends ServerMatrix {
         $this->server->on('close', fn(Server $server, int $fd, int $reactorId) => Exception::catchRequest(fn() => $this->takeoverClose($server, $fd, $reactorId)));
 
         // 扩展自定义的Swoole Server事件回调
-        foreach ($swooleTcpEvents as $eventName => $eventCallback) {
+        foreach ($swooleTcpEvents as $eventName => $eventCallback)
             $this->server->on($eventName, $eventCallback);
-        }
 
         $this->runApiService();
-        LogManager::dce(self::$langStarted->format('Tcp/Udp', $host, $port));
+        $this->printStartLog('Tcp/Udp', $host, $port, $extraPorts);
         $this->server->start();
     }
 

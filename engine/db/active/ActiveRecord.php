@@ -7,10 +7,12 @@
 namespace dce\db\active;
 
 use dce\base\CoverType;
+use dce\base\ExtractType;
 use dce\db\entity\Field;
 use dce\db\proxy\Transaction;
 use dce\model\Model;
 use dce\model\ModelException;
+use dce\model\Property;
 use drunk\Structure;
 use ReflectionClass;
 use ReflectionException;
@@ -21,11 +23,14 @@ abstract class ActiveRecord extends Model {
     /** @var class-string<Field> */
     protected static string $fieldClass;
 
-    /** @var array<string, Field[]> 活动记录字段集 */
-    private static array $fields = [];
+    /** @var string 实体储存名前缀 */
+    protected static string $prefix;
 
-    /** @var array<string, Field[]> 活动记录主键集 */
-    private static array $pkFields = [];
+    /** @var array<string, Property[]> 活动记录字段集 */
+    private static array $fieldProperties = [];
+
+    /** @var array<string, Property[]> 活动记录主键集 */
+    private static array $pkProperties = [];
 
     /** @var array<string, array<string, ActiveRelation>> 活动记录关系表 */
     private static array $relationMapping = [];
@@ -41,33 +46,59 @@ abstract class ActiveRecord extends Model {
 
     /**
      * 取主键值集
+     * @param bool $pureValue {true: 纯值数组, false: 字段为下标的数组}
      * @return array
      */
-    public function getPkValues(): array {
-        return array_reduce(static::getPkNames(), fn($carry, $pk) => $carry + [$pk => $this->$pk], []);
+    public function getPkValues(bool $pureValue = false): array {
+        return array_reduce(static::getPkNames(), fn($carry, $pk) => array_merge($carry, [$pureValue ? 0 : $pk => $this->$pk]), []);
     }
 
-    /**
-     * 处理Getter值 (取关联数据)
-     * @param string $name
-     * @param mixed $value
-     * @return ActiveRecord|array|string|int|float|false|null
-     */
+    /** @inheritDoc */
     protected function handleGetter(string $name, mixed $value): ActiveRecord|array|string|int|float|false|null {
         $value instanceof ActiveRelation && $value = $value->screen($this);
         return $value;
     }
 
+    /** @inheritDoc */
+    protected function setGetterValue(string $name, mixed $value, CoverType $coverType = CoverType::Replace): void {
+        if ($value && $relation = self::getActiveRelation($name)) {
+            if ($relation->isHasOne()) {
+                is_array($value) && $value = $relation->foreignActiveRecordClass::from($value, $coverType);
+            } else if (is_array($value[0] ?? 0)) {
+                $value = array_map(fn($item) => $relation->foreignActiveRecordClass::from($item, $coverType), $value);
+            }
+        }
+        parent::setGetterValue($name, $value, $coverType);
+    }
+
+    /** @inheritDoc */
+    protected function getGetterValue(string $name, array $extractArgs = []): mixed {
+        if (($value = parent::getGetterValue($name, $extractArgs)) && $extractArgs && $relation = self::getActiveRelation($name)) {
+            if ($relation->isHasOne()) {
+                $value = $value->extract(... $extractArgs);
+            } else {
+                $value = array_map(fn($item) => $item->extract(... $extractArgs), $value);
+            }
+        }
+        return $value;
+    }
+
     /**
      * 初始化查询结果活动记录实例 (对新实例属性赋值)
-     * @param array $properties
      * @return ActiveRecord
      */
-    public function setQueriedProperties(array $properties): static {
+    public function markQueriedProperties(): static {
         $this->clearGetterValues()->createByQuery = true;
-        static::apply($properties, CoverType::Unset);
-        $this->originalProperties = $this->extract(true, false);
+        $this->originalProperties = $this->extract();
         return $this;
+    }
+
+    /**
+     * 取活动记录原始查询值
+     * @return array
+     */
+    protected function getOriginalProperties(): array {
+        return $this->originalProperties;
     }
 
     /**
@@ -83,35 +114,7 @@ abstract class ActiveRecord extends Model {
      * @return array
      */
     protected function genPropertyConditions(): array {
-        return self::mappingToWhere($this->originalProperties);
-    }
-
-    /**
-     * 将模型属性键值表转查询条件
-     * @param array $mapping
-     * @return array
-     */
-    protected static function mappingToWhere(array $mapping): array {
-        return array_map(fn($kv) => [$kv[0], '=', $kv[1]], Structure::arrayEntries($mapping));
-    }
-
-    /**
-     * 保存数据 (插入或更新数据库)
-     * @return int|string
-     */
-    public function save(): int|string {
-        return $this->createByQuery ? $this->update() : $this->insert();
-    }
-
-    /**
-     * 删除数据库记录
-     * @return int
-     * @throws ActiveException
-     */
-    public function delete(): int {
-        ! $this->createByQuery && throw new ActiveException(ActiveException::CANNOT_DELETE_BEFORE_SAVE);
-        $where = $this->genPropertyConditions();
-        return static::query()->where($where)->delete();
+        return ActiveQuery::mappingToWhere(array_reduce(self::getPkProperties(), fn($m, $p) => array_merge($m, [$p->storeName => $p->dbValue($this->originalProperties[$p->name])]), []));
     }
 
     /**
@@ -124,12 +127,13 @@ abstract class ActiveRecord extends Model {
         if ($refClass->isAbstract()) return;
         // Field初始化
         Structure::forEach(self::getProperties(), fn($p) =>
-            ($attrs = $p->refProperty->getAttributes(static::$fieldClass)) && $p->setField($attrs[0]->newInstance()->setName(static::toDbKey($p->name))));
+            ($attrs = $p->refProperty->getAttributes(static::$fieldClass)) && $p->setField($attrs[0]->newInstance()->setName($p->storeName)));
         // ActiveRelation初始化
         $fakeInstance = $refClass->newInstanceWithoutConstructor();
         foreach ($refClass->getMethods(ReflectionMethod::IS_PUBLIC) as $method)
-            if ($method->getReturnType() instanceof ReflectionNamedType && $method->getReturnType()->getName() === ActiveRelation::class && ! $refClass->getParentClass()->hasMethod($method->name))
-                self::$relationMapping[static::class][($relation = $method->invoke($fakeInstance))->getName()] = $relation;
+            if ($method->getReturnType() instanceof ReflectionNamedType && $method->getReturnType()->getName() === ActiveRelation::class
+                && ! $refClass->getParentClass()->hasMethod($method->name) && $relation = $method->invoke($fakeInstance))
+                self::$relationMapping[static::class][$relation->name] = $relation;
     }
 
     /**
@@ -207,30 +211,30 @@ abstract class ActiveRecord extends Model {
      */
     public static function getTableName(): string {
         static $nameMapping = [];
-        if (! key_exists(static::class, $nameMapping))
-            $nameMapping[static::class] = static::toDbKey(preg_replace('/^.*\b(?=\w+$)/u', '', static::class));
-        return $nameMapping[static::class];
+        $modelName = (static::$prefix ?? '') . static::class;
+        ! key_exists($modelName, $nameMapping) && $nameMapping[$modelName] = static::toDbKey(preg_replace('/^.*\b(?=\w+$)/u', '', $modelName));
+        return $nameMapping[$modelName];
     }
 
     /**
      * 取字段集
-     * @return Field[]
+     * @return Property[]
      */
-    public static function getFields(): array {
-        if (! key_exists(static::class, self::$fields))
-            self::$fields[static::class] = array_column(array_filter(static::getProperties(), fn($p) => isset($p->field)), 'field');
-        return self::$fields[static::class];
+    public static function getFieldProperties(): array {
+        if (! key_exists(static::class, self::$fieldProperties))
+            self::$fieldProperties[static::class] = array_filter(array_values(static::getProperties()), fn($p) => isset($p->field));
+        return self::$fieldProperties[static::class];
     }
 
-    /** @return Field[] */
-    public static function getPks(): array {
-        ! key_exists(static::class, self::$pkFields) && self::$pkFields[static::class] = array_filter(self::getFields(), fn($f) => $f->isPrimaryKey());
-        return self::$pkFields[static::class];
+    /** @return Property[] */
+    public static function getPkProperties(): array {
+        ! key_exists(static::class, self::$pkProperties) && self::$pkProperties[static::class] = array_filter(self::getFieldProperties(), fn($p) => $p->field->isPrimaryKey());
+        return self::$pkProperties[static::class];
     }
 
     /** @return string[] */
     public static function getPkNames(): array {
-        return array_map(fn($f) => $f->getName(), self::getPks());
+        return array_map(fn($p) => $p->name, self::getPkProperties());
     }
 
     /**
@@ -247,8 +251,13 @@ abstract class ActiveRecord extends Model {
 
     /**
      * 将当前对象更新到数据库
-     * @param array $columns 指定需更新的属性字段而不更新全部
      * @return int
      */
-    abstract public function update(array $columns = []): int;
+    abstract public function update(): int;
+
+    /**
+     * 将当前实体从数据库删除
+     * @return int
+     */
+    abstract public function delete(): int;
 }

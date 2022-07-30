@@ -7,8 +7,11 @@
 namespace dce\model;
 
 use dce\base\CoverType;
+use dce\base\ExtractType;
+use dce\Dce;
 use dce\loader\Decorator;
 use drunk\Char;
+use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionProperty;
 use Throwable;
@@ -17,7 +20,13 @@ abstract class Model implements Decorator {
     /** @var string 默认场景名 */
     public const SCENARIO_DEFAULT = 'default';
 
-    /** @var Property[][] 模型属性实例映射表 */
+    /** @var int 模型ID，用于扩展属性等 */
+    public static int $modelId;
+
+    /** @var bool 是否自动缓存（若开启，活动记录将自动缓存所有属性字段） */
+    public static bool $cacheable = false;
+
+    /** @var Property[][][] 模型属性实例映射表 */
     private static array $properties = [];
 
     /** @var Validator[][][] 模型属性校验规则映射表 */
@@ -45,8 +54,7 @@ abstract class Model implements Decorator {
             ? $properties = array_reduce(array_keys($properties), fn($ps, $k) => array_merge($ps, [static::toModelKey($k) => $properties[$k]]), [])
             : array_filter(get_object_vars($properties), fn($v) => $v !== null));
 
-        $isIgnore = $coverType === CoverType::Ignore;
-        foreach ($passedKeys as $key) $this->setPropertyValue($key, $properties[$key], $isIgnore);
+        foreach ($passedKeys as $key) $this->setPropertyValue($key, $properties[$key], $coverType);
 
         if ($coverType === CoverType::Unset)
             foreach (static::getProperties() as $property)
@@ -60,28 +68,36 @@ abstract class Model implements Decorator {
      * 设置属性值
      * @param string $key
      * @param mixed $value
-     * @param bool $ignoreExists
+     * @param CoverType $coverType
      */
-    public function setPropertyValue(string $key, mixed $value, bool $ignoreExists = false): void {
+    public function setPropertyValue(string $key, mixed $value, CoverType $coverType = CoverType::Replace): void {
         $property = $this->getProperty($key);
         // 此处本不应设置getterValue，但为了ActiveRecord::setQueriedProperties及DbActiveQuery::select等能高效方便的将关系数据储存到新建对象中，方才自动处理
-        $property ? $property->setValue($this, $value, $ignoreExists) : $this->setGetterValue($key, $value);
+        $property ? $property->setValue($this, $value, $coverType === CoverType::Ignore) : $this->setGetterValue($key, $value, $coverType);
     }
 
     /**
      * 提取模型属性键值表
-     * @param bool|null $toStorableOrKeep {true: toDbKey and toStorable, null: toDbKey, false: return as is key and value}
+     * @param ExtractType $type {true: toDbKey and toStorable, null: toDbKey, false: return as is key and value}
      * @param mixed $null
      * @return array
      */
-    public function extract(bool|null $toStorableOrKeep = false, mixed $null = null): array {
+    public function extract(ExtractType $type = ExtractType::KeepKey, mixed $null = null): array {
         $mapping = [];
-        foreach (static::getProperties() as $property) {
-            if ($null !== $value = $property->getValue($this, $null, true === $toStorableOrKeep)) {
-                $mappingKey = false === $toStorableOrKeep ? $property->name : static::toDbKey($property->name);
+        // 若为储存，则仅留纯Property（排除ExtProperty）
+        $filterFn = match ($type) {
+            ExtractType::DbSave => fn($p) => ! $p->isExtend(),
+            ExtractType::ExtSave => fn($p) => $p->isExtend(),
+            default => false,
+        };
+        foreach (($filterFn ? array_filter(static::getProperties(), $filterFn) : static::getProperties()) as $property) {
+            if ($null !== $value = $property->getValue($this, $null, in_array($type, [ExtractType::DbSave, ExtractType::Serialize]))) {
+                $mappingKey = ExtractType::KeepKey === $type ? $property->name : static::toDbKey($property->name);
                 $mapping[$mappingKey] = $value;
             }
         }
+        if (false === $filterFn)
+            foreach (array_keys($this->getterValues) as $k) $mapping[ExtractType::KeepKey === $type ? $k : static::toDbKey($k)] = $this->getGetterValue($k, [$type, $null]);
         return $mapping;
     }
 
@@ -158,12 +174,12 @@ abstract class Model implements Decorator {
         $staticClass = $refClass->getName();
         self::$scenarioRulesMapping[$staticClass] = [];
         foreach ($refClass->getProperties(ReflectionProperty::IS_PUBLIC) as $refProperty) {
-            if ($attributes = $refProperty->getAttributes(Property::class)) {
+            if ($attributes = $refProperty->getAttributes(Property::class, ReflectionAttribute::IS_INSTANCEOF)) {
                 $properties[$refProperty->name] = $propertyInstance = $attributes[0]->newInstance();
                 $validatorInstances = [];
                 foreach ($refProperty->getAttributes(Validator::class) as $ruleProperty)
                     $validatorInstances[] = $ruleProperty->newInstance()->setProperty($propertyInstance);
-                $propertyInstance->applyProperties($refProperty, $validatorInstances);
+                $propertyInstance->applyProperties($refProperty, $validatorInstances, $staticClass);
 
                 // 按场景分组校验器
                 foreach ($validatorInstances as $validator)
@@ -173,15 +189,40 @@ abstract class Model implements Decorator {
         }
         // 将校验器按照类型分组
         array_walk(self::$scenarioRulesMapping[$staticClass], fn(&$validators) => $validators = Validator::validatorsClassify($validators));
-        self::$properties[$staticClass] = $properties ?? [];
+        self::$properties[$staticClass]['nameIndex'] = $properties ?? [];
+        self::$properties[$staticClass]['idIndex'] = array_reduce(self::$properties[$staticClass]['nameIndex'], fn($m, $p) => $m + ($p?->id ? [$p->id => $p] : []), []);
     }
 
     /**
      * 取实例类的模型属性实例表
      * @return Property[]
      */
-    protected static function getProperties(): array {
-        return self::$properties[static::class];
+    protected static function getProperties(bool $nameIndexed = true): array {
+        return self::$properties[static::class][$nameIndexed ? 'nameIndex' : 'idIndex'];
+    }
+
+    /** @return Property[] */
+    public static function getExtProperties(): array {
+        $properties = Dce::$cache->var->get(['ext_properties', static::class]);
+        ! $properties && Dce::$cache->var->set(['ext_properties', static::class],
+            $properties = array_filter(self::getProperties(false), fn($p) => $p->isExtend()));
+        return $properties;
+    }
+
+    /** @return Property[] */
+    protected static function getModifyRecordProperties(): array {
+        $properties = Dce::$cache->var->get(['modify_record_properties', static::class]);
+        ! $properties && Dce::$cache->var->set(['modify_record_properties', static::class],
+            $properties = array_filter(self::getProperties(false), fn($p) => $p->isModifyRecord()));
+        return $properties;
+    }
+
+    /** @return Property[] */
+    protected static function getCacheProperties(): array {
+        $properties = Dce::$cache->var->get(['cache_properties', static::class]);
+        ! $properties && Dce::$cache->var->set(['cache_properties', static::class],
+            $properties = array_filter(self::getProperties(false), fn($p) => $p->isNeedCache(static::class)));
+        return $properties;
     }
 
     /**
@@ -190,8 +231,12 @@ abstract class Model implements Decorator {
      * @param callable|null $thrownSupplier
      * @return Property|null
      */
-    public function getProperty(string $name, callable $thrownSupplier = null): Property|null {
+    public static function getProperty(string $name, callable $thrownSupplier = null): Property|null {
         return self::getProperties()[$name] ?? ($thrownSupplier ? call_user_func($thrownSupplier) : null);
+    }
+
+    public static function getPropertyById(int $id, callable $thrownSupplier = null): Property|null {
+        return self::getProperties(false)[$id] ?? ($thrownSupplier ? call_user_func($thrownSupplier) : null);
     }
 
     /**
@@ -249,17 +294,19 @@ abstract class Model implements Decorator {
      * 缓存getter值
      * @param string $name
      * @param mixed $value
+     * @param CoverType $coverType
      */
-    private function setGetterValue(string $name, mixed $value): void {
-        $this->getterValues[$name] = $value;
+    protected function setGetterValue(string $name, mixed $value, CoverType $coverType = CoverType::Replace): void {
+        ($coverType !== CoverType::Ignore || ! $this->hasGetterValue($name)) && $this->getterValues[$name] = $value;
     }
 
     /**
      * 取getter缓存值
      * @param string $name
+     * @param array $extractArgs
      * @return mixed
      */
-    private function getGetterValue(string $name): mixed {
+    protected function getGetterValue(string $name, array $extractArgs = []): mixed {
         return $this->getterValues[$name] ?? null;
     }
 
@@ -268,7 +315,7 @@ abstract class Model implements Decorator {
      * @param string $name
      * @return bool
      */
-    private function hasGetterValue(string $name): bool {
+    protected function hasGetterValue(string $name): bool {
         return key_exists($name, $this->getterValues);
     }
 

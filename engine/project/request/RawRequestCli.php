@@ -30,7 +30,6 @@ class RawRequestCli extends RawRequest {
     /**
      * 将命令行命令路径组装为通用形式
      * @return string
-     * @throws RequestException
      */
     private function makeQueryPath(): string {
         global $argc, $argv;
@@ -109,5 +108,10 @@ class RawRequestCli extends RawRequest {
     /** @inheritDoc */
     public function getClientInfo(): array {
         return ['request' => "$this->method /$this->path"];
+    }
+
+    /** @inheritDoc */
+    public function getServerInfo(): array {
+        return [];
     }
 }

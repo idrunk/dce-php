@@ -25,24 +25,32 @@ class ShardingTransaction extends Transaction {
 
     private DbPool $pool;
 
-    public function __construct(
+    private const CLEAR_TRIGGER_SECOND = 10;
+
+    private static int $lastBegin = PHP_INT_MAX >> 8;
+
+    private static int $lastCommit = 0;
+
+    private function __construct(
         private string $shardingAlias,
     ) {
         parent::__construct();
         $this->requestId = RequestManager::currentId();
-        $this->clearExpired();
+        // 如果提交过，最后事务开始10秒后还没完成，或前个事务10秒还没提交，则进入自动清除过期事务流程
+        (self::$lastCommit ? self::$lastBegin - self::$lastCommit : $this->createStamp - self::$lastBegin)
+            > self::CLEAR_TRIGGER_SECOND && $this->clearExpired();
+        self::$lastBegin = $this->createStamp;
     }
 
     /** @inheritDoc */
     protected function envValid(): void {
-        if (! SwooleUtility::inCoroutine()) {
-            throw new TransactionException(TransactionException::NEED_RUN_IN_COROUTINE);
-        }
+        ! SwooleUtility::inCoroutine() && throw new TransactionException(TransactionException::NEED_RUN_IN_COROUTINE);
     }
 
     /** @inheritDoc */
     public function commit(): bool {
         $result = parent::commit();
+        self::$lastCommit = time();
         $this->pool->put($this->connector);
         return $result;
     }
@@ -67,12 +75,28 @@ class ShardingTransaction extends Transaction {
         return null;
     }
 
+    public static function rollbackRequestThrown(int $requestId): void {
+        if (SwooleUtility::inCoroutine()) foreach (self::$pond as $trans) $trans->requestId === $requestId && $trans->rollback();
+    }
+
+    /**
+     * 实例化一个事务对象，并递增进入计数
+     * @param string $shardingAlias
+     * @return static
+     */
+    public static function begin(string $shardingAlias): self {
+        $instance = self::aliasMatch($shardingAlias) ?? new self($shardingAlias);
+        $instance->entries ++;
+        return $instance;
+    }
+
     /**
      * 尝试开启事务
      * @param string $shardingAlias
      * @param string $dbAlias
      * @param DbPool $dbPool
      * @return self|DbConnector
+     * @throws TransactionException
      */
     public static function tryBegin(string $shardingAlias, string $dbAlias, DbPool $dbPool): self|DbConnector {
         $transaction = self::aliasMatch($shardingAlias);

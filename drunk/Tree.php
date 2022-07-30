@@ -92,7 +92,7 @@ abstract class Tree {
 
     /**
      * 遍历全树执行回调函数
-     * @param callable $callback(static $child) @return {false: 跳出兄弟级遍历, 0: 不遍历子级}
+     * @param callable $callback(static $child) @return {TreeTraverResult::StopAll: 停止遍历, TreeTraverResult::StopSibling: 跳出兄弟级遍历, TreeTraverResult::StopChild: 不遍历子级}
      */
     public function traversal(callable $callback): void {
         $parents = [$this];

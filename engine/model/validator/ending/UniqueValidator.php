@@ -15,6 +15,7 @@ class UniqueValidator extends TypeEnding {
 
     protected function check(mixed $value):ValidatorException|null {
         if ($this->model instanceof ActiveRecord) {
+            if (! $value) return null;
             $combined = $this->getProperty('combined');
             $combinedNames = $combined->value ?? [];
             $whereConditions = [[$this->model::toDbKey($this->modelPropertyName), '=', $value]];

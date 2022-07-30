@@ -203,7 +203,7 @@ final class NodeManager {
                 $node->omissiblePath && ! $child->parent->hasHiddenChild($child->pathFormat) && $child->parent->addHiddenChild($child, $child->pathFormat);
 
                 ! isset($node->corsOrigins) && $node->corsOrigins = $parentNode->corsOrigins ?? [];
-                ! isset($node->methods) && $node->methods = $parentNode->methods ?? ['get' => null, 'head' => null];
+                ! isset($node->methods) && $node->methods = $parentNode->methods ?? ['get' => null];
                 if (! isset($node->render)) {
                     $node->render = isset($parentNode->render) && ! str_contains($parentNode->render, '.') ? $parentNode->render : Renderer::TYPE_JSON;
                 } else if (! str_contains($node->render, '.')) {
@@ -285,20 +285,21 @@ final class NodeManager {
     /**
      * 根据主机地址匹配节点树 (主用于对主机与项目绑定特性的支持)
      * @param string $host
+     * @param int $port
      * @return NodeTree|null
      */
-    public static function getTreeByHost(string $host): NodeTree|null {
+    public static function getTreeByHost(string $host, int $port): NodeTree|null {
         static $hostTreeMapping;
         if (null === $hostTreeMapping) {
             $hostTreeMapping = [];
             foreach (self::getRootTree()->children as $child) {
                 foreach ($child->nodes as $node) {
                     foreach ($node->projectHosts ?? [] as $nodeHost)
-                        $hostTreeMapping[$nodeHost] = $child;
+                        $hostTreeMapping[sprintf('%s:%s', $nodeHost['host'] ?? 'any', $nodeHost['port'] ?? 'any')] = $child;
                 }
             }
         }
-        return $hostTreeMapping[$host] ?? null;
+        return $hostTreeMapping["any:$port"] ?? $hostTreeMapping["$host:any"] ?? null; // 端口或主机匹配即可，无需全匹配，实际意义不大
     }
 
     public static function exists(string $path, bool $tryFillRoot = true): NodeTree|null {

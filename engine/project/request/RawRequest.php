@@ -51,6 +51,12 @@ abstract class RawRequest {
     abstract public function getClientInfo(): array;
 
     /**
+     * 取服务端信息, {host, port}
+     * @return array{host: string, port: int}
+     */
+    abstract public function getServerInfo(): array;
+
+    /**
      * 取原始请求提交数据
      * @return string|string[]
      */

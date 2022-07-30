@@ -107,6 +107,9 @@ class QueryException extends Exception {
     #[Language(['当前设置不允许无等于条件更新数据'])]
     public const NO_EQUAL_UPDATE_NOT_ALLOW = 1363;
 
+    #[Language(['不支持批量INSERT UPDATE'])]
+    public const NOT_ALLOW_BATCH_INSERT_UPDATE = 1364;
+
     #[Language(['ID %s 无法匹配到对应的分库, 数据无法完成插入'])]
     public const ID_CANNOT_MATCH_DB = 1380;
 

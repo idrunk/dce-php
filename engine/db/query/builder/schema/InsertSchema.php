@@ -33,7 +33,7 @@ class InsertSchema extends SchemaAbstract {
             $this->columns[$k] = $columnName;
         }
 
-        foreach ($data as $i=>$datum) {
+        foreach ($data as $datum) {
             $placeholders = [];
             foreach ($columns as $column) {
                 $value = $datum[$column] ?? null;

@@ -494,6 +494,16 @@ class Query {
     }
 
     /**
+     * 插入单条数据，当唯一约束数据存在时，更新这条数据
+     * @param array $data
+     * @return int|string
+     */
+    public function insertUpdate(array $data): int|string {
+        $statement = $this->queryBuilder->buildInsertUpdate($data);
+        return $this->proxy->queryGetInsertId($statement);
+    }
+
+    /**
      * 按查询结果插入数据
      * @param SelectStatement|RawBuilder $selectStatement 查询语句
      * @param string|array|null $columns 写入数据对应字段, 支持逗号分隔的字段名字符串, 或字段名数组

@@ -16,6 +16,9 @@ class ActiveRelation {
     /** @var list<ActiveRelation> 反向的via关系集，用于数据映射 */
     private array $reversedVias = [];
 
+    /** @var array<string, mixed> 主记录过滤条件，仅对匹配的主记录绑定关系数据 */
+    private array $primaryQualifiers = [];
+
     /**
      * @param string $name
      * @param class-string<ActiveRecord> $primaryActiveRecordClass
@@ -25,9 +28,9 @@ class ActiveRelation {
      * @param ActiveRelation|null $via 依赖的关系实例
      */
     public function __construct(
-        readonly private string $name,
-        string $primaryActiveRecordClass,
-        readonly private string $foreignActiveRecordClass,
+        readonly public string $name,
+        readonly private string $primaryActiveRecordClass,
+        readonly public string $foreignActiveRecordClass,
         array $relationMapping,
         private bool $hasOneBool,
         readonly public ActiveRelation|null $via
@@ -40,8 +43,10 @@ class ActiveRelation {
         if ($via) do {array_unshift($this->reversedVias, $via);} while($via = $via->via);
     }
 
-    public function getName(): string {
-        return $this->name;
+    public function qualify(array $primaryQualifiers): self {
+        $this->primaryQualifiers = array_reduce(array_keys($primaryQualifiers),
+            fn($qs, $qk) => $qs + [$this->primaryActiveRecordClass::toModelKey($qk) => $primaryQualifiers[$qk]], []);
+        return $this;
     }
 
     public function getReversedVias(): array {
@@ -123,16 +128,25 @@ class ActiveRelation {
         $this->via && $primaryConditionData = key_exists($this->via->name, $relationDataMapping)
             ? $relationDataMapping[$this->via->name] : $this->via->loadWithActiveRecordList($primaryConditionData, $relationDataMapping);
 
+        // 当ID可能与多个表关联时，需根据类型筛选出正确的关联表
+        $this->primaryQualifiers && $primaryConditionData = array_filter($primaryConditionData, function($record) {
+            foreach ($this->primaryQualifiers as $prop => $value)
+                if ($record->{$prop} !== $value) return false;
+            return true;
+        });
+
         // 有via数据时才能查with数据，否则设为空数组即可，即主数据没有关联的with数据
         $relationData = [];
         if ($primaryConditionData) {
             // 这里在为单一条件时没问题, 在为多条件时会多查出单条件匹配但可能多条件不匹配的数据, 但对于最终正确结果的匹配无影响
             // 根据依赖关系批量查出所有关联数据, 此处虽然新建了ActiveQuery对象, 但因为主ActiveQuery对象缓存了数据，且非with查询，所以不会重复发送相同查询请求
-            $relationData = $this->newForeignActiveQuery()->where(array_map(function ($c) use ($primaryConditionData) {
+            $where = array_reduce($this->getRelationColumns(), function ($cm, $c) use ($primaryConditionData) {
                 $relationWhereParams = array_map(fn($conditionDatum) => $conditionDatum->{$c['modelPrimary']}, $primaryConditionData);
                 ! $relationWhereParams && throw (new ActiveException(ActiveException::PRIMARY_RECORD_NO_FOREIGN_COLUMN))->format($this->name, $c['modelPrimary']);
-                return [$c['dbForeign'], 'in', array_unique($relationWhereParams)];
-            }, $this->getRelationColumns()))->select();
+                $relationWhereParams = array_filter($relationWhereParams, fn($p) => $p !== null);
+                return array_merge($cm, $relationWhereParams ? [[$c['dbForeign'], 'in', array_unique($relationWhereParams)]] : []);
+            }, []);
+            $where && $relationData = $this->newForeignActiveQuery()->where($where)->select();
         }
 
         $relationDataMapping[$this->name] = $relationData;

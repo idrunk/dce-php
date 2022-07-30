@@ -10,6 +10,7 @@ use ArrayAccess;
 use ArrayObject;
 use drunk\Char;
 use drunk\Structure;
+use ReflectionException;
 use ReflectionObject;
 use SplFixedArray;
 
@@ -22,7 +23,7 @@ class Config implements ArrayAccess {
      * ConfigMatrix constructor.
      * @param array|ArrayAccess $config
      * @throws ConfigException
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     function __construct(array|ArrayAccess $config = []) {
         $this->extend($config);
@@ -33,12 +34,10 @@ class Config implements ArrayAccess {
      * @param array|ArrayAccess $config
      * @return static
      * @throws ConfigException
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public static function inst(array|ArrayAccess $config = []): static {
-        if (! key_exists(static::class, self::$instMapping)) {
-            self::$instMapping[static::class] = new static($config);
-        }
+        ! key_exists(static::class, self::$instMapping) && self::$instMapping[static::class] = new static($config);
         return self::$instMapping[static::class];
     }
 
@@ -59,17 +58,11 @@ class Config implements ArrayAccess {
      */
     public function get(string $key): mixed {
         $property = Char::camelize($key);
-        if (property_exists($this, $property)) {
-            return $this->$property;
-        }
+        if (property_exists($this, $property)) return $this->$property;
         Structure::arraySplitKey($key, $key, $keyArray); // 拆分键为主键及数组下标数组
-        if (! isset($this->dynamics[$key])) {
-            return null; // 若无该配置, 则返回null
-        }
+        if (! isset($this->dynamics[$key])) return null; // 若无该配置, 则返回null
         $value = $this->dynamics[$key];
-        if (empty($keyArray)) {
-            return $value; // 若非取子元素, 则直接返回整个配置
-        }
+        if (empty($keyArray)) return $value; // 若非取子元素, 则直接返回整个配置
         return Structure::arrayIndexGet($value, $keyArray);
     }
 
@@ -79,7 +72,6 @@ class Config implements ArrayAccess {
      * @param mixed $value
      * @return $this
      * @throws ConfigException
-     * @throws \ReflectionException
      */
     public function set(string $key, mixed $value): self {
         $property = Char::camelize($key);
@@ -89,13 +81,9 @@ class Config implements ArrayAccess {
                 $this->dynamics[$key] = $value; // 若非设置子元素, 则直接覆盖配置
                 return $this;
             }
-            if (! array_key_exists($key, $this->dynamics)) {
-                $this->dynamics[$key] = []; // 若未定义配置, 则初始化为空数组
-            }
+            ! array_key_exists($key, $this->dynamics) && $this->dynamics[$key] = []; // 若未定义配置, 则初始化为空数组
             $valueRoot = Structure::arrayAssign($this->dynamics[$key], $keyArray, $value);
-            if (! $valueRoot) {
-                throw new ConfigException(ConfigException::ITERATION_ASSIGNMENT_ERROR);
-            }
+            ! $valueRoot && throw new ConfigException(ConfigException::ITERATION_ASSIGNMENT_ERROR);
             $this->dynamics[$key] = $valueRoot;
         }
         return $this;
@@ -151,12 +139,10 @@ class Config implements ArrayAccess {
      * @param array|ArrayAccess $config
      * @return $this
      * @throws ConfigException
-     * @throws \ReflectionException
      */
     public function extend(array|ArrayAccess $config): self {
-        foreach ($config as $key => $value) {
+        foreach ($config as $key => $value)
             $this->set($key, $value);
-        }
         return $this;
     }
 
@@ -167,9 +153,7 @@ class Config implements ArrayAccess {
      */
     public function del(string $key): self {
         Structure::arraySplitKey($key, $key, $keyArray);
-        if (! array_key_exists($key, $this->dynamics)) {
-            return $this;
-        }
+        if (! array_key_exists($key, $this->dynamics)) return $this;
         if (empty($keyArray)) {
             unset($this->dynamics[$key]);
         } else {
@@ -200,7 +184,7 @@ class Config implements ArrayAccess {
      * @param string $key
      * @param mixed $value
      * @throws ConfigException
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function __set(string $key, mixed $value) {
         $this->set($key, $value);

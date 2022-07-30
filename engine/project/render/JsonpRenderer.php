@@ -9,6 +9,7 @@ namespace dce\project\render;
 use dce\project\Controller;
 use dce\project\request\RawRequest;
 use dce\project\request\RawRequestHttp;
+use stdClass;
 
 class JsonpRenderer extends Renderer {
     /** @inheritDoc */
@@ -19,7 +20,7 @@ class JsonpRenderer extends Renderer {
     /** @inheritDoc */
     protected function rendering(Controller $controller, mixed $data): string {
         $callback = $controller->request->get[$controller->request->node->jsonpCallback];
-        $response = json_encode(false === $data ? $controller->getAllAssignedStatus() : $data, JSON_UNESCAPED_UNICODE);
+        $response = json_encode(false === $data ? ($controller->getAllAssignedStatus() ?: new stdClass) : $data, JSON_UNESCAPED_UNICODE);
         return "{$callback}({$response})";
     }
 }

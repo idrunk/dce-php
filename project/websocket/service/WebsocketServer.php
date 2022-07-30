@@ -43,9 +43,8 @@ class WebsocketServer extends ServerMatrix {
      * @throws WebsocketException
      */
     final public function start(array $param): void {
-        if (! is_subclass_of(static::$rawRequestWebsocketClass, RawRequestConnection::class)) {
+        if (! is_subclass_of(static::$rawRequestWebsocketClass, RawRequestConnection::class))
             throw new WebsocketException(WebsocketException::RAW_REQUEST_WEBSOCKET_CLASS_ERROR);
-        }
 
         $this->projectConfig = ProjectManager::get('websocket')->getConfig();
         $websocketConfig = $this->projectConfig->websocket;
@@ -63,34 +62,30 @@ class WebsocketServer extends ServerMatrix {
         $this->server = new Server($host, $port, SWOOLE_PROCESS, SWOOLE_SOCK_TCP | $sslBit);
         // 拓展自定义Swoole Server配置
         $this->server->set($swooleWebsocketConfig);
-        foreach ($extraPorts as ['host' => $extraHost, 'port' => $extraPort]) {
-            // 同时监听额外的端口
+        // 同时监听额外的端口
+        foreach ($extraPorts as ['host' => $extraHost, 'port' => $extraPort])
             $this->server->listen($extraHost, $extraPort, SWOOLE_SOCK_TCP);
-        }
         $this->eventBeforeStart($this->server);
 
         $this->server->on('open', fn(Server $server, Request $request) => Exception::catchRequest(fn() => $this->takeoverOpen($server, $request)));
 
         $this->server->on('message', fn(Server $server, Frame $frame) => Exception::catchRequest(fn() => $this->takeoverMessage($server, $frame)));
 
-        $this->server->on('close', fn(Server $server, int $fd, int $reactorId) => Exception::catchRequest(fn() => $this->takeoverClose($server, $fd, $reactorId)));
+        $this->server->on('close', fn(Server $server, int $fd, int $reactorId) => Exception::catchRequest(fn() => $server->getClientInfo($fd, $reactorId)['websocket_status'] && $this->takeoverClose($server, $fd, $reactorId)));
 
-        if ($websocketConfig['enable_http'] ?? false) {
+        if ($websocketConfig['enable_http'] ?? false)
             $this->server->on('request', fn(Request $request, Response $response) => Exception::catchRequest(fn() => $this->takeoverRequest($request, $response)));
-        }
 
         // 扩展自定义的Swoole Server事件回调
-        foreach ($swooleWebsocketEvents as $eventName => $eventCallback) {
+        foreach ($swooleWebsocketEvents as $eventName => $eventCallback)
             $this->server->on($eventName, $eventCallback);
-        }
 
         // 开启Tcp/Udp支持
-        if (is_array($websocketConfig['enable_tcp_ports'] ?? false)) {
+        if (is_array($websocketConfig['enable_tcp_ports'] ?? false))
             $this->enableTcpPorts($websocketConfig['enable_tcp_ports'], $this->projectConfig->swooleTcp ?: []);
-        }
 
         $this->runApiService();
-        LogManager::dce(self::$langStarted->format('Websocket', $host, $port));
+        $this->printStartLog('Websocket', $host, $port, $extraPorts);
         $this->server->start();
     }
 

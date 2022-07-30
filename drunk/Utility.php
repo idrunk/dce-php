@@ -62,7 +62,7 @@ final class Utility {
         return false;
     }
 
-    public static function noop(): callable {
+    public static function noop(mixed ...$args): callable {
         static $noop;
         $noop ??= fn() => null;
         return $noop;

@@ -6,11 +6,16 @@
 
 namespace dce\project\request;
 
+use dce\base\QuietException;
 use dce\project\node\Node;
 use dce\project\node\NodeManager;
+use drunk\Network;
 use Throwable;
 
 abstract class RawRequestHttp extends RawRequest {
+    public const METHOD_OPTIONS = 'options';
+    public const METHOD_HEAD = 'head';
+
     public bool $isHttps;
 
     public string $host;
@@ -104,7 +109,7 @@ abstract class RawRequestHttp extends RawRequest {
     protected function getPath(): string {
         $this->pathInQueryString = str_starts_with($this->queryString, '/');
         $path = $this->pathInQueryString ? $this->queryString : $this->requestUri;
-        $nodeTree = NodeManager::getTreeByHost($this->host);
+        $nodeTree = NodeManager::getTreeByHost($this->host, $this->serverPort);
         if ($nodeTree) {
             $slash = str_starts_with($path, '/') ? '/' : '';
             if (! str_starts_with($path, "{$slash}{$nodeTree->projectName}"))
@@ -116,7 +121,7 @@ abstract class RawRequestHttp extends RawRequest {
     /** @inheritDoc */
     public function routeGetNode(): Node {
         try {
-            $router = new Router($this);// 取路由定位到的当前节点及其上级节点ID集
+            $router = new Router($this); // 取路由定位到的当前节点及其上级节点ID集
             $nodeIdFamily = $router->getLocatedNodeIdFamily();
             // 取从请求地址中解析出来的参数
             $this->locatedArguments = $router->getLocatedArguments();
@@ -174,15 +179,14 @@ abstract class RawRequestHttp extends RawRequest {
         } else if ('get' !== $this->method) {
             $post = $this->parseRawData() ?? [];
             switch ($this->method) {
-                case 'post':
-                    $request->post = $post;
-                    break;
                 case 'put':
                     $request->put = $post;
                     break;
-                case 'delete':
-                    $request->delete = $post;
+                case 'patch':
+                    $request->patch = $post;
                     break;
+                default:
+                    $request->post = $post;
             }
         }
         return $post;
@@ -200,17 +204,29 @@ abstract class RawRequestHttp extends RawRequest {
     /**
      * 处理跨域
      * @param Request $request
+     * @throws QuietException
      */
     private function handleCors(Request $request): void {
-        if ($request->node->corsOrigins ?? []) {
-            $this->header('Access-Control-Allow-Origin', implode(',', $request->node->corsOrigins));
+        if ($corsOrigins = $request->node->corsOrigins ?? []) {
+            // 若配置了跨域白名单，则允许所有本地地址跨域
+            if (Network::isLocalIp($this->getClientInfo()['ip'])) $corsOrigins = ['*'];
+            $this->header('Access-Control-Allow-Origin', implode(',', $corsOrigins));
             $this->header('Access-Control-Allow-Credentials', 'true');
-            $this->header('Access-Control-Allow-Methods', 'GET,PUT,DELETE,POST,OPTIONS');
+            $this->header('Access-Control-Allow-Methods', 'GET,PUT,DELETE,POST,HEAD,OPTIONS');
             $this->header('Access-Control-Allow-Headers', 'X-Requested-With, X-Session-Id, Content-Type, Authorization, Accept, Cookie, Origin, Referer, UserToken, ReferToken');
             $this->header('Access-Control-Max-Age', '7200');
-            if($this->method === 'options') {
-                die('*_^');
+            if($this->method === self::METHOD_OPTIONS) {
+                $this->response('*_^');
+                throw new QuietException(0);
             }
         }
+    }
+
+    /** @inheritDoc */
+    public function getServerInfo(): array {
+        return [
+            'host' => $this->host,
+            'port' => $this->serverPort,
+        ];
     }
 }

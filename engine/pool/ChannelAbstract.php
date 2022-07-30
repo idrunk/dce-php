@@ -13,9 +13,7 @@ abstract class ChannelAbstract{
     protected int $capacity;
 
     public function __construct(int $capacity = 0) {
-        if ($capacity > 0) {
-            $this->setCapacity($capacity);
-        }
+        $capacity > 0 && $this->setCapacity($capacity);
     }
 
     /**

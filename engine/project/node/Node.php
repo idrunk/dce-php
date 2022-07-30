@@ -86,7 +86,7 @@ class Node {
     /** @var bool 是否目录节点 */
     public bool $isDir = false;
 
-    /** @var array 项目绑定域名 (只在项目根节点配置有效, 当访问绑定的域名时, 会自动路由到相应项目下) */
+    /** @var array<array{host: string, port: int}> 项目绑定主机端口 (只在项目根节点配置有效, 当访问绑定的域名时, 会自动路由到相应项目下) */
     public array $projectHosts;
 
     /** @var array 用户自定义参数 */
@@ -145,6 +145,7 @@ class Node {
                 unset($properties['methods'][$method]);
                 is_int($method) ? $properties['methods'][strtolower($render)] = null : $properties['methods'][strtolower($method)] = $render;
             }
+            $idGene = implode('|', array_keys($properties['methods'])) . ":$idGene";
         }
         if (isset($properties['url_arguments'])) {
             // 初始化参数
@@ -173,6 +174,11 @@ class Node {
             'path_format' => $this->pathFormat,
             'path_parent' => $pathParent,
         ];
+    }
+
+    public function getIdentity(bool $hash = false): string {
+        $id = join('|', array_map(fn($k) => is_int($k) ? $this->methods[$k] : $k, array_keys($this->methods))) .':'. $this->pathFormat;
+        return $hash ? hash('crc32', $id) : $id;
     }
 
     /**

@@ -25,7 +25,7 @@ final class ShardingDbProxy extends DbProxy {
      * @param string|null $dbAlias
      * @return static
      */
-    public static function inst(string|null $dbAlias = null): self {
+    public static function inst(string|null $dbAlias = null): static {
         $dbAlias ??= DbConfig::DEFAULT_DB;
         static $mapping = [];
         ! key_exists($dbAlias, $mapping) && $mapping[$dbAlias] = new self($dbAlias);
@@ -88,7 +88,7 @@ final class ShardingDbProxy extends DbProxy {
     /** @inheritDoc */
     public function begin(Query $query): Transaction {
         $tableName = $query->getQueryBuilder()->getTableSchema()->getName();
-        $shardingConfig = Dce::$config->sharding->getConfig($tableName);
-        return new ShardingTransaction($shardingConfig->alias ?? ShardingTransaction::ALIAS_NO_SHARDING);
+        $shardingConfig = (Dce::$config->sharding ?? null)?->getConfig($tableName);
+        return ShardingTransaction::begin($shardingConfig->alias ?? ShardingTransaction::ALIAS_NO_SHARDING);
     }
 }

@@ -13,7 +13,7 @@ use dce\service\server\RawRequestConnection;
 use dce\service\server\ServerMatrix;
 
 class RawRequestTcp extends RawRequestConnection {
-    public const ConnectionPath = 'tcp/connecting';
+    public const CONNECTION_PATH = 'tcp/connecting';
 
     public string $method = 'tcp';
 

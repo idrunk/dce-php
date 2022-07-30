@@ -57,10 +57,11 @@ final class Structure {
 
     /**
      * 用回调函数在数组中查找匹配值集
-     * @param callable $needle
-     * @param array $haystack
+     * @template T
+     * @param callable<T> $needle
+     * @param T[] $haystack
      * @param bool $lazyMode
-     * @return mixed
+     * @return T|T[]
      */
     public static function arraySearchItem(callable $needle, array $haystack, bool $lazyMode = true): mixed {
         $indexes = self::arraySearch($needle, $haystack, $lazyMode);
@@ -81,12 +82,18 @@ final class Structure {
         $keysIntersect = array_intersect(array_keys($needle), array_keys($haystackItem));
         $indexes = [];
         foreach ($haystack as $k => $item) {
-            foreach ($keysIntersect as $key)
-                if ($needle[$key] != $item[$key]) continue 2;
+            if (! self::arrayMatch($needle, $item, $keysIntersect)) continue;
             if ($lazyMode) return $k;
             $indexes[] = $k;
         }
         return $indexes ?: false;
+    }
+
+    public static function arrayMatch(array $needle, array $matcher, array $keys = null): bool {
+        $keys ??= array_intersect(array_keys($needle), array_keys($matcher));
+        foreach ($keys as $key)
+            if ($needle[$key] != $matcher[$key]) return false;
+        return true;
     }
 
     /**
@@ -160,8 +167,8 @@ final class Structure {
      * @param array|null $array
      * @return bool
      */
-    public static function arrayIsList(array|null $array): bool{
-        if (null === $array) return false;
+    public static function arrayIsList(mixed $array): bool {
+        if (! is_array($array)) return false;
         $keys = array_keys($array);
         $keysShouldBe = range(0, count($keys) - 1);
         return $keys === $keysShouldBe;

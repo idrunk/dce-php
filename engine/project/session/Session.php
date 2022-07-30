@@ -12,7 +12,7 @@ use dce\storage\redis\RedisProxy;
 use Swoole\Http\Request as SwooleRequest;
 
 abstract class Session {
-    private const DEFAULT_ID_NAME = 'dcesid';
+    public const DEFAULT_ID_NAME = 'dcesid';
 
     private const HEADER_SID_KEY = 'x-session-id';
 
@@ -36,9 +36,8 @@ abstract class Session {
         self::initConfig();
         /** @var static $instance */
         $instance = new self::$config['class']();
-        if (self::$config['auto_open'] ?? 0) {
+        if (self::$config['auto_open'] ?? 0)
             $instance->open($request);
-        }
         return $instance;
     }
 
@@ -54,13 +53,10 @@ abstract class Session {
 
     /** 初始化处理Session配置 */
     private static function initConfig(): void {
-        if (isset(self::$config)) {
-            return;
-        }
+        if (isset(self::$config)) return;
         self::$config = Dce::$config->session;
-        if (! self::$config['class']) {
+        if (! self::$config['class'])
             self::$config['class'] = RedisProxy::isAvailable() ? '\dce\project\session\SessionRedis' : '\dce\project\session\SessionFile';
-        }
     }
 
     /**
@@ -81,9 +77,8 @@ abstract class Session {
      * @return string
      */
     public static function getSidName(): string {
-        if (! isset(self::$sidName)) {
+        if (! isset(self::$sidName))
             self::$sidName = Dce::$config->session['name'] ?: self::DEFAULT_ID_NAME;
-        }
         return self::$sidName;
     }
 
@@ -115,8 +110,8 @@ abstract class Session {
         if (! $this->getId()) {
             $id = self::getSid($request);
             if (! $id) {
-                $id = self::genId();
-                $request->cookie->set(self::getSidName(), $id);
+                $request->ext(self::DEFAULT_ID_NAME, $id = self::genId()); // 记录新生成的sid
+                if (self::$config['auto_response']) $request->cookie->set(self::getSidName(), $id);
             }
             $this->setId($id);
         }
@@ -135,9 +130,7 @@ abstract class Session {
      * @param mixed|null $param1 附加参数, 供子类传参
      */
     protected function tryTouch(mixed $param1 = null): void {
-        if ($this->touched) {
-            return;
-        }
+        if ($this->touched) return;
         if (false === (self::$config['valid'])($this)) {
             $this->destroy(); // 如果session非法校验失败（可能非法异地登录等），则将其删掉
         } else {

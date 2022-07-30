@@ -4,17 +4,15 @@
  * Date: 2019/6/10 15:46
  */
 
-namespace drunk\debug\storage;
+namespace dce\log;
+
+use dce\base\LogMethod;
 
 /**
  * 储存引擎接口
  * Interface StorageInterface
  */
-abstract class DebugStorage {
-    public const LogTypeAppend = 'append';
-    public const LogTypeReplace = 'replace';
-    public const LogTypePrepend = 'prepend';
-
+abstract class MatrixOutput {
     public function __construct(
         protected string $root,
     ) {
@@ -34,7 +32,7 @@ abstract class DebugStorage {
      * 压入调试内容
      * @param string $path
      * @param string $content
-     * @param string $logType
+     * @param LogMethod $logMethod
      */
-    abstract public function push(string $path, string $content, string $logType = self::LogTypeAppend): void;
+    abstract public function push(string $path, string $content, LogMethod $logMethod = LogMethod::Append): void;
 }

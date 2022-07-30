@@ -7,6 +7,7 @@
 namespace dce\project\request;
 
 use dce\base\SwooleUtility;
+use dce\base\Value;
 use dce\config\DceConfig;
 use dce\event\Event;
 use dce\i18n\Locale;
@@ -18,10 +19,13 @@ use dce\project\Project;
 use dce\project\ProjectManager;
 use dce\project\session\Cookie;
 use dce\project\session\Session;
+use drunk\Structure;
 use Swoole\Coroutine;
 use Throwable;
 
 class Request {
+    public int $id;
+
     /** @var RawRequest 原始请求对象, (用于全部类型请求) */
     public RawRequest $rawRequest;
 
@@ -67,7 +71,7 @@ class Request {
      * get: get参数
      * post: get + post
      * put: get + put
-     * delete: get + delete
+     * patch: get + patch
      * cli: cli
      * tcp: 除开路径的数据若为json，则此处为数组，否则为null（可以取rawData）
      * udp: 同tcp
@@ -91,8 +95,8 @@ class Request {
     /** @var array Http请求的put参数 */
     public array $put;
 
-    /** @var array Http请求的delete参数 */
-    public array $delete;
+    /** @var array Http请求的patch参数 */
+    public array $patch;
 
     /** @var array Http请求的上传文件集 */
     public array $files;
@@ -101,19 +105,25 @@ class Request {
     public int $fd;
 
     /** @var array 供用户用的扩展属性 */
-    public array $ext = [];
+    private array $extends = [];
 
     public function __construct(RawRequest $rawRequest) {
+        $this->id = RequestManager::currentId();
         $this->rawRequest = $rawRequest;
     }
 
     /**
      * 扩展属性
      * @param string $key
-     * @param mixed $value
+     * @param mixed|Value $value
+     * @return mixed
      */
-    public function extend(string $key, mixed $value): void {
-        $this->ext[$key] = $value;
+    public function ext(string $key, mixed $value = Value::Default): mixed {
+        if ($value === Value::Default) {
+            return $this->extends[$key] ?? Value::False;
+        } else {
+            return $this->extends[$key] = $value;
+        }
     }
 
     /**
@@ -138,6 +148,7 @@ class Request {
             // 标记project已完善
             $this->project->isComplete = true;
         }
+        $this->projectHostValid();
         // 补充请求对象相关属性
         $this->rawRequest->supplementRequest($this);
         $this->locale = new Locale($this);
@@ -152,6 +163,13 @@ class Request {
      */
     private function prepare(): void {
         $this->config->prepare && call_user_func_array($this->config->prepare, [$this]);
+    }
+
+    private function projectHostValid(): void {
+        if (! ($this->project->getRootNode()->projectHosts ?? false)) return;
+        foreach ($this->project->getRootNode()->projectHosts as $nodeHost)
+            if (Structure::arrayMatch($nodeHost, $this->rawRequest->getServerInfo())) return;
+        throw new RequestException(RequestException::NO_NODE_ACCESS_PERMISSION);
     }
 
     /**

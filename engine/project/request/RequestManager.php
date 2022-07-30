@@ -37,7 +37,7 @@ class RequestManager {
 
     /** 尝试清理过期请求的映射记录 */
     private static function logMapping(Request $request): void {
-        self::$requestMapping[self::currentId()] = WeakReference::create($request);
+        self::$requestMapping[$request->id] = WeakReference::create($request);
         // 每隔一定轮数清理一次过期请求的残留映射记录
         if (! (count(self::$requestMapping) % self::CLEAR_MOD)) {
             foreach (self::$requestMapping as $k => $requestRef)

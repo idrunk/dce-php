@@ -20,26 +20,21 @@ trait TraitModel {
      */
     public function setProperty(string $name, mixed $value): static {
         $propertyName = Char::camelize($name);
-        if (property_exists($this, $propertyName)) {
+        if (property_exists($this, $propertyName))
             $this->$propertyName = $value;
-        }
         return $this;
     }
 
     public function setProperties(array $properties): static {
-        foreach ($properties as $name => $property) {
+        foreach ($properties as $name => $property)
             $this->setProperty($name, $property);
-        }
         return $this;
     }
 
     public function arrayify(): array {
         $properties = get_object_vars($this);
-        foreach ($properties as $k => $property) {
-            if (! is_scalar($property)) {
-                unset($properties[$k]);
-            }
-        }
+        foreach ($properties as $k => $property)
+            if (! is_scalar($property)) unset($properties[$k]);
         return $properties;
     }
 }

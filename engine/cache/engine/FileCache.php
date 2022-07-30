@@ -6,6 +6,7 @@
 
 namespace dce\cache\engine;
 
+use dce\base\DceInit;
 use dce\cache\CacheClearable;
 use dce\Dce;
 
@@ -16,9 +17,8 @@ class FileCache extends CacheClearable {
 
     function __construct(array $config) {
         $this->dir = $config['dir'];
-        if(Dce::$initState > 1 && ! is_dir($this->dir)) {
+        if(Dce::$initState !== DceInit::Minimal && ! is_dir($this->dir))
             mkdir($this->dir, 0777, true);
-        }
     }
 
     public function exists(string|array $key): bool {

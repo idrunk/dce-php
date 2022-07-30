@@ -6,6 +6,7 @@
 
 namespace dce;
 
+use dce\base\DceInit;
 use dce\base\Exception;
 use dce\base\Lock;
 use dce\base\SwooleUtility;
@@ -30,8 +31,8 @@ final class Dce {
     /** @var bool 是否开发环境 */
     private static bool $isDevEnvBool;
 
-    /** @var int 启动状态: {0: 未初始化, 1: 仅初始化Dce, 2: 初始化了Dce及项目节点, 3: 已初始化并引导} */
-    public static int $initState = 0;
+    /** @var DceInit 启动状态 */
+    public static DceInit $initState = DceInit::Pending;
 
     /** @var DceConfig DCE全局配置 */
     public static DceConfig $config;
@@ -47,19 +48,17 @@ final class Dce {
      * @throws null
      */
     private static function prepare(): void {
-        // 预加载公共类库
-        Loader::prepareCommon();
         // 加载公共配置
         self::$config = ConfigManager::getCommonConfig();
+        // 缓存初始化
+        self::$cache = CacheManager::init();
         LogManager::dce(new Language(['正在加载Dce类库...', 'DCE library loading...']));
         // PHP初始化
         self::phpInit();
-        // 初始化日志类
-        LogManager::init();
+        // 预加载公共类库
+        Loader::prepareCommon();
         // 拦截异常
         Exception::init();
-        // 缓存初始化
-        self::$cache = CacheManager::init();
         // 并发锁初始化
         self::$lock = Lock::init();
     }
@@ -89,8 +88,8 @@ final class Dce {
 
     /** 仅初始化Dce */
     public static function initOnly(): void {
-        if (self::$initState > 0) return;
-        self::$initState = 1;
+        if (self::$initState !== DceInit::Pending) return;
+        self::$initState = DceInit::Minimal;
 
         self::prepare();
         // 事件中可能会派生新进程，在此前需将环境初始化好
@@ -99,8 +98,8 @@ final class Dce {
 
     /** 初始化Dce及项目节点 */
     public static function scan(): void {
-        if (self::$initState > 0) return;
-        self::$initState = 2;
+        if (self::$initState !== DceInit::Pending) return;
+        self::$initState = DceInit::Scan;
 
         self::prepare();
         // 扫描并加载项目
@@ -121,8 +120,8 @@ final class Dce {
     /** 引导路由 */
     public static function boot(): void {
         self::scan();
-        if (2 !== self::$initState) return;
-        self::$initState = 3;
+        if (self::$initState !== DceInit::Scan) return;
+        self::$initState = DceInit::Boot;
 
         LogManager::dce(new Language(['正在引导请求处理器...', 'Request handler is booting...']));
         Exception::catchRequest([RequestManager::class, 'route'], DCE_CLI_MODE ? RawRequestCli::class : RawRequestHttpCgi::class);

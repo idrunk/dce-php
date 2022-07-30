@@ -146,11 +146,14 @@ abstract class ValidatorAbstract {
      */
     protected function getGeneralError(string|Stringable|null $definedError, string|Stringable|null $defaultError): string|Stringable|null {
         if ($definedError) {
+            is_string($definedError) && $defaultError instanceof Language && $definedError = new Language($definedError, $defaultError->id);
             return $definedError;
         }
         $generalError = $this->getProperty('error');
         if ($generalError) {
-            return $generalError->error ?? $generalError->value;
+            $generalError = $generalError->error ?? $generalError->value;
+            is_string($generalError) && $defaultError instanceof Language && $generalError = new Language($generalError, $defaultError->id);
+            return $generalError;
         }
         return $defaultError;
     }

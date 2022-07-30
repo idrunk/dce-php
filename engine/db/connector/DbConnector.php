@@ -9,6 +9,7 @@ namespace dce\db\connector;
 use Closure;
 use dce\db\query\builder\StatementAbstract;
 use dce\db\query\builder\StatementInterface;
+use dce\log\LogManager;
 
 abstract class DbConnector {
     private static StatementAbstract|string $lastStatement;
@@ -25,12 +26,11 @@ abstract class DbConnector {
         self::$lastStatement = $statement;
         self::$lastParams = $params;
         $sql = StatementAbstract::fill($statement, $params);
-        $logId = ScriptLogger::trigger([$this->host, $this->port, $this->dbName], $sql);
-        return $logId;
+        return LogManager::queryRequest($this->host, $this->port, $this->dbName, $sql);
     }
 
-    protected function logStatementUpdate(string|int $logId, string|float $result): void {
-        ScriptLogger::triggerUpdate($logId, [$this->host, $this->port, $this->dbName], $result);
+    protected function logStatementUpdate(string $logId, string|float $result): void {
+        LogManager::queryResponse($logId, [$this->host, $this->port, $this->dbName], $result);
     }
 
     protected static function checkInsertStatement(string $statement): bool {

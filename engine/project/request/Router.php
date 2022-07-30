@@ -68,9 +68,8 @@ class Router {
         $components = [];
         if (preg_match_all('/([\/-]|^)([^\/\\\.\s&-]+)/', $queryPath, $matches, PREG_SET_ORDER)) {
             // 拆解url提取组件, 如: /home/news-1 -> [['/', 'home'], ['/', 'news'], ['-', 1]]
-            foreach ($matches as $v) {
+            foreach ($matches as $v)
                 $components[] = ['separator' => $v[1], 'argument' => Url::argumentDecode($v[2])];
-            }
         }
         return $components;
     }
@@ -164,7 +163,7 @@ class Router {
      * @param array $nodeIdElders
      * @param array $urlArguments
      * @return bool|null
-     * @throws RouterException
+     * @throws RouterException|RequestException
      */
     private function locationByArguments(array $nodeTrees, array $components, array $nodeIdElders, array $urlArguments): bool|null {
         foreach ($nodeTrees as $nodeTree) {
@@ -172,7 +171,7 @@ class Router {
                 $componentsRemaining = $components;
                 // 若未指定请求类型, 则不对请求类型做限制, 只要url匹配到即可
                 // 若非目录型节点, 则当前的请求类型必须符合节点配置
-                $methodMatched = key_exists($this->rawRequest->method, $node->methods);
+                $methodMatched = key_exists($this->rawRequest->method, $node->methods) || in_array($this->rawRequest->method, [RawRequestHttp::METHOD_OPTIONS, RawRequestHttp::METHOD_HEAD]);
                 if (! $methodMatched && ! $node->isDir) {
                     continue;
                 }
@@ -259,7 +258,7 @@ class Router {
 
     /**
      * 匹配参数
-     * @param array $param
+     * @param array|null $param
      * @param NodeArgument $nodeArgument
      * @param array $getArguments
      * @param bool $needMatchSeparator

@@ -144,22 +144,30 @@ class PdoDbConnector extends DbConnector {
      * @param bool $isRegister 是否为注册自动超时
      * @throws QueryException
      */
-    public static function registerCoroutineAutoReleaseOrHandle(int $coroutineId, bool $isRegister = true): void {
+    public static function registerCoroutineAutoReleaseOrHandle(int $coroutineId, bool $isRegister = true, string $type = 'db'): void {
         if ($coroutineId < 1) return;
         static $maxPrepareTime = 1200;
         static $coroutineMapping = [];
 
         if ($isRegister) {
-            $coroutineMapping[$coroutineId] = Timer::after($maxPrepareTime, function() use($coroutineId) {
-                testPoint("超时了！！！");
-                Coroutine::exists($coroutineId) && Coroutine::cancel($coroutineId);
+            if (key_exists($coroutineId, $coroutineMapping[$type] ?? [])) {
+                unset($coroutineMapping[$type][$coroutineId]);
+                return; // 若查询较快，记录cid时该协程已退出，则不再继续记录
+            }
+            $coroutineMapping[$type][$coroutineId] = Timer::after($maxPrepareTime, function() use($coroutineId, & $coroutineMapping, $type) {
+                // 如果协程还存在，则表示纯粹超时了，则需手动取消协程，取消动作实际会从IO切换恢复到后续过程
+                if ($before = Coroutine::exists($coroutineId))
+                    Coroutine::cancel($coroutineId);
+                else // 如果不存在了，则表示可能抛出了异常，被捕获后退出了协程，此时需解除映射
+                    unset($coroutineMapping[$type][$coroutineId]);
+                testPoint("超时了！！！", $before, Coroutine::exists($coroutineId));
             });
-        } else if (Coroutine::isCanceled()) {
-            // 若canceled，则表示超时了，且PDO未抛出异常，则需抛出超时异常。若已抛出异常，则会退出协程，则继续触发Timer::after也无影响
-            throw new QueryException(QueryException::PDO_PREPARE_TIMEOUT);
-        } else if ($timerId = $coroutineMapping[$coroutineId] ?? 0) {
-            // 若非canceled，则表示Timer::after尚未触发，则可能需清除掉
-            Timer::clear($timerId);
+        } else if ($timerId = $coroutineMapping[$type][$coroutineId] ?? 0) {  // 以非注册逻辑进入时，映射必未解除，此处必为类真值，表达式仅为取timerId
+            unset($coroutineMapping[$type][$coroutineId]);
+            // 若协程被取消，则表示prepare超时了，需抛出超时异常，否则需清除计时器
+            Coroutine::isCanceled() ? throw new QueryException(QueryException::PDO_PREPARE_TIMEOUT) : Timer::clear($timerId);
+        } else {
+            $coroutineMapping[$type][$coroutineId] = 0; // 未注册即进入此逻辑则表示查询较快，记录此协程id以便后续不进入注册逻辑
         }
     }
 }

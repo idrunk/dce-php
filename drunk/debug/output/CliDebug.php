@@ -14,8 +14,6 @@ class CliDebug extends DebugStorable {
     protected function output(array $dataFormatted): void {
         $content = $this->format($dataFormatted);
         echo $content;
-        if ($this->logStorage) {
-            $this->logStorage->push($this->getPath(), $content);
-        }
+        $this->logStorage && $this->logStorage->push($this->getPath(), $content);
     }
 }

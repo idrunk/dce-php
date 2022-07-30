@@ -10,8 +10,8 @@ abstract class Middleware {
     public function __construct(
         protected DirectiveParser $directiveParser,
     ) {
-        $this->route();
+        $this->shardingQuery();
     }
 
-    abstract protected function route(): void;
+    abstract protected function shardingQuery(): void;
 }

@@ -23,14 +23,11 @@ use dce\sharding\middleware\data_processor\DbReadProcessor;
 use dce\sharding\middleware\data_processor\DbWriteProcessor;
 use drunk\Structure;
 use Iterator;
-use Swoole\Coroutine\WaitGroup;
+use Swoole\Coroutine\Barrier;
+use Swoole\Exception;
 
 class DbMiddleware extends Middleware {
     private ShardingConfig $config;
-
-    private DbConnector $connector;
-
-    private bool $inTransaction = false;
 
     private int $lastInsertId = 0;
 
@@ -45,38 +42,29 @@ class DbMiddleware extends Middleware {
      * 路由解析, 根据Sql语句判断分库或普通查询, 进行相应后续操作
      * @throws MiddlewareException
      * @throws QueryException
-     * @throws TransactionException
      * @throws IdgException
+     * @throws Exception
      */
-    protected function route(): void {
-        $isWrite = $this->directiveParser->isWrite();
-        if ($this->directiveParser->isSharding()) {
-            $this->config = $this->directiveParser->getSharding();
-            $dbMapping = $this->shardingRoute();
-            $waitGroup = SwooleUtility::inSwoole() ? new WaitGroup : null;
-            $thrownChannel = ChannelAbstract::autoNew(64);
-            // Swoole环境则并发查询分库 (不做什么分离设计了, 直接放这直观方便)
-            foreach ($dbMapping as $dbAlias => $statementSet) {
-                $connectorPool = DbPool::inst($dbAlias, $isWrite)->setConfigs(Dce::$config->mysql->getConfig($dbAlias, $isWrite), false);
-                // warn 容器必须放在这层，若放在外层，可能因多次执行导致数据混淆，放在内层则会导致同库并发顺序问题
-                // 同库不并发 (除了跨库更新的情况外, 当前查询不会拆为多条, 可以避免可能出现的并发问题)
-                $cid = $connectorPool->retryableContainer(
-                    fn() => Structure::forEach($statementSet, fn($statement) => $this->directDistribute($statement, $dbAlias, $connectorPool)), $thrownChannel, $waitGroup);
+    protected function shardingQuery(): void {
+        $this->thrownChannel = ChannelAbstract::autoNew(64);
+        if (! $this->directiveParser->isSharding()) return;
 
-                // 注册协程自动释放，解决未知原因导致长时间闲置连接导致断开时，PDO::prepare()可能需等待960秒才能释放协程抛出连接已断开的异常的问题
-                PdoDbConnector::registerCoroutineAutoReleaseOrHandle($cid);
-            }
-            $waitGroup && $waitGroup->wait();
-            ! $thrownChannel->isEmpty() && throw $thrownChannel->pop();
-        } else {
-            // 将非分库查询全部打发给default连接器处理, 直接返回其查询结果
-            $dbConfigs = Dce::$config->mysql->getConfig($this->dbProxy->dbAlias, $isWrite);
-            $connectorPool = DbPool::inst($this->dbProxy->dbAlias, $isWrite)->setConfigs($dbConfigs, false);
-            // 若打开了事务开关, 则尝试开启事务
-            $transaction = ShardingTransaction::tryBegin(ShardingTransaction::ALIAS_NO_SHARDING, $this->dbProxy->dbAlias, $connectorPool);
-            $this->inTransaction = $transaction instanceof ShardingTransaction;
-            $this->connector = $this->inTransaction ? $transaction->getConnector() : $transaction;
+        $isWrite = $this->directiveParser->isWrite();
+        $this->config = $this->directiveParser->getSharding();
+        $dbMapping = $this->shardingRoute();
+        $exceptions = [];
+        $barrier = SwooleUtility::inSwoole() ? Barrier::make() : null;
+        // Swoole环境则并发查询分库 (不做什么分离设计了, 直接放这直观方便)
+        foreach ($dbMapping as $dbAlias => $statementSet) {
+            $connectorPool = DbPool::inst($dbAlias, $isWrite)->setConfigs(Dce::$config->mysql->getConfig($dbAlias, $isWrite), false);
+            // warn 容器必须放在这层，若放在外层，可能因多次执行导致数据混淆，放在内层则会导致同库并发顺序问题
+            // 同库不并发 (除了跨库更新的情况外, 当前查询不会拆为多条, 可以避免可能出现的并发问题)
+            // 注册协程自动释放，解决未知原因导致长时间闲置连接导致断开时，PDO::prepare()可能需等待960秒才能释放协程抛出连接已断开的异常的问题
+            PdoDbConnector::registerCoroutineAutoReleaseOrHandle($connectorPool->retryableContainer(
+                fn() => Structure::forEach($statementSet, fn($statement) => $this->directDistribute($statement, $dbAlias, $connectorPool)), $exceptions, $barrier));
         }
+        $barrier && Barrier::wait($barrier);
+        $exceptions && throw array_pop($exceptions);
     }
 
     /**
@@ -401,6 +389,7 @@ class DbMiddleware extends Middleware {
         return array_diff($mapping, $outRangeSet) ?: [array_pop($outRangeSet)];
     }
 
+
     /**
      * 惰性获取单例数据处理器
      * @return DbReadProcessor|DbWriteProcessor
@@ -412,80 +401,77 @@ class DbMiddleware extends Middleware {
     }
 
     public function queryAll(string|null $indexColumn = null, string|null $extractColumn = null): array {
-        if ($this->directiveParser->isSharding()) {
-            return $this->getProcessor()->queryAll($indexColumn, $extractColumn);
-        } else {
-            $data = $this->connector->queryAll($this->directiveParser->getStatement(), $indexColumn, $extractColumn);
-            $this->putBackGeneralConnection();
-            return $data;
-        }
+        return $this->directiveParser->isSharding()
+            ? $this->getProcessor()->queryAll($indexColumn, $extractColumn)
+            : $this->retryableQuery(fn($connector) => $connector->queryAll($this->directiveParser->getStatement(), $indexColumn, $extractColumn));
     }
 
     public function queryEach(Closure|null $decorator = null): Iterator {
-        if ($this->directiveParser->isSharding()) {
-            return $this->getProcessor()->queryEach($decorator);
-        } else {
-            $iterator = $this->connector->queryEach($this->directiveParser->getStatement(), $decorator);
-            $this->putBackGeneralConnection(); // 这里放回去可能有问题, 需观察
-            return $iterator;
-        }
+        return $this->directiveParser->isSharding()
+            ? $this->getProcessor()->queryEach($decorator)
+            : $this->retryableQuery(fn($connector) => $connector->queryEach($this->directiveParser->getStatement(), $decorator));
     }
 
     public function queryOne(): array|false {
-        if ($this->directiveParser->isSharding()) {
-            return $this->getProcessor()->queryOne();
-        } else {
-            $data = $this->connector->queryOne($this->directiveParser->getStatement());
-            $this->putBackGeneralConnection();
-            return $data;
-        }
+        return $this->directiveParser->isSharding()
+            ? $this->getProcessor()->queryOne()
+            : $this->retryableQuery(fn($connector) => $connector->queryOne($this->directiveParser->getStatement()));
     }
 
     public function queryColumn(): string|float|null|false {
-        if ($this->directiveParser->isSharding()) {
-            return $this->getProcessor()->queryColumn();
-        } else {
-            $data = $this->connector->queryColumn($this->directiveParser->getStatement());
-            $this->putBackGeneralConnection();
-            return $data;
-        }
+        return $this->directiveParser->isSharding()
+            ? $this->getProcessor()->queryColumn()
+            : $this->retryableQuery(fn($connector) => $connector->queryColumn($this->directiveParser->getStatement()));
     }
 
     public function queryGetInsertId(): int|string {
-        if ($this->directiveParser->isSharding()) {
-            return $this->getProcessor()->queryGetInsertId();
-        } else {
-            $data = $this->connector->queryGetInsertId($this->directiveParser->getStatement());
-            $this->putBackGeneralConnection();
-            return $data;
-        }
+        return $this->directiveParser->isSharding()
+            ? $this->getProcessor()->queryGetInsertId()
+            : $this->retryableQuery(fn($connector) => $connector->queryGetInsertId($this->directiveParser->getStatement()));
     }
 
     public function queryGetAffectedCount(): int {
-        if ($this->directiveParser->isSharding()) {
-            return $this->getProcessor()->queryGetAffectedCount();
-        } else {
-            $data = $this->connector->queryGetAffectedCount($this->directiveParser->getStatement());
-            $this->putBackGeneralConnection();
-            return $data;
-        }
+        return $this->directiveParser->isSharding()
+            ? $this->getProcessor()->queryGetAffectedCount()
+            : $this->retryableQuery(fn($connector) => $connector->queryGetAffectedCount($this->directiveParser->getStatement()));
     }
 
     public function query(array $fetchArgs): array {
-        $data = $this->connector->query($this->directiveParser->getStatement(), $this->directiveParser->getParams(), $fetchArgs);
-        $this->putBackGeneralConnection();
-        return $data;
+        return $this->retryableQuery(fn($connector) => $connector->query($this->directiveParser->getStatement(), $this->directiveParser->getParams(), $fetchArgs));
     }
 
     public function execute(): int|string {
-        $data = $this->connector->execute($this->directiveParser->getStatement(), $this->directiveParser->getParams());
-        $this->putBackGeneralConnection();
-        return $data;
+        return $this->retryableQuery(fn($connector) => $connector->execute($this->directiveParser->getStatement(), $this->directiveParser->getParams()));
     }
 
-    private function putBackGeneralConnection(): void {
-        if (! $this->inTransaction) {
-            DbPool::inst($this->dbProxy->dbAlias, $this->directiveParser->isWrite())->put($this->connector);
-        }
+    /**
+     * 在自动重连连接池容器中执行查询
+     * @param callable<DbConnector, mixed> $query
+     * @return mixed
+     * @throws Exception|QueryException
+     */
+    private function retryableQuery(callable $query): mixed {
+        $data = null;
+        $nonTransConnector = null;
+        $exceptions = [];
+        $dbConfigs = Dce::$config->mysql->getConfig($this->dbProxy->dbAlias, $this->directiveParser->isWrite());
+        $connectorPool = DbPool::inst($this->dbProxy->dbAlias, $this->directiveParser->isWrite())->setConfigs($dbConfigs, false);
+        $barrier = SwooleUtility::inSwoole() ? Barrier::make() : null;
+        // 注册协程自动释放，解决未知原因导致长时间闲置连接导致断开时，PDO::prepare()可能需等待960秒才能释放协程抛出连接已断开的异常的问题
+        PdoDbConnector::registerCoroutineAutoReleaseOrHandle(
+            $connectorPool->retryableContainer(function() use($query, $connectorPool, &$data, &$nonTransConnector) {
+                // 若打开了事务开关, 则尝试开启事务
+                $transaction = ShardingTransaction::tryBegin(ShardingTransaction::ALIAS_NO_SHARDING, $this->dbProxy->dbAlias, $connectorPool);
+                $inTransaction = $transaction instanceof ShardingTransaction;
+                $connector = $inTransaction ? $transaction->getConnector() : $transaction;
+                ! $inTransaction && $nonTransConnector = $connector;
+                $data = call_user_func($query, $connector);
+            }, $exceptions, $barrier)
+        );
+        $barrier && Barrier::wait($barrier);
+        $exceptions && throw array_pop($exceptions);
+        // 若连接未绑定到事务中，则还给连接池
+        $nonTransConnector && $connectorPool->put($nonTransConnector);
+        return $data;
     }
 }

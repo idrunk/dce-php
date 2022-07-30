@@ -9,7 +9,6 @@ namespace dce\service\server;
 use dce\base\Exception;
 use dce\config\DceConfig;
 use dce\event\Daemon;
-use dce\event\Event;
 use dce\i18n\Language;
 use dce\loader\Decorator;
 use dce\loader\Loader;
@@ -21,18 +20,16 @@ use dce\project\session\Session;
 use dce\project\session\SessionManager;
 use dce\rpc\RpcClient;
 use dce\rpc\RpcServer;
-use dce\rpc\RpcUtility;
 use http\service\RawRequestHttpSwoole;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
-use Swoole\Process;
 use Swoole\Server;
 use tcp\service\RawRequestTcp;
 use tcp\service\RawRequestUdp;
 use Throwable;
 
 abstract class ServerMatrix implements Decorator {
-    protected static Language|array $langStarted = ["%s 服务器已启动于 %s:%s.", "%s server started with %s:%s."];
+    private static Language|array $langStarted = ["%s 服务器已启动于%s", "%s server started with%s"];
 
     /** @var class-string<RawRequestHttp> 定义RawRequestHttp类名, (可在子类覆盖此属性使用自定义RawRequest类) */
     protected static string $rawRequestHttpClass = RawRequestHttpSwoole::class;
@@ -66,6 +63,17 @@ abstract class ServerMatrix implements Decorator {
 
     public function __construct() {
         self::prepareApiRpc();
+    }
+
+    /**
+     * @param string $protocol
+     * @param string $host
+     * @param int $port
+     * @param array<array{host: string, port: int}> $extraPorts
+     */
+    protected function printStartLog(string $protocol, string $host, int $port, array $extraPorts = []): void {
+        LogManager::dce(self::$langStarted->format($protocol,
+            sprintf(': %s.', implode(", ", array_map(fn($t) => "{$t['host']}:{$t['port']}", [['host' => $host, 'port' => $port], ... $extraPorts])))));
     }
 
     /**

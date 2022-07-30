@@ -12,6 +12,7 @@ use dce\db\query\builder\schema\GroupSchema;
 use dce\db\query\builder\schema\HavingSchema;
 use dce\db\query\builder\schema\InsertSchema;
 use dce\db\query\builder\schema\InsertSelectSchema;
+use dce\db\query\builder\schema\InsertUpdateSchema;
 use dce\db\query\builder\schema\JoinSchema;
 use dce\db\query\builder\schema\LimitSchema;
 use dce\db\query\builder\schema\OrderSchema;
@@ -141,6 +142,12 @@ class QueryBuilder {
     public function buildInsert(array $data, bool|null $ignoreOrReplace): InsertStatement {
         $insertSchema = new InsertSchema($data);
         $insertStatement = new InsertStatement($this->getTableSchema(), $insertSchema, $ignoreOrReplace);
+        return $insertStatement;
+    }
+
+    public function buildInsertUpdate(array $data): InsertStatement {
+        $insertUpdateSchema = new InsertUpdateSchema($data);
+        $insertStatement = new InsertStatement($this->getTableSchema(), $insertUpdateSchema, null);
         return $insertStatement;
     }
 

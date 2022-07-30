@@ -6,25 +6,59 @@
 
 namespace dce\db\active;
 
+use drunk\Structure;
+
 /**
  * @template T of ActiveRecord
  */
 abstract class ActiveQuery {
-    /** @var list<ActiveRelation> */
+    /** @var array<array{relation: ActiveRelation, children?: array<>}> */
     readonly protected array $withRelations;
+
+    readonly protected bool $withExtends;
 
     /**
      * 设置即时加载关联数据
-     * @param string ...$relationNames
+     * @param string|array ...$relationNames <pre>若需递归，仅支持传递第一个参数，格式如:
+     * [grass, appleTree => flower,
+     *  tree => [appleTree => flower, orangeTree => [flower, fruit]]
+     * ]</pre>
      * @return $this
      * @throws ActiveException
      */
-    public function with(string ... $relationNames): static {
-        $this->withRelations = array_map(function($name) {
-            $relation = static::getActiveRecordClass()::getActiveRelation(static::getActiveRecordClass()::toModelKey($name));
-            ! $relation && throw (new ActiveException(ActiveException::RELATION_NAME_INVALID))->format($name);
-            return $relation;
-        }, $relationNames);
+    public function with(string|array ... $relationNames): static {
+        $relationNames = is_array(current($relationNames)) ? $relationNames[0] : $relationNames;
+        $this->withRelations = self::buildWithRelation($relationNames, $this->getActiveRecordClass());
+        return $this;
+    }
+
+    /**
+     * 构建树形with关系
+     * @param array $relationNames
+     * @param class-string<ActiveRecord> $activeRecordClass
+     * @return array
+     * @throws ActiveException
+     */
+    private static function buildWithRelation(array $relationNames, string $activeRecordClass): array {
+        $relations = [];
+        foreach ($relationNames as $name => $children) {
+            if (is_int($name)) {
+                is_array($children) && throw (new ActiveException(ActiveException::RELATION_KEY_INVALID))->format($name);
+                $name = $children;
+                $children = [];
+            } else if ($children) {
+                ! is_array($children) && $children = [$children];
+            }
+            $pack['relation'] = $activeRecordClass::getActiveRelation($activeRecordClass::toModelKey($name));
+            ! $pack['relation'] && throw (new ActiveException(ActiveException::RELATION_NAME_INVALID))->format($name);
+            $pack['children'] = $children ? self::buildWithRelation($children, $pack['relation']->foreignActiveRecordClass) : [];
+            array_push($relations, $pack);
+        }
+        return $relations;
+    }
+
+    public function withExtends(bool $with = true): static {
+        $this->withExtends = $with;
         return $this;
     }
 
@@ -49,6 +83,15 @@ abstract class ActiveQuery {
         foreach ($relationColumns as ['modelPrimary' => $modelPrimary, 'modelForeign' => $modelForeign])
             if (($foreignRecord->$modelForeign ?? null) !== ($primaryRecord->$modelPrimary ?? null)) return false;
         return true;
+    }
+
+    /**
+     * 将模型属性键值表转查询条件
+     * @param array $mapping
+     * @return array
+     */
+    public static function mappingToWhere(array $mapping): array {
+        return array_map(fn($kv) => [$kv[0], '=', $kv[1]], Structure::arrayEntries($mapping));
     }
 
     /**

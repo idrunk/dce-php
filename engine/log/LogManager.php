@@ -6,8 +6,8 @@
 
 namespace dce\log;
 
-use dce\db\connector\ScriptLogger;
-use dce\db\connector\ScriptLoggerConsole;
+use dce\base\LoggerType;
+use dce\base\SwooleUtility;
 use dce\Dce;
 use dce\project\request\RawRequest;
 use dce\project\request\RawRequestCli;
@@ -19,14 +19,11 @@ use dce\service\cron\Cron;
 use Stringable;
 use Throwable;
 use websocket\service\WebsocketServer;
-use Swoole\Coroutine\Server\Connection as SwooleConnection;
 
 final class LogManager {
-    public static function init() {
-        if (Dce::$config->log['db']['console']) {
-            ScriptLogger::addDriver(new ScriptLoggerConsole());
-        }
-    }
+    private static MatrixLogger $simpleLogger;
+    private static MatrixLogger $tableLogger;
+    private static bool $isServerStart;
 
     public static function warning(Throwable $throwable): void {
         self::exception($throwable, true, true);
@@ -42,7 +39,7 @@ final class LogManager {
         $pureContent = self::exceptionRender($throwable, $isSimple, warn: $isWarn);
 
         // 打印异常
-        self::consoleFileLog($pureContent, Dce::$config->log['exception']['console'], self::standardConfigLogfile(Dce::$config->log['exception']));
+        self::push(LoggerType::Exception, "\n" . $pureContent);
     }
 
     /**
@@ -54,17 +51,16 @@ final class LogManager {
      * @return string
      */
     public static function exceptionRender(Throwable $throwable, bool|null $simple = false, bool $html = false, bool $warn = false): string {
-        $now = date('Y-m-d H:i:s');
         if ($simple === null) {
             $data = ['status' => false];
             $throwable->getCode() && $data['code'] = $throwable->getCode();
             $throwable->getMessage() && $data['message'] = $throwable->getMessage();
             $content = json_encode($data, JSON_UNESCAPED_UNICODE);
         } else if ($warn) {
-            $content = sprintf('[%s] (警告：%s) %s', $now, $throwable->getCode(), $throwable->getMessage());
+            $content = sprintf('[#T;] (警告：%s) %s', $throwable->getCode(), $throwable->getMessage());
         } else {
-            $content = $simple ? sprintf('[%s] (%s: %s) %s', $now, get_class($throwable), $throwable->getCode(), $throwable->getMessage())
-                : sprintf("[%s] (%s: %s) %s\n%s", $now, get_class($throwable),$throwable->getCode(), $throwable->getMessage(), $throwable);
+            $content = $simple ? sprintf('[#T;] (%s: %s) %s', get_class($throwable), $throwable->getCode(), $throwable->getMessage())
+                : sprintf("[#T;] (%s: %s) %s\n%s", get_class($throwable),$throwable->getCode(), $throwable->getMessage(), $throwable);
             $html && $content = sprintf('<!doctype html><html lang="zh"><head><meta charset="UTF-8"><title>%s</title></head><body><pre>%s</pre></body></html>', $throwable->getMessage(), $content);
         }
         return $content;
@@ -78,10 +74,10 @@ final class LogManager {
         // 所有被调用频率较高的日志，都尝试先拦截，节省脚本执行量
         if (! (Dce::$config->log['access']['request'] || Dce::$config->log['access']['logfile_power']) || ($rawRequest = $request->rawRequest) instanceof RawRequestCli) return;
 
-        $topic = sprintf('[%s] (%s %s) %s/%s', date('Y-m-d H:i:s'), ($rawRequest->isConnecting ?? false) ? '连' : '求',
-            $rawRequest->getClientInfo()['request'], $rawRequest->getClientInfo()['ip'], $request->session->getId() ?? '');
-        self::consoleFileLog($topic, Dce::$config->log['access']['request'], self::standardConfigLogfile(Dce::$config->log['access']),
-            is_string($rawRequest->getRawData()) ? $rawRequest->getRawData() : json_encode($rawRequest->getRawData(), JSON_UNESCAPED_UNICODE));
+        $isConnecting = $rawRequest->isConnecting ?? false;
+        $topic = sprintf("\n[#T;] (%s %s) %s/%s%s", $isConnecting ? '连' : '求',
+            $rawRequest->getClientInfo()['request'], $rawRequest->getClientInfo()['ip'], $request->session->getId() ?? '', $isConnecting ? '/' . $request->fd : '');
+        self::push(LoggerType::Request, $topic, is_string($rawRequest->getRawData()) ? $rawRequest->getRawData() : json_encode($rawRequest->getRawData(), JSON_UNESCAPED_UNICODE));
     }
 
     /**
@@ -93,10 +89,9 @@ final class LogManager {
         if (! Dce::$config->log['access']['response'] && ! Dce::$config->log['access']['logfile_power']) return;
 
         $request = RequestManager::current();
-        $topic = sprintf('[%s] (应 %s) %s/%s', date('Y-m-d H:i:s'), $rawRequest->getClientInfo()['request'],
+        $topic = sprintf('[#T;] (应 %s) %s/%s', $rawRequest->getClientInfo()['request'],
             $rawRequest->getClientInfo()['ip'], isset($request->session) ? $request->session->getId() : '');
-        self::consoleFileLog($topic, Dce::$config->log['access']['response'], self::standardConfigLogfile(Dce::$config->log['access']),
-            is_string($data) ? $data : json_encode($data, JSON_UNESCAPED_UNICODE));
+        self::push(LoggerType::Response, $topic, is_string($data) ? $data : json_encode($data, JSON_UNESCAPED_UNICODE));
     }
 
     /**
@@ -107,10 +102,10 @@ final class LogManager {
     public static function connect(Connection $conn, bool $isConnect = true): void {
         if (! Dce::$config->log['access']['connect'] && ! Dce::$config->log['access']['logfile_power']) return;
 
-        $topic = sprintf('[%s] (%s %s) %s/%s', date('Y-m-d H:i:s'), $isConnect ? '连' : '断',
+        $topic = sprintf("\n[#T;] (%s %s) %s/%s/%s", $isConnect ? '连' : '断',
             $conn->server instanceof WebsocketServer ? 'websocket' : 'tcp',
-            $conn->server->getServer()->getClientInfo($conn->fd)['remote_ip'] ?? '', $conn->session->getId());
-        self::consoleFileLog($topic, Dce::$config->log['access']['connect'], self::standardConfigLogfile(Dce::$config->log['access']));
+            $conn->server->getServer()->getClientInfo($conn->fd)['remote_ip'] ?? '', $conn->session->getId(), $conn->fd);
+        self::push(LoggerType::Connect, $topic);
     }
 
     /**
@@ -133,29 +128,25 @@ final class LogManager {
             $ip = $server->getServer()->getClientInfo($fd)['remote_ip'] ?? '';
             $sid = $conn?->session->getId();
         }
-        self::consoleFileLog(sprintf('[%s] (发 %s %s) %s/%s', date('Y-m-d H:i:s'), $type, $path ?: '', $ip, $sid),
-            Dce::$config->log['access']['send'], self::standardConfigLogfile(Dce::$config->log['access']), $data);
+        self::push(LoggerType::Send, sprintf("\n[#T;] (发 %s %s) %s/%s", $type, $path ?: '', $ip, $sid), $data);
     }
 
     public static function rpcConnect($serverHost, $serverPort, $clientHost, bool $isConnect = true): void {
         if (! Dce::$config->log['rpc']['connect'] && ! Dce::$config->log['rpc']['logfile_power']) return;
 
-        self::consoleFileLog(sprintf('[%s] (RPC%s %s) %s', date('Y-m-d H:i:s'), $isConnect ? '连' : '断', "$serverHost:$serverPort", $clientHost),
-            Dce::$config->log['rpc']['connect'], self::standardConfigLogfile(Dce::$config->log['rpc']));
+        self::push(LoggerType::RpcConnect, sprintf('[#T;] (RPC%s %s) %s', $isConnect ? '连' : '断', "$serverHost:$serverPort", $clientHost));
     }
 
     public static function rpcRequest(string $method, array $arguments, string $clientIp): void {
         if (! Dce::$config->log['rpc']['request'] && ! Dce::$config->log['rpc']['logfile_power']) return;
 
-        self::consoleFileLog(sprintf('[%s] (RPC求 %s) %s', date('Y-m-d H:i:s'), $method, $clientIp), Dce::$config->log['rpc']['request'],
-            self::standardConfigLogfile(Dce::$config->log['rpc']), implode("\n", array_map(fn($a) => is_scalar($a) ? $a : json_encode($a, JSON_UNESCAPED_UNICODE), $arguments)));
+        self::push(LoggerType::RpcRequest, sprintf('[#T;] (RPC求 %s) %s', $method, $clientIp), implode("\n", array_map(fn($a) => is_scalar($a) ? $a : json_encode($a, JSON_UNESCAPED_UNICODE), $arguments)));
     }
 
     public static function rpcResponse(string $method, mixed $result, string $clientIp): void {
         if (! Dce::$config->log['rpc']['response'] && ! Dce::$config->log['rpc']['logfile_power']) return;
 
-        self::consoleFileLog(sprintf('[%s] (RPC应 %s) %s', date('Y-m-d H:i:s'), $method, $clientIp), Dce::$config->log['rpc']['response'],
-            self::standardConfigLogfile(Dce::$config->log['rpc']), is_scalar($result) ? $result : json_encode($result, JSON_UNESCAPED_UNICODE));
+        self::push(LoggerType::RpcResponse, sprintf('[#T;] (RPC应 %s) %s', $method, $clientIp), is_scalar($result) ? $result : json_encode($result, JSON_UNESCAPED_UNICODE));
     }
 
     /**
@@ -163,54 +154,62 @@ final class LogManager {
      * @param Cron[] $tasks
      */
     public static function cron(Cron $task, array $tasks): void {
-        $topic = sprintf('[%s] (开始) %s', date('Y-m-d H:i:s'), $task->command);
+        $topic = sprintf("\n[#T;] (开始) %s", $task->command);
 
-        self::consoleFileLog($topic, Dce::$config->log['cron']['console'], self::standardConfigLogfile(Dce::$config->log['cron']));
+        self::push(LoggerType::Cron, $topic);
 
         ($tasksFile = self::standardConfigLogfile(Dce::$config->log['cron'], 'tasks'))
-            && file_put_contents($tasksFile, array_reduce($tasks, fn($c, $t) => $c . ($c ? '\n' : '') . $t->format(), ''));
+            && self::write($tasksFile, array_reduce($tasks, fn($c, $t) => $c . ($c ? '\n' : '') . $t->format(), ''));
     }
 
     public static function cronDone(Cron $task, string $output): void {
-        $topic = sprintf('%s[%s] (完成) %s', ">>>\n$output\n<<<\n\n", date('Y-m-d H:i:s'), $task->command);
+        $topic = sprintf("%s\n[#T;] (完成) %s\n", $output, $task->command);
 
-        self::consoleFileLog($topic, Dce::$config->log['cron']['console'], self::standardConfigLogfile(Dce::$config->log['cron']));
+        self::push(LoggerType::CronDone, $topic);
     }
 
     public static function showCron(bool $showStatus): string {
-        return substr(file_get_contents(self::standardConfigLogfile(Dce::$config->log['cron'], $showStatus ? 'tasks' : '')), - 16384);
+        return substr(file_get_contents(Dce::$config->log['common']['root'] . self::standardConfigLogfile(Dce::$config->log['cron'], $showStatus ? 'tasks' : '')), - 16384);
+    }
+
+    public static function queryRequest(string $host, string $port, string $dbName, string $sql): string {
+        if (Dce::$config->log['db']['console'] || Dce::$config->log['db']['logfile_power'])
+            self::push(LoggerType::QueryRequest, sprintf("[#T;] (查 %s:%s/%s)", $host, $port, $dbName), $sql);
+        return '';
+    }
+
+    public static function queryResponse(string $logId, mixed ... $args): void {
+        //
     }
 
     public static function dce(Stringable|string $text): void {
-        self::consoleFileLog(sprintf('[%s] %s', date('Y-m-d H:i:s'), $text),
-            Dce::$config->log['dce']['console'], self::standardConfigLogfile(Dce::$config->log['dce']));
-    }
-
-    private static function consoleFileLog(string $topic, bool $console = true, string $logFile = null, string $content = null): void {
-        if ($content) {
-            $topic .= "\n" . self::contentFormat($content);
-            $content = "$topic\n$content";
-        } else {
-            $content = $topic;
+        if (! isset(self::$isServerStart)) {
+            global $argv;
+            self::$isServerStart = in_array('start', $argv);
+            self::$simpleLogger = SimpleLogger::inst();
+            SwooleUtility::inSwoole() && self::$tableLogger = TableLogger::inst();
         }
-        $console && self::console($topic, prefix: '');
-        if ($logFile) {
-            ! file_exists(dirname($logFile)) && mkdir(dirname($logFile), 0755, true);
-            file_put_contents($logFile, "$content\n\n", FILE_APPEND | LOCK_EX);
-        }
+
+        // 服务启动时才打印Dce日志
+        self::$isServerStart && self::push(LoggerType::Dce, sprintf('[#T;] %s', $text));
     }
 
-    private static function contentFormat(string $content, bool $short = true): string {
-        $max = $short ? 1024 : 16384;
-        return mb_substr($content, 0, $max) . (mb_strlen($content) > $max ? '...' : '');
+    private static function push(LoggerType $type, string $topic, string $content = null): void {
+        SwooleUtility::inCoroutine() && self::$isServerStart ? self::$tableLogger->push($type, $topic, $content) : self::$simpleLogger->push($type, $topic, $content);
     }
 
-    private static function standardConfigLogfile(array $config, string $replacement = null): string {
+    public static function standardConfigLogfile(array $config, string $replacement = null): string {
         return $config['logfile_power'] ? sprintf($config['logfile'], $replacement ?: date($config['logfile_format'])) : '';
     }
 
-    public static function console(Stringable|string $text, string $suffix = "\n\n", string $prefix = null): void {
-        $prefix ??= sprintf('[%s] ', date('Y-m-d H:i:s'));
+    public static function console(Stringable|string $text, string $suffix = "\n", string $prefix = null): void {
+        $prefix ??= sprintf('[%s] ', date('d H:i:s'));
         DCE_CLI_MODE && print("$prefix$text$suffix");
+    }
+
+    public static function write(string $filepath, string $content): void {
+        static $fileOutput;
+        $fileOutput ??= new FileOutput(Dce::$config->log['common']['root']);
+        $fileOutput->push($filepath, $content);
     }
 }

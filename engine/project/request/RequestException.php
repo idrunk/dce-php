@@ -11,6 +11,8 @@ use dce\i18n\Language;
 
 // 1230-1259
 class RequestException extends Exception {
+    #[Language(['无权访问当前节点'])]
+    public const NO_NODE_ACCESS_PERMISSION = 403;
     #[Language(['节点定位失败，请检查路径（%s）是否正确'])]
     public const NODE_LOCATION_FAILED = 404;
 

@@ -20,9 +20,7 @@ class LogDebug extends DebugStorable {
     }
 
     protected function output(array $dataFormatted): void {
-        if (! $this->logStorage) {
-            throw new DebugException(DebugException::SET_STORAGE_FIRST);
-        }
+        ! $this->logStorage && throw new DebugException(DebugException::SET_STORAGE_FIRST);
         $content = $this->format($dataFormatted);
         $this->logStorage->push($this->getPath(), $content); // 储存调试内容
     }

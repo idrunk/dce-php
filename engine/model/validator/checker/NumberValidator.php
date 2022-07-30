@@ -34,7 +34,7 @@ class NumberValidator extends TypeChecker {
             }
 
             $decimal = $this->getProperty('decimal');
-            if (! ($decimal->value ?? null) && ! ctype_digit((string) $value)) {
+            if (! ($decimal->value ?? null) && ! ctype_digit(ltrim((string) $value, '-'))) {
                 $this->addError($this->getGeneralError($decimal->error ?? null, lang(ValidatorException::CANNOT_BE_FLOAT)));
             }
 

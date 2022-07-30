@@ -46,11 +46,12 @@ class DbPool extends Pool {
 
         // 若当前库开启了分库事务，且事务中成功发送过请求，则禁止重试连接
         if ($result && false !== Structure::arraySearch(function($shardingAlias) {
-            $transaction = ShardingTransaction::aliasMatch($shardingAlias);
-            $transaction && $transaction->clearBounds();
-            return $transaction->uses ?? 0 > 1;
-        }, array_unique(array_column(Dce::$config->sharding->filter(fn($c) => key_exists($this->dbAlias, $c->mapping)), 'alias'))))
-            $result = new PoolException(PoolException::DISCONNECTED_TRANSACTION_ACTIVATED);
+                $transaction = ShardingTransaction::aliasMatch($shardingAlias);
+                $transaction && $transaction->clearBounds();
+                return $transaction->uses ?? 0 > 1;
+            }, array_unique(array_column(isset(Dce::$config->sharding)
+                ? Dce::$config->sharding->filter(fn($c) => key_exists($this->dbAlias, $c->mapping)) : [], 'alias')))
+        ) $result = new PoolException(PoolException::DISCONNECTED_TRANSACTION_ACTIVATED);
 
         return $result;
     }

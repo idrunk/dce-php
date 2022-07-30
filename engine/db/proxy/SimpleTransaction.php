@@ -10,7 +10,7 @@ use dce\base\SwooleUtility;
 use dce\db\connector\DbConnector;
 
 class SimpleTransaction extends Transaction {
-    public function __construct(
+    private function __construct(
         private SimpleDbProxy $proxy
     ) {
         parent::__construct();
@@ -18,12 +18,8 @@ class SimpleTransaction extends Transaction {
 
     /** @inheritDoc */
     protected function envValid(): void {
-        if (SwooleUtility::inCoroutine()) {
-            throw new TransactionException(TransactionException::CANNOT_RUN_IN_COROUTINE);
-        }
-        if (self::proxyMatch($this->proxy)) {
-            throw new TransactionException(TransactionException::REPEATED_OPEN);
-        }
+        SwooleUtility::inCoroutine() && throw new TransactionException(TransactionException::CANNOT_RUN_IN_COROUTINE);
+        self::proxyMatch($this->proxy) && throw new TransactionException(TransactionException::REPEATED_OPEN);
     }
 
     /**
@@ -32,12 +28,20 @@ class SimpleTransaction extends Transaction {
      * @return static|null
      */
     private static function proxyMatch(DbProxy $proxy): static|null {
-        foreach (self::$pond as $transaction) {
-            if ($transaction->proxy === $proxy) {
-                return $transaction;
-            }
-        }
+        foreach (self::$pond as $transaction)
+            if ($transaction->proxy === $proxy) return $transaction;
         return null;
+    }
+
+    /**
+     * 实例化一个事务对象，并递增进入计数
+     * @param SimpleDbProxy $proxy
+     * @return static
+     */
+    public static function begin(SimpleDbProxy $proxy): self {
+        $instance = self::proxyMatch($proxy) ?? new self($proxy);
+        $instance->entries ++;
+        return $instance;
     }
 
     /**

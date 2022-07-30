@@ -18,7 +18,7 @@ class NodeArgument {
     public string $prefix = '';
 
     /** @var string|array|callable 参数匹配器, {[regexp]: 以正则匹配, [array]: in_array方法匹配, [callable]: 自定义方法匹配} */
-    public $match;
+    public mixed $match;
 
     /** @var bool 参数是否必传 */
     public bool $required = true;

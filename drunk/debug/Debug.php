@@ -7,13 +7,13 @@
 namespace drunk\debug;
 
 use dce\Dce;
+use dce\log\FileOutput;
+use dce\log\HttpOutput;
+use dce\log\MatrixOutput;
 use drunk\debug\output\CliDebug;
 use drunk\debug\output\DebugStorable;
 use drunk\debug\output\HtmlDebug;
 use drunk\debug\output\LogDebug;
-use drunk\debug\storage\FileStorage;
-use drunk\debug\storage\DebugStorage;
-use drunk\debug\storage\HttpStorage;
 use Throwable;
 
 final class Debug {
@@ -30,7 +30,7 @@ final class Debug {
 
     private string $logPath;
 
-    private DebugStorage|null $logStorage = null;
+    private MatrixOutput|null $logStorage = null;
 
     private bool $dumpThenDie = false;
 
@@ -81,19 +81,20 @@ final class Debug {
 
     /**
      * 设置日志储存引擎
-     * @param string|DebugStorage|null $storage
+     * @param string|MatrixOutput|null $storage
      * @param string $root
      * @return Debug
+     * @throws DebugException
      */
-    public function storage(string|DebugStorage|null $storage, string $root = ''): self {
+    public function storage(string|MatrixOutput|null $storage, string $root = ''): self {
         if (is_string($storage)) {
             if (! $root && ! $root = $storage === self::STORAGE_FILE ? Dce::$config->debug['file_root'] : Dce::$config->debug['url_root']) {
                 throw new DebugException(DebugException::INVALID_STORAGE_PATH);
             }
             try {
                 $storage = match ($storage) {
-                    self::STORAGE_FILE => new FileStorage($root),
-                    self::STORAGE_HTTP => new HttpStorage($root),
+                    self::STORAGE_FILE => new FileOutput($root),
+                    self::STORAGE_HTTP => new HttpOutput($root),
                 };
             } catch (Throwable) {
                 throw (new DebugException(DebugException::INVALID_STORAGE_NAME))->format($storage);

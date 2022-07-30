@@ -15,7 +15,7 @@ abstract class RawRequestConnection extends RawRequest {
     protected const PATH_SEPARATOR = ';'; // 路径内容分隔符
     protected const REQUEST_SEPARATOR = ':'; // 路径与请求ID分隔符
 
-    /** @var bool 是否正建立连接 */
+    /** @var bool 是否正建立连接（用属性而非方法，方便null推导表达式） */
     public bool $isConnecting = false;
     /** @var Connection 当前连接 */
     public Connection $connection;
@@ -45,6 +45,14 @@ abstract class RawRequestConnection extends RawRequest {
         $clientInfo['ip'] = $clientInfo['remote_ip'];
         $clientInfo['port'] = $clientInfo['remote_port'];
         return $clientInfo;
+    }
+
+    /** @inheritDoc */
+    public function getServerInfo(): array {
+        return [
+            'host' => $this->connection->swRequest->header['host'] ?? '0.0.0.0',
+            'port' => $this->getClientInfo()['server_port'],
+        ];
     }
 
     /**
@@ -86,7 +94,7 @@ abstract class RawRequestConnection extends RawRequest {
 
     /** 是否请求响应模式 */
     public function isResponseMode(): bool {
-        return isset($this->requestId);
+        return isset($this->requestId) || $this->isConnecting;
     }
 
     /**

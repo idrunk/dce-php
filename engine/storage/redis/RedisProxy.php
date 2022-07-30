@@ -15,13 +15,13 @@ use Redis;
  * @note 提取未deprecated的参数与返回值类型 (?:@param\s+[^$]+?\$\w+|@return\s+(?:\w+\|?)+)(?=(?:(?!public function|#\[Deprecated[^]]+\]\s+).)+public function \w+)
  */
 abstract class RedisProxy {
-    protected Redis $redis;
+    public Redis $redis;
 
     protected function __construct(
         private int $index,
         private bool $noSerialize,
     ) {
-        if ($index > -1 && $index != Dce::$config->redis['index']) $this->redis->select($index);
+        $this->redis->select($index > -1 ? $index : Dce::$config->redis['index']);
         $noSerialize && $this->redis->setOption(Redis::OPT_SERIALIZER, Redis::SERIALIZER_NONE);
     }
 

@@ -6,14 +6,14 @@
 
 namespace drunk\debug\output;
 
+use dce\log\MatrixOutput;
 use drunk\debug\DebugMatrix;
-use drunk\debug\storage\DebugStorage;
 
 abstract class DebugStorable extends DebugMatrix {
     /** @var string 填充符 */
     private static string $fillerChar = ' ';
 
-    protected DebugStorage|null $logStorage = null;
+    protected MatrixOutput|null $logStorage = null;
 
     private string $path;
 
@@ -40,10 +40,8 @@ abstract class DebugStorable extends DebugMatrix {
             . self::fillColumn('步耗时', $widthMap[3])
             . self::fillColumn('总耗时', $widthMap[4])
             . "执行时间\n";
-        foreach ($data as $k=>$v) {
-            // 处理拼接标记点
+        foreach ($data as $v) // 处理拼接标记点
             $content .= $this->makeMark($v, $widthMap);
-        }
         return $content . "\n";
     }
 
@@ -136,10 +134,10 @@ abstract class DebugStorable extends DebugMatrix {
 
     /**
      * 设置储存引擎
-     * @param DebugStorage $storage
+     * @param MatrixOutput $storage
      * @return mixed
      */
-    public function setStorage(DebugStorage $storage): static {
+    public function setStorage(MatrixOutput $storage): static {
         $this->logStorage = $storage;
         return $this;
     }

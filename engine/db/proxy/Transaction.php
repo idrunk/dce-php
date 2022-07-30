@@ -17,6 +17,9 @@ abstract class Transaction {
     /** @var static[] $pond */
     protected static array $pond = [];
 
+    /** @var int 进入次数/嵌套数 */
+    protected int $entries = 0;
+
     protected int $createStamp;
 
     protected DbConnector $connector;
@@ -75,10 +78,8 @@ abstract class Transaction {
      * @return bool
      */
     private function connectorCommit(): bool {
-        if (! isset($this->connector)) {
-            // warning: Empty transaction
-            return false;
-        }
+        // warning: Empty transaction
+        if (! isset($this->connector)) return false;
         return $this->connector->commit();
     }
 
@@ -87,10 +88,8 @@ abstract class Transaction {
      * @return bool
      */
     private function connectorRollback(): bool {
-        if (! isset($this->connector)) {
-            // warning: Empty transaction
-            return false;
-        }
+        // warning: Empty transaction
+        if (! isset($this->connector)) return false;
         return $this->connector->rollback();
     }
 
@@ -98,6 +97,8 @@ abstract class Transaction {
      * 提交事务
      */
     public function commit(): bool {
+        // 提交时必须跑到最外层时才行
+        if (-- $this->entries > 0) return false;
         $result = $this->connectorCommit();
         $this->removeInstance();
         return $result;
@@ -107,6 +108,7 @@ abstract class Transaction {
      * 回滚事务
      */
     public function rollback(): bool {
+        // 回滚时任何层次都可
         $result = $this->connectorRollback();
         $this->removeInstance();
         return $result;
@@ -116,13 +118,9 @@ abstract class Transaction {
      * 回滚超时的事务
      */
     protected function clearExpired(): void {
-        if (rand() * 100 >= self::$percentageCollect) return;
-
         $minEffectiveStamp = time() - self::$timeToExpire;
-        foreach (self::$pond as $transaction) {
-            if ($transaction->createStamp < $minEffectiveStamp)
-                $transaction->rollback();
-        }
+        foreach (self::$pond as $transaction)
+            $transaction->createStamp < $minEffectiveStamp && $transaction->rollback();
     }
 
     /**

@@ -28,7 +28,7 @@ final class SimpleDbProxy extends DbProxy {
      * @param bool $useDb
      * @return self
      */
-    public static function inst(string|null $dbAlias = null, bool $useDb = true): self {
+    public static function inst(string|null $dbAlias = null, bool $useDb = true): static {
         $dbAlias ??= DbConfig::DEFAULT_DB;
         static $mapping = [];
         ! key_exists($dbAlias, $mapping) && $mapping[$dbAlias] = self::new($dbAlias, $useDb);
@@ -42,7 +42,7 @@ final class SimpleDbProxy extends DbProxy {
      * @return static
      */
     public static function new(string $dbAlias, bool $useDb = true): self {
-        $config = self::getDbConfig($dbAlias);
+        $config = clone self::getDbConfig($dbAlias);
         ! $useDb && $config->dbName = null;
         return new self($config);
     }
@@ -125,6 +125,6 @@ final class SimpleDbProxy extends DbProxy {
     /** @inheritDoc */
     public function begin(Query $query): Transaction {
         // ProxySimple对象能经过Proxy类型约束也能再经过ProxySimple类型约束
-        return new SimpleTransaction($query->getProxy(null));
+        return SimpleTransaction::begin($query->getProxy(null));
     }
 }

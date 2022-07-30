@@ -10,11 +10,12 @@ use Closure;
 use dce\db\connector\DbConfig;
 use dce\i18n\Language;
 use dce\i18n\Locale;
-use dce\i18n\TextMapping;
 use dce\sharding\id_generator\DceIdGenerator;
 use dce\sharding\middleware\ShardingConfig;
 use drunk\Utility;
 use JetBrains\PhpStorm\ArrayShape;
+
+! defined('SWOOLE_HOOK_ALL') && define('SWOOLE_HOOK_ALL', 2147481599);
 
 /**
  * Class config 配置操作基础类
@@ -108,7 +109,7 @@ class DceConfig extends Config {
             'backup_on' => false, // 是否备份
         ],
         'redis' => [
-            'index' => 0,
+            'index' => 1,
         ],
     ];
 
@@ -116,6 +117,7 @@ class DceConfig extends Config {
     #[ArrayShape([
         'name' => 'string',
         'auto_open' => 'bool',
+        'auto_response' => 'bool',
         'ttl' => 'int',
         'long_ttl' => 'int',
         'class' => 'string',
@@ -128,11 +130,12 @@ class DceConfig extends Config {
     public array $session = [
         'name' => 'dcesid', // Sid名
         'auto_open' => 0, // 是否自动启动
+        'auto_response' => 1, // 是否自动响应（setCookie）
         'ttl' => 3600, // Session存活时间
         'long_ttl' => 0, // 较长的Session存活时间
         'class' => '', // 未指定Session类则Dce自行选择
         'root' => APP_RUNTIME . 'session/', // 文件型Session处理器根目录
-        'index' => 0, // RedisSession处理器库号
+        'index' => 2, // RedisSession处理器库号
         'manager_class' => '', // 留空表示Dce执行选择SessionManager类
         'manager_index' => 0,
         'valid' => [Utility::class, 'noop'], // session有效性校验方法，若返回false，则表示该session异常（如非法异地登录），Dce将自动清除这个session
@@ -336,7 +339,7 @@ class DceConfig extends Config {
 
     /** @var array Swoole\Coroutine::set参数, 若运行于swoole环境，则会自动以此设置调用该方法  */
     public array $coroutineSet = [
-        'hook_flags' => 2147481599, // SWOOLE_HOOK_ALL
+        'hook_flags' => SWOOLE_HOOK_ALL, // SWOOLE_HOOK_ALL
     ];
 
     /** @var array Debug配置  */
@@ -347,10 +350,13 @@ class DceConfig extends Config {
 
     /** @var array 日志记录器配置 */
     public array $log = [
+        'common' => [
+            'root' => APP_RUNTIME . 'log/',
+        ],
         'dce' => [
             'console' => true,
             'logfile_power' => false,
-            'logfile' => APP_RUNTIME . 'log/dce/%s.log',
+            'logfile' => 'dce/%s.log',
             'logfile_format' => 'Y',
         ],
         'access' => [
@@ -359,19 +365,19 @@ class DceConfig extends Config {
             'response' => true,
             'send' => false,
             'logfile_power' => false,
-            'logfile' => APP_RUNTIME . 'log/access/%s.log',
+            'logfile' => 'access/%s.log',
             'logfile_format' => 'Y-W',
         ],
         'exception' => [
             'console' => true,
             'logfile_power' => true,
-            'logfile' => APP_RUNTIME . 'log/exception/%s.log',
+            'logfile' => 'exception/%s.log',
             'logfile_format' => 'Y-m',
         ],
         'db' => [ // 数据库日志
             'console' => false, // 是否在控制台输出日志
             'logfile_power' => false, // mark not support yet
-            'logfile' => APP_RUNTIME . 'log/db/%s.log',
+            'logfile' => 'db/%s.log',
             'logfile_format' => 'Y-W',
         ],
         'rpc' => [
@@ -379,13 +385,13 @@ class DceConfig extends Config {
             'request' => true,
             'response' => true,
             'logfile_power' => false,
-            'logfile' => APP_RUNTIME . 'log/rpc/%s.log',
+            'logfile' => 'rpc/%s.log',
             'logfile_format' => 'Y-W',
         ],
         'cron' => [
             'console' => true,
             'logfile_power' => true,
-            'logfile' => APP_RUNTIME . 'log/cron/%s.log',
+            'logfile' => 'cron/%s.log',
             'logfile_format' => 'Y-m',
         ],
     ];

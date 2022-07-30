@@ -8,7 +8,7 @@ namespace dce\pool;
 
 use dce\log\LogManager;
 use drunk\Utility;
-use Swoole\Coroutine\WaitGroup;
+use Swoole\Coroutine\Barrier;
 use Throwable;
 
 abstract class Pool {
@@ -238,24 +238,19 @@ abstract class Pool {
     /**
      * 重试容器，容器中代码执行时，若连接异常断开，则可被自动重新执行以便连接池重连
      * @param callable $callback
-     * @param ChannelAbstract $thrownChannel
-     * @param WaitGroup|null $waitGroup
+     * @param array $exceptions
+     * @param Barrier|null $barrier
      * @return int
      */
-    final public function retryableContainer(callable $callback, ChannelAbstract $thrownChannel, WaitGroup $waitGroup = null): int {
-        if ($waitGroup) {
-            $waitGroup->add();
-            $cid = go(function() use($callback, $thrownChannel, $waitGroup) {
-                $this->tryCall($callback, $thrownChannel);
-                $waitGroup->done();
-            });
-        } else {
-            $this->tryCall($callback, $thrownChannel);
-        }
+    final public function retryableContainer(callable $callback, array & $exceptions, Barrier $barrier = null): int {
+        if ($barrier)
+            $cid = go(function() use($callback, & $exceptions, $barrier) {$this->tryCall($callback, $exceptions);});
+        else
+            $this->tryCall($callback, $exceptions);
         return $cid ?? 0;
     }
 
-    private function tryCall(callable $callback, ChannelAbstract $thrownChannel): void {
+    private function tryCall(callable $callback, array & $exceptions): void {
         try {
             call_user_func($callback);
         } catch (Throwable $throwable) {
@@ -268,21 +263,26 @@ abstract class Pool {
             if (true === $retryable) {
                 // 首次重试前弹警告
                 ! $this->retries && LogManager::warning((new PoolException(PoolException::WARNING_RETRY_CONNECT))->format(static::class));
-                $this->retry($callback, $thrownChannel);
+                $this->retry($callback, $exceptions);
             } else {
-                $thrownChannel->push($retryable ?: $throwable);
+                array_push($exceptions, $retryable ?: $throwable);
             }
 
             // explain 可重试的异常发生于从实例池取出的连接，其已不在池中，且后续池容量不足时会自动回收垃圾，此处无需处理；非实例池的异常更加无需处理。
         }
     }
 
-    private function retry(callable $callback, ChannelAbstract $thrownChannel): void {
+    private function retry(callable $callback, array & $exceptions): void {
         $this->retries ++;
-        $this->tryCall($callback, $thrownChannel);
+        $this->tryCall($callback, $exceptions);
         $this->retries --;
     }
 
+    /**
+     * 判断当前对象操作失败时是否可重试
+     * @param Throwable $throwable
+     * @return Throwable|bool 可重试时返回true, 否则返回false或需抛的异常
+     */
     abstract protected function retryable(Throwable $throwable): Throwable|bool;
 
     /**

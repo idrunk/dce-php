@@ -38,6 +38,9 @@ class ValidatorException extends Exception {
     #[Language(['当前模型不支持唯一值校验'])]
     public const NOT_SUPPORT_UNIQUE = 1525;
 
+    #[Language(['{{regexp}} "{{value}}" 不是有效正则表达式'])]
+    public const INVALID_REGEXP = 1526;
+
     // 交互异常
     #[Language(['%s 无法通过 %s 校验'])]
     public const VALIDATE_FAILED = 1530;
@@ -71,9 +74,6 @@ class ValidatorException extends Exception {
 
     #[Language(['{{label}} "{{value}}" 不能大于 {{max}}'])]
     public const CANNOT_LARGE_THAN = 1540;
-
-    #[Language(['{{regexp}} "{{value}}" 不是有效正则表达式'])]
-    public const INVALID_REGEXP = 1541;
 
     #[Language(['{{label}} "{{value}}" 输入不正确'])]
     public const INVALID_INPUT = 1542;

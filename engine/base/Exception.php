@@ -15,6 +15,7 @@ use dce\project\request\Request;
 use dce\project\request\RequestException;
 use dce\project\request\RequestManager;
 use dce\service\server\RawRequestConnection;
+use dce\sharding\middleware\ShardingTransaction;
 use Stringable;
 use Throwable;
 
@@ -155,6 +156,10 @@ class Exception extends \Exception implements Decorator {
             LogManager::exception($throwable, $isSimple); // 打印及记录日志
 
             if (($request = self::getRequest($throwable)) && $request instanceof Request) {
+
+                // 尝试回滚请求中的事务（先这么写死吧）
+                ShardingTransaction::rollbackRequestThrown($request->id);
+
                 // 否则如果是http异常或开发模式，则响应异常内容，否则响应http500
                 $exception = $isSimple || Dce::isDevEnv() ? $throwable : new RequestException(RequestException::INTERNAL_SERVER_ERROR);
                 if ($request->rawRequest instanceof RawRequestHttp) {

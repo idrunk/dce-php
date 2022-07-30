@@ -27,9 +27,8 @@ class HttpServer extends ServerMatrix {
      * @throws HttpException
      */
     final public function start(array $param): void {
-        if (! is_subclass_of(static::$rawRequestHttpClass, RawRequestHttp::class)) {
+        if (! is_subclass_of(static::$rawRequestHttpClass, RawRequestHttp::class))
             throw new HttpException(HttpException::RAW_REQUEST_HTTP_CLASS_ERROR);
-        }
 
         $this->projectConfig = ProjectManager::get('http')->getConfig();
         $httpConfig = $this->projectConfig->http;
@@ -47,26 +46,23 @@ class HttpServer extends ServerMatrix {
         $this->server = new Server($host, $port, SWOOLE_PROCESS, SWOOLE_SOCK_TCP | $sslBit);
         // 拓展自定义Swoole Server配置
         $this->server->set($swooleHttpConfig);
-        foreach ($extraPorts as ['host' => $extraHost, 'port' => $extraPort]) {
-            // 同时监听额外的端口
+        // 同时监听额外的端口
+        foreach ($extraPorts as ['host' => $extraHost, 'port' => $extraPort])
             $this->server->listen($extraHost, $extraPort, SWOOLE_SOCK_TCP);
-        }
         $this->eventBeforeStart($this->server);
 
         $this->server->on('request', fn(Request $request, Response $response) => Exception::catchRequest(fn() => $this->takeoverRequest($request, $response)));
 
         // 扩展自定义的Swoole Server事件回调
-        foreach ($swooleHttpEvents as $eventName => $eventCallback) {
+        foreach ($swooleHttpEvents as $eventName => $eventCallback)
             $this->server->on($eventName, $eventCallback);
-        }
 
         // 开启Tcp/Udp支持
-        if (is_array($httpConfig['enable_tcp_ports'] ?? false)) {
+        if (is_array($httpConfig['enable_tcp_ports'] ?? false))
             $this->enableTcpPorts($httpConfig['enable_tcp_ports'], $this->projectConfig->swooleTcp ?: []);
-        }
 
         $this->runApiService();
-        LogManager::dce(self::$langStarted->format('Http', $host, $port));
+        $this->printStartLog('Http', $host, $port, $extraPorts);
         $this->server->start();
     }
 

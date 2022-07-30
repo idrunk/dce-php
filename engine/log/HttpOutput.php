@@ -4,10 +4,12 @@
  * Date: 2020/2/3 2:01
  */
 
-namespace drunk\debug\storage;
+namespace dce\log;
 
-class HttpStorage extends DebugStorage {
-    public function push(string $path, string $content, string $logType = self::LogTypeAppend): void {
+use dce\base\LogMethod;
+
+class HttpOutput extends MatrixOutput {
+    public function push(string $path, string $content, LogMethod $logMethod = LogMethod::Append): void {
         $url = $this->genPath($path);
         $content .= "\n";
         $ch = curl_init();
@@ -17,7 +19,7 @@ class HttpStorage extends DebugStorage {
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
         }
         curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: text/plain', 'Dce-Debug: 1', "Log-Type: $logType"]);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: text/plain', 'Dce-Debug: 1', "Log-Type: $logMethod->value"]);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $content);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_exec($ch);

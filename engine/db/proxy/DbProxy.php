@@ -43,6 +43,13 @@ abstract class DbProxy {
     }
 
     /**
+     * 取一个代理实例
+     * @param string|null $dbAlias
+     * @return static
+     */
+    abstract public static function inst(string|null $dbAlias = null): static;
+
+    /**
      * 筛选取出全部数据
      * @param StatementInterface $statement
      * @param string|null $indexColumn
