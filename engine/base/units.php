@@ -157,8 +157,8 @@ enum LoggerType: int {
     public function spec(): array {
         return match($this->name) {
             default => [
-                'delay' => 100,
-                'timeout' => 500,
+                'delay' => 50,
+                'timeout' => 1000,
                 'capital' => 1024,
             ],
         };

@@ -23,6 +23,8 @@ class Loader {
     /** @var array 自动加载类映射表 */
     private static array $classMapping = [];
 
+    private static array $unmatched = [];
+
     /** 注册自动加载, 核心类预加载初始化 */
     public static function init(): void {
         spl_autoload_register(['self', 'autoload'], true, true);
@@ -37,6 +39,7 @@ class Loader {
      * @return bool|string
      */
     private static function autoload(string $className): string|bool {
+        if (key_exists($className, self::$unmatched)) return false;
         if (null !== $loader = self::autoloadClass($className)) {
             $loader && self::triggerOnLoad($className);
             return $loader;
@@ -55,6 +58,7 @@ class Loader {
             }
             $prefix = rtrim($prefix, '\\');
         }
+        self::$unmatched[$className] = 1;
         return false;
     }
 

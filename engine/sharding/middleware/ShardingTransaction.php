@@ -49,9 +49,10 @@ class ShardingTransaction extends Transaction {
 
     /** @inheritDoc */
     public function commit(): bool {
-        $result = parent::commit();
-        self::$lastCommit = time();
-        $this->pool->put($this->connector);
+        if ($result = parent::commit()) {
+            self::$lastCommit = time();
+            $this->pool->put($this->connector);
+        }
         return $result;
     }
 
