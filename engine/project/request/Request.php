@@ -53,6 +53,9 @@ class Request {
     /** @var Controller 控制器，(用于全部类型请求) */
     public Controller $controller;
 
+    /** @var string 请求地址，method + pathFormat */
+    public string $location;
+
     /**
      * @var mixed 原始请求数据, (用于全部类型请求)
      * <pre>
@@ -133,7 +136,8 @@ class Request {
      */
     public function route(): void {
         Event::trigger(Event::BEFORE_ROUTE, $this->rawRequest);
-        $this->node = $this->rawRequest->routeGetNode();
+        $this->node = NodeManager::tryReroute($this->rawRequest->routeGetNode());
+        $this->location = "{$this->rawRequest->method}:{$this->node->pathFormat}";
         // 当前项目赋值
         $this->project = ProjectManager::get($this->node->projectName);
         $this->config = $this->project->getConfig();
@@ -167,7 +171,8 @@ class Request {
 
     private function projectHostValid(): void {
         if (! ($this->project->getRootNode()->projectHosts ?? false)) return;
-        foreach ($this->project->getRootNode()->projectHosts as $nodeHost)
+        // 若项目根节点绑定了主机，则当前节点有定义绑定的主机，或项目根节点与请求信息命中，才是合法请求
+        foreach ($this->node->projectHosts ?? $this->project->getRootNode()->projectHosts as $nodeHost)
             if (Structure::arrayMatch($nodeHost, $this->rawRequest->getServerInfo())) return;
         throw new RequestException(RequestException::NO_NODE_ACCESS_PERMISSION);
     }

@@ -40,8 +40,8 @@ class Char {
      * @param string $test
      * @return bool
      */
-    public static function isRegexp(string $test): bool {
-        return preg_match('/^\/.+\/\w*$/', $test);
+    public static function isRegexp(mixed $test): bool {
+        return is_string($test) && preg_match('/^\/.+\/\w*$/u', $test);
     }
 
     /**
@@ -63,5 +63,34 @@ class Char {
             $target = mb_substr($target, 0, $leftKeeps) . str_repeat($coverWith, $coverLen) . mb_substr($target, - $rightKeeps);
         }
         return $target;
+    }
+
+    /**
+     * mb打乱字序
+     * @param string $str
+     * @return string
+     */
+    public static function shuffle(string $str): string {
+        $chars = mb_str_split($str);
+        shuffle($chars);
+        return implode('', $chars);
+    }
+
+    /**
+     * unicode转utf8编码字符
+     * @param int $unicode
+     * @return string
+     */
+    public static function unicodeToUtf8(int $unicode): string {
+        $binary = decbin($unicode);
+        $binaryLength = strlen($binary);
+        if ($binaryLength < 8) {
+            return chr($unicode);
+        } else {
+            $binaryParts = str_split(str_repeat('0', 6 - $binaryLength % 6) . $binary, 6);
+            $byteCount = ceil($binaryLength / 6);
+            return array_reduce(array_keys($binaryParts), fn(string $word, int $i) => $word .
+                chr(($i ? 0b10000000 : bindec(str_repeat('1', $byteCount)) << (8 - $byteCount)) + bindec($binaryParts[$i])), '');
+        }
     }
 }

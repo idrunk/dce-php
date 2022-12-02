@@ -77,4 +77,29 @@ final class Utility {
     public static function staticConstraint(string $parentClass, string $staticClass): void {
         $parentClass == $staticClass && throw new BaseException(BaseException::NEED_CHILD_STATIC);
     }
+
+    /**
+     * 生产至
+     * @param callable<mixed> $supplier
+     * @param callable<mixed, bool> $checker
+     * @return mixed
+     */
+    public static function supplyUntil(callable $supplier, callable $checker): mixed {
+        do {
+            $result = call_user_func($supplier);
+        } while (! call_user_func($checker, $result));
+        return $result;
+    }
+
+    /**
+     * 生产加工数据并返回
+     * @param mixed $result
+     * @param callable $factory
+     * @return mixed
+     */
+    public static function pass(mixed $result, callable $factory): mixed {
+        is_callable($result) && $result = call_user_func($result);
+        call_user_func_array($factory, [& $result]);
+        return $result;
+    }
 }

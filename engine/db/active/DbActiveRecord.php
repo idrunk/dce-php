@@ -11,8 +11,6 @@ use dce\base\FindMethod;
 use dce\base\SaveMethod;
 use dce\db\entity\DbField;
 use dce\db\proxy\DbProxy;
-use dce\db\query\builder\RawBuilder;
-use dce\db\query\builder\schema\WhereSchema;
 use dce\db\query\QueryException;
 use dce\model\ModelException;
 use dce\model\validator\ValidatorException;
@@ -121,7 +119,7 @@ abstract class DbActiveRecord extends ActiveRecord {
      */
     public function update(SaveMethod|array $method = SaveMethod::Main, array $columns = []): int {
         ! $this->isCreateByQuery() && throw new ActiveException(ActiveException::CANNOT_UPDATE_BEFORE_SAVE);
-        $affected = self::query($this->getOriginalProperties())->where($this->genPropertyConditions())->update($this, false, $method);
+        $affected = self::query($this->getOriginalProperties())->where($this->genPropertyConditions())->update($this, false, $method, $columns);
         $affected > 0 && $this->saveModifyRecord();
         $this->saveCache();
         return $affected;

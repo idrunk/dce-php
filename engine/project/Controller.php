@@ -24,6 +24,7 @@ class Controller {
 
     private Renderer $rendererInstance;
 
+    /** @var array{status: bool, code: int, message: string, data: mixed} */
     private array $statusData = [];
 
     private bool $isHttpException = false;
@@ -71,9 +72,7 @@ class Controller {
      */
     public function response(mixed $data = false, string|false|null $path = null): void {
         $this->rendered = true;
-        if (false === $data) {
-            $data = $this->getAllAssignedStatus();
-        }
+        false === $data && $data = $this->getAllAssignedStatus();
         if ($this->rawRequest instanceof RawRequestHttp) {
             $this->rawRequest->response(is_string($data) ? $data : json_encode($this->getAllAssignedStatus(), JSON_UNESCAPED_UNICODE));
         } else if ($this->rawRequest instanceof RawRequestConnection) {
@@ -98,11 +97,8 @@ class Controller {
      * @param mixed ...$arguments
      */
     public function printf(string $format, mixed ... $arguments): void {
-        foreach ($arguments as $k => $argument) {
-            if (! is_scalar($argument)) {
-                $arguments[$k] = json_encode($argument, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            }
-        }
+        foreach ($arguments as $k => $argument)
+            ! is_scalar($argument) && $arguments[$k] = json_encode($argument, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         printf($format, ... $arguments);
     }
 
@@ -151,12 +147,8 @@ class Controller {
      * @param int|null $code
      */
     private function renderResult(string|null $message, int|null $code): void {
-        if (null !== $message) {
-            $this->assignStatus('message', $message);
-        }
-        if (null !== $code) {
-            $this->assignStatus('code', $code);
-        }
+        null !== $message && ('' !== $message || ! $this->getAssignedStatus('message')) && $this->assignStatus('message', $message);
+        null !== $code && $this->assignStatus('code', $code);
         ! $this->rendererInstance instanceof TemplateRenderer ? $this->render()
             : $this->response(TemplateRenderer::renderPhp($this->request->project->config->template[$this->isHttpException ? 'exception' : 'status'], $this->statusData));
     }
@@ -199,9 +191,8 @@ class Controller {
      * @return $this
      */
     public function assignMapping(array $mapping): static {
-        foreach ($mapping as $k=>$v) {
+        foreach ($mapping as $k=>$v)
             $this->assign($k, $v);
-        }
         return $this;
     }
 
@@ -231,13 +222,22 @@ class Controller {
 
     /**
      * 设置外层状态数据
-     * @param string $key
+     * @param string $key 'status'|'code'|'message'|'data'
      * @param mixed $value
      * @return $this
      */
     public function assignStatus(string $key, mixed $value): static {
         $this->statusData[$key] = $value;
         return $this;
+    }
+
+    /**
+     * 取指派的变量值
+     * @param string $key
+     * @return string|null
+     */
+    public function getAssignedStatus(string $key): string|null {
+        return $this->statusData[$key] ?? null;
     }
 
     /**

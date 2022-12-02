@@ -20,7 +20,7 @@ class RegularValidator extends TypeChecker {
     protected function check(mixed $value):ValidatorException|null {
         $regexp = $this->getProperty('regexp', lang(ValidatorException::REGEXP_REQUIRED));
         if ($regexp) {
-            if (! Char::isRegexp($regexp)) {
+            if (! Char::isRegexp($regexp->value)) {
                 $this->addError(lang(ValidatorException::INVALID_REGEXP));
             } else if (! preg_match($regexp->value, $value)) {
                 $this->addError($this->getGeneralError($regexp->error, lang(ValidatorException::INVALID_INPUT)));

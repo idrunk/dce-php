@@ -20,6 +20,11 @@ class Node {
         TraitModel::arrayify as baseArrayify;
     }
 
+    public const CACHE_NONE = 0;
+    public const CACHE_API = 1;
+    public const CACHE_TEMPLATE = 2;
+    public const CACHE_PAGE = 4;
+
     /** @var string 节点ID, 若未在配置中指定, 则会自动生成 */
     public string $id;
 
@@ -68,6 +73,9 @@ class Node {
     /** @var array 允许的后缀, 下述配置情况下news或news/都能匹配到对应节点 */
     public array $urlSuffix = ['', '/'];
 
+    /** @var string 路由至，与http30x不同的是，此设置为dce node层的重定向，而非http重定向 */
+    public string $routeTo;
+
     /** @var string 301永久转移目标地址 */
     public string $http301;
 
@@ -107,12 +115,13 @@ class Node {
         string|null $templateLayout = null,
         array|null $corsOrigins = null,
         array|null $projectHosts = null,
-        int|null $apiCache = null,
+        int|null $renderCache = null,
         bool|null $omissiblePath = null,
         array|null $urlArguments = null,
         bool|null $urlPlaceholder = null,
         array|null $urlSuffix = null,
         bool|null $lazyMatch = null,
+        string|null $routeTo = null,
         string|null $http301 = null,
         string|null $http302 = null,
         string|null $jsonpCallback = null,
@@ -174,11 +183,6 @@ class Node {
             'path_format' => $this->pathFormat,
             'path_parent' => $pathParent,
         ];
-    }
-
-    public function getIdentity(bool $hash = false): string {
-        $id = join('|', array_map(fn($k) => is_int($k) ? $this->methods[$k] : $k, array_keys($this->methods))) .':'. $this->pathFormat;
-        return $hash ? hash('crc32', $id) : $id;
     }
 
     /**

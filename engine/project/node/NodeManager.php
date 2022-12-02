@@ -205,6 +205,7 @@ final class NodeManager {
                 ! isset($node->corsOrigins) && $node->corsOrigins = $parentNode->corsOrigins ?? [];
                 ! isset($node->methods) && $node->methods = $parentNode->methods ?? ['get' => null];
                 if (! isset($node->render)) {
+                    // 可以从父节点继承非模板型渲染器
                     $node->render = isset($parentNode->render) && ! str_contains($parentNode->render, '.') ? $parentNode->render : Renderer::TYPE_JSON;
                 } else if (! str_contains($node->render, '.')) {
                     // 对含有后缀名的大概非模板的自动转为小写
@@ -307,5 +308,13 @@ final class NodeManager {
         $tryFillRoot && $paths = array_reduce(ProjectManager::getAll(false), fn($ps, $p) => ["$p->name/$path", ... $ps], $paths);
         $pathIndex = Structure::arraySearch(fn($p) => key_exists($p, self::$pathTreeMapping), $paths);
         return $pathIndex === false ? null : self::getTreeByPath($paths[$pathIndex]);
+    }
+
+    public static function tryReroute(Node $node): Node {
+        if ($node->routeTo ?? false) {
+            ! ($tree = self::getTreeByPath($node->routeTo)) && throw (new NodeException(NodeException::ROUTE_TO_IS_INVALID_PATH))->format($node->pathFormat);
+            $node = $tree->getFirstNode();
+        }
+        return $node;
     }
 }

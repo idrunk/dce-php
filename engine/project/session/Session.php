@@ -14,7 +14,7 @@ use Swoole\Http\Request as SwooleRequest;
 abstract class Session {
     public const DEFAULT_ID_NAME = 'dcesid';
 
-    private const HEADER_SID_KEY = 'x-session-id';
+    private const HEADER_SID_KEY = 'x-session-id'; // Request的httpHeader键会自动全部小写化，不论客户端如何传递的
 
     protected static string $sidName;
 

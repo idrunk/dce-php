@@ -178,16 +178,11 @@ abstract class RawRequestHttp extends RawRequest {
             $request->post = $post;
         } else if ('get' !== $this->method) {
             $post = $this->parseRawData() ?? [];
-            switch ($this->method) {
-                case 'put':
-                    $request->put = $post;
-                    break;
-                case 'patch':
-                    $request->patch = $post;
-                    break;
-                default:
-                    $request->post = $post;
-            }
+            match ($this->method) {
+                'put' => $request->put = $post,
+                'patch' => $request->patch = $post,
+                default => $request->post = $post,
+            };
         }
         return $post;
     }
@@ -212,7 +207,7 @@ abstract class RawRequestHttp extends RawRequest {
             if (Network::isLocalIp($this->getClientInfo()['ip'])) $corsOrigins = ['*'];
             $this->header('Access-Control-Allow-Origin', implode(',', $corsOrigins));
             $this->header('Access-Control-Allow-Credentials', 'true');
-            $this->header('Access-Control-Allow-Methods', 'GET,PUT,DELETE,POST,HEAD,OPTIONS');
+            $this->header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS');
             $this->header('Access-Control-Allow-Headers', 'X-Requested-With, X-Session-Id, Content-Type, Authorization, Accept, Cookie, Origin, Referer, UserToken, ReferToken');
             $this->header('Access-Control-Max-Age', '7200');
             if($this->method === self::METHOD_OPTIONS) {

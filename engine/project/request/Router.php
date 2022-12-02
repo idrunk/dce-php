@@ -109,10 +109,8 @@ class Router {
 
         // 根据Path参数匹配定位Node
         $isLocated = $this->locationByArguments($nodeTrees, $components, $nodeIdElders, $urlArguments);
-        if (! $isProjectLevel) {
-            // 若非根级别, 则直接返回匹配结果
-            return $isLocated;
-        }
+        if (! $isProjectLevel)
+            return $isLocated; // 若非根级别, 则直接返回匹配结果
         if ($isLocated !== true) {
             // 如果在根级别定位失败, 则最终定位失败
             throw (new RequestException(RequestException::NODE_LOCATION_FAILED))->format($this->rawRequest->getClientInfo()['request']);
@@ -172,20 +170,15 @@ class Router {
                 // 若未指定请求类型, 则不对请求类型做限制, 只要url匹配到即可
                 // 若非目录型节点, 则当前的请求类型必须符合节点配置
                 $methodMatched = key_exists($this->rawRequest->method, $node->methods) || in_array($this->rawRequest->method, [RawRequestHttp::METHOD_OPTIONS, RawRequestHttp::METHOD_HEAD]);
-                if (! $methodMatched && ! $node->isDir) {
+                if (! $methodMatched && ! $node->isDir)
                     continue;
-                }
                 $gottenArguments = self::locationMatchArguments($node, $componentsRemaining);
-                if ($gottenArguments === false) {
-                    // 如果参数不匹配, 则跳过
-                    continue;
-                }
+                if ($gottenArguments === false)
+                    continue; // 如果参数不匹配, 则跳过
                 $gottenArguments = array_merge($urlArguments, $gottenArguments);
                 $nodeIdElders[] = $node->id;
-                if ($node->lazyMatch) {
-                    // 如果节点配置了锁定, 则不再尝试继续递归, 节点定位完毕
+                if ($node->lazyMatch) // 如果节点配置了锁定, 则不再尝试继续递归, 节点定位完毕
                     return $this->locationDone($nodeIdElders, $gottenArguments, $componentsRemaining);
-                }
                 // 当前节点元素是否最后一个, (Url组件是否已经处理完毕)
                 $itemIsLast = self::isComponentTakeDone($componentsRemaining);
                 if ($methodMatched && $itemIsLast && in_array($this->urlSuffix, $node->urlSuffix)) {
@@ -194,9 +187,8 @@ class Router {
                     return $this->locationDone($nodeIdElders, $gottenArguments);
                 } else {
                     $location = $this->location($nodeTree, $componentsRemaining, $nodeIdElders, $gottenArguments);
-                    if ($location === true) {
+                    if ($location === true)
                         return true;
-                    }
                 }
             }
         }
@@ -222,13 +214,11 @@ class Router {
             // 保留分隔符模式下匹配参数
             foreach ($node->urlArguments as $k => $argument) {
                 $needMatchSeparator = $k || ! $node->omissiblePath;
-                $gottenArguments[$argument->name] = self::parseMatchArgument($argumentsPossible[$k], $argument, $gottenArguments, $needMatchSeparator);
-                if (false === $gottenArguments[$argument->name]) {
+                $gottenArguments[$argument->name] = self::parseMatchArgument($argumentsPossible[$k] ?? null, $argument, $gottenArguments, $needMatchSeparator);
+                if (false === $gottenArguments[$argument->name])
                     return false;
-                }
-                if (empty($gottenArguments[$argument->name])) {
+                if (empty($gottenArguments[$argument->name]))
                     unset($gottenArguments[$argument->name]);
-                }
             }
         } else {
             // 不保留分隔符模式下匹配参数
@@ -236,9 +226,8 @@ class Router {
             foreach ($node->urlArguments as $i => $argument) {
                 $filled = false;
                 foreach ($argumentsPossible as $k => $v) {
-                    if (array_key_exists($k, $keyLog)) {
+                    if (array_key_exists($k, $keyLog))
                         continue;
-                    }
                     $needMatchSeparator = $k || ! $node->omissiblePath;
                     $gottenArguments[$argument->name] = self::parseMatchArgument($argumentsPossible[$i], $argument, $gottenArguments, $needMatchSeparator);
                     if (! empty($gottenArguments[$argument->name])) {
@@ -247,9 +236,8 @@ class Router {
                         break;
                     }
                 }
-                if ($argument->required && ! $filled) {
+                if ($argument->required && ! $filled)
                     return false;
-                }
             }
         }
         self::componentTakeLock($components, $cntComponentTake);
@@ -266,22 +254,16 @@ class Router {
      * @throws RouterException
      */
     private static function parseMatchArgument(array|null $param, NodeArgument $nodeArgument, array $getArguments, bool $needMatchSeparator): mixed {
-        if ($needMatchSeparator && ! is_null($param) && $param['separator'] !== $nodeArgument->separator ) {
-            // 如果需匹配分隔符却不匹配, 则匹配失败
-            return false;
-        }
-        if (is_null($param) || $param['argument'] === '') {
-            // 如果参数为空, 如果必填, 则返回假, 否则返回null
+        if ($needMatchSeparator && ! is_null($param) && $param['separator'] !== $nodeArgument->separator )
+            return false; // 如果需匹配分隔符却不匹配, 则匹配失败
+        if (is_null($param) || $param['argument'] === '') // 如果参数为空, 如果必填, 则返回假, 否则返回null
             return $nodeArgument->required ? false : null; // is required // 是否必传
-        }
         $argument = $param['argument'];
         if ($nodeArgument->prefix) {
             $lenPrefix = strlen($nodeArgument->prefix);
             $prefix = substr($argument, 0, $lenPrefix);
-            if ($prefix !== $nodeArgument->prefix) {
-                // 如果配置了前缀, 但不匹配, 则返回假
-                return false;
-            }
+            if ($prefix !== $nodeArgument->prefix)
+                return false; // 如果配置了前缀, 但不匹配, 则返回假
             // 提取除开前缀后的参数
             $argument = substr($argument, $lenPrefix);
         }
@@ -342,6 +324,7 @@ class Router {
         $this->locatedNodeIdFamily = $nodeIdElders;
         $this->locatedArguments = $extractedArguments;
         $this->componentsRemaining = array_column($componentsRemaining, 'argument');
+        $this->urlSuffix && $this->componentsRemaining && $this->componentsRemaining[array_key_last($this->componentsRemaining)] .= $this->urlSuffix;
         return true;
     }
 }

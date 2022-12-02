@@ -41,7 +41,7 @@ abstract class RawRequestConnection extends RawRequest {
     /** @inheritDoc */
     public function getClientInfo(): array {
         $clientInfo = $this->getServer()->getServer()->getClientInfo($this->fd) ?: ['remote_ip' => '', 'remote_port' => 0];
-        $clientInfo['request'] = "$this->method {$clientInfo['remote_ip']}/$this->path:" . ($this->requestId ?? '');
+        $clientInfo['request'] = "$this->method :{$clientInfo['server_port']}/$this->path#" . ($this->requestId ?? '');
         $clientInfo['ip'] = $clientInfo['remote_ip'];
         $clientInfo['port'] = $clientInfo['remote_port'];
         return $clientInfo;

@@ -65,8 +65,8 @@ class Url {
      * 按路径, 参数与后缀取出最匹配的节点
      * @param string $path
      * @param array $arguments
-     * @param string $suffix
-     * @return array
+     * @param string|null $suffix
+     * @return array|null
      */
     private static function makeMatchNode (string $path, array & $arguments, string|null $suffix): array|null {
         $nodeTree = NodeManager::getTreeByPath($path);
@@ -180,8 +180,8 @@ class Url {
     /**
      * 判断是否有效地址
      * @param string $url
-     * @param bool $isFull    是否作全路径判断
-     * @return bool|int
+     * @param bool $isFull 是否作全路径判断
+     * @return bool
      */
     public static function validate (string $url, bool $isFull = true): bool {
         return $isFull ? preg_match('/^https?:\/\//i', $url): ! preg_match('/^(?:#+|(?:js|javascript).+|\s*)$/i', $url);
@@ -190,8 +190,9 @@ class Url {
     /**
      * 将url转为全路径
      * @param string $url
-     * @param string $urlReference  所依据的全路径url
+     * @param string $urlReference 所依据的全路径url
      * @return string
+     * @throws RequestException
      */
     public static function fill (string $url, string $urlReference): string {
         $url = preg_replace('/[\r\n]+/', '', $url);
@@ -201,13 +202,13 @@ class Url {
         if (! self::validate($urlReference)) {
             throw new RequestException(RequestException::INVALID_URL);
         }
-        $isAbsolute = substr($url, 0, 1) === '/'; // 是否绝对路径
+        $isAbsolute = str_starts_with($url, '/'); // 是否绝对路径
         $parse = parse_url($urlReference);
         if (empty($parse)) {
             throw new RequestException(RequestException::CANNOT_PARSE_URL);
         }
         if (! $isAbsolute) { // 若非绝对路径, 则需取参考url的路径补上当前处理的相对路径url作为绝对路径url
-            if (substr($url, 0, 2) === './') {
+            if (str_starts_with($url, './')) {
                 $url = substr($url, 2);
             }
             $url =  preg_replace('/[^\/]*$/', '', $parse['path']) . $url;
@@ -218,8 +219,9 @@ class Url {
 
     /**
      * 根据url取根域名
-     * @param string $url
+     * @param string|null $url
      * @return mixed
+     * @throws RequestException
      */
     public function getRootDomain (string|null $url = null): string {
         if (! $url) {
@@ -235,8 +237,9 @@ class Url {
 
     /**
      * 取url域名
-     * @param string $url
+     * @param string|null $url
      * @return mixed
+     * @throws RequestException
      */
     public function getDomain (string|null $url = null): string {
         if (! $url) {
@@ -248,6 +251,7 @@ class Url {
     /**
      * 返回当前url
      * @return string
+     * @throws RequestException
      */
     public function getCurrent (): string {
         $host = 'http' . ($this->request->isHttps ? 's' : '') . '://' . $this->request->host; // 自带port

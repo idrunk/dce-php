@@ -24,9 +24,9 @@ class RawRequestHttpSwoole extends RawRequestHttp {
 
     /**
      * 取Http Server
-     * @return HttpServer
+     * @return HttpServer|WebsocketServer
      */
-    public function getServer(): HttpServer {
+    public function getServer(): HttpServer|WebsocketServer {
         return $this->httpServer;
     }
 
@@ -36,30 +36,30 @@ class RawRequestHttpSwoole extends RawRequestHttp {
         // Swoole Http Server原生未提供判断依据, 且连接可能是经过nginx转发的, 转发时可能会丢掉这个信息, 所以这里无法准确获取是否https
         // 因为这个属性在Dce中依赖度不高, 仅在Url->getCurrent时用到, 所以用了这个可能成立的条件判断, 就算错了也影响不大
         // 还有一种方法判断, 那就是利用Server->getClientInfo方法, 返回值里面有ssl_client_cert属性则为Https, 但因为感觉为了取这个无关紧要又不一定对的属性, 而花费未知的资源消耗成本, 有点划不来, 就没实现
+        $header = $this->requestSwoole->header;
         $this->isHttps = $this->requestSwoole->server['server_port'] === 443 || $this->requestSwoole->server['server_protocol'] === 'HTTP/2';
-        $this->host = $this->requestSwoole->header['host'];
+        $this->host = $header['host'];
         $this->requestUri = $this->requestSwoole->server['request_uri'];
-        $this->queryString = $this->requestSwoole->server['query_string'] ?? '';
-        $this->httpOrigin = $this->requestSwoole->header['origin'] ?? '';
-        $this->userAgent = $this->requestSwoole->header['user-agent'];
-        $this->remoteAddr = $this->requestSwoole->server['remote_addr'];
+        $this->queryString = urldecode($this->requestSwoole->server['query_string'] ?? '');
+        $this->httpOrigin = $header['origin'] ?? '';
+        $this->userAgent = $header['user-agent'];
+        $this->remoteAddr = $header['remote-addr'] ?? $header['x-real-ip'] ?? $this->getServer()->getServer()->getClientInfo($this->requestSwoole->fd)['remote_ip'] ?? '-';
         $this->serverPort = $this->requestSwoole->server['server_port'];
     }
 
     /** @inheritDoc */
     public function getClientInfo(): array {
-        return [
-            'request' => "$this->method {$this->requestSwoole->server['remote_addr']}$this->requestUri?$this->queryString",
-            'ip' => $this->requestSwoole->server['remote_addr'],
-            'port' => $this->requestSwoole->server['remote_port'],
-        ];
+        $header = $this->requestSwoole->header;
+        $header['request'] = "$this->method $this->host$this->requestUri?$this->queryString";
+        $header['ip'] = $this->remoteAddr;
+        $header['port'] = $header['remote-port'] ?? $header['x-real-port'] ?? $this->getServer()->getServer()->getClientInfo($this->requestSwoole->fd)['remote_port'] ?? 0;
+        $header['server_port'] = $this->serverPort;
+        return $header;
     }
 
     /** @inheritDoc */
     public function getRawData(): string {
-        if (! isset($this->rawData)) {
-            $this->rawData = $this->requestSwoole->rawContent();
-        }
+        $this->rawData ??= $this->requestSwoole->rawContent();
         return $this->rawData;
     }
 

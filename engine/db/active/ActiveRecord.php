@@ -7,7 +7,6 @@
 namespace dce\db\active;
 
 use dce\base\CoverType;
-use dce\base\ExtractType;
 use dce\db\entity\Field;
 use dce\db\proxy\Transaction;
 use dce\model\Model;
@@ -222,7 +221,8 @@ abstract class ActiveRecord extends Model {
      */
     public static function getFieldProperties(): array {
         if (! key_exists(static::class, self::$fieldProperties))
-            self::$fieldProperties[static::class] = array_filter(array_values(static::getProperties()), fn($p) => isset($p->field));
+            self::$fieldProperties[static::class] = array_filter(array_values(static::getProperties()),
+                fn($p) => isset($p->field) && $p->refProperty->getDeclaringClass()->name === static::class);
         return self::$fieldProperties[static::class];
     }
 

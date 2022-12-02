@@ -10,6 +10,8 @@ use dce\Dce;
 use dce\i18n\Language;
 use dce\loader\Decorator;
 use dce\log\LogManager;
+use dce\log\MatrixLogger;
+use dce\project\Controller;
 use dce\project\request\RawRequestHttp;
 use dce\project\request\Request;
 use dce\project\request\RequestException;
@@ -53,12 +55,8 @@ class Exception extends \Exception implements Decorator {
             $code = $message;
             $message = '';
         }
-        if ($code && ! $message) {
-            $message = Language::find($code) ?? '';
-        }
-        if ($message instanceof Language) {
-            $this->langMessage = $message;
-        }
+        $code && ! $message && $message = Language::find($code) ?? '';
+        ($message instanceof Language) && $this->langMessage = $message;
         parent::__construct($message, $code, $previous);
     }
 
@@ -68,11 +66,7 @@ class Exception extends \Exception implements Decorator {
      * @return $this
      */
     public function format(string|Stringable ...$parameters): static {
-        if (isset($this->langMessage)) {
-            $this->message = $this->langMessage->format(... $parameters);
-        } else {
-            $this->message = sprintf($this->message, ... $parameters);
-        }
+        $this->message = isset($this->langMessage) ? $this->langMessage->format(... $parameters) : sprintf($this->message, ... $parameters);
         return $this;
     }
 
@@ -83,9 +77,8 @@ class Exception extends \Exception implements Decorator {
      * @throws BaseException
      */
     public function lang(string $lang): static {
-        if (! isset($this->langMessage)) {
+        if (! isset($this->langMessage))
             throw new BaseException(BaseException::MESSAGE_NOT_LANGUAGE);
-        }
         $this->message = $this->langMessage->lang($lang);
         return $this;
     }
@@ -119,10 +112,8 @@ class Exception extends \Exception implements Decorator {
     private static function rulesMatch(array $rules, int $needle): bool {
         if ($rules && $needle) {
             foreach ($rules as $rule) {
-                if (! is_numeric($rule) && ! str_contains($rule, '-')) {
-                    // 如果当前不是数字或者非区间，则视为无效项，则跳过
-                    continue;
-                }
+                // 如果当前不是数字或者非区间，则视为无效项，则跳过
+                if (! is_numeric($rule) && ! str_contains($rule, '-')) continue;
                 $range = explode('-', $rule);
                 $from = $range[0] ?: 0;
                 $to = ($range[1] ?? 0) ?: 0;
@@ -139,6 +130,10 @@ class Exception extends \Exception implements Decorator {
         return false;
     }
 
+    /**
+     * @param self $throwable
+     * @return Request|null
+     */
     private static function getRequest(Throwable $throwable): Request|null {
         return $throwable->request ?? RequestManager::current();
     }
@@ -155,29 +150,38 @@ class Exception extends \Exception implements Decorator {
 
             LogManager::exception($throwable, $isSimple); // 打印及记录日志
 
-            if (($request = self::getRequest($throwable)) && $request instanceof Request) {
+            if (! ($request = self::getRequest($throwable)) instanceof Request) return;
 
-                // 尝试回滚请求中的事务（先这么写死吧）
-                ShardingTransaction::rollbackRequestThrown($request->id);
+            // 尝试回滚请求中的事务（先这么写死吧）
+            ShardingTransaction::rollbackRequestThrown($request->id);
 
-                // 否则如果是http异常或开发模式，则响应异常内容，否则响应http500
-                $exception = $isSimple || Dce::isDevEnv() ? $throwable : new RequestException(RequestException::INTERNAL_SERVER_ERROR);
-                if ($request->rawRequest instanceof RawRequestHttp) {
-                    if ($isOpenly) { // 如果是公开异常，则响应异常消息
-                        ($request->controller ?? 0) ? $request->controller->exception($exception) : $request->rawRequest->response(self::render($exception, null));
-                    } else {
-                        if ($request->controller ?? 0) {
-                            $request->controller->httpException($exception->getCode(), $exception->getMessage());
-                        } else {
-                            $request->rawRequest->status($exception->getCode(), $exception->getMessage());
-                            $request->rawRequest->response(self::render($exception, $isHttp || ! Dce::isDevEnv(), true));
-                        }
-                    }
-                } else if ($request->rawRequest instanceof RawRequestConnection && $request->rawRequest->isResponseMode()) {
-                    // 如果是公开异常或开发模式，则响应异常消息，否则响应http500
-                    ($request->controller ?? 0) ? $request->controller->exception($exception) : $request->rawRequest->response(self::render($exception, null), $request->rawRequest->path);
+            // 如果不是简单异常或开发模式，则响应http500，否则响应异常消息
+            $exception = ! ($isSimple || Dce::isDevEnv()) && ($isHttp = true) ? new RequestException(RequestException::INTERNAL_SERVER_ERROR) : $throwable;
+            $controller = $request->controller ?? null;
+            if ($request->rawRequest instanceof RawRequestHttp) {
+                if ($isOpenly) { // 如果是公开异常，则响应异常消息
+                    $controller ? self::renderController($controller, $exception, $isHttp) : $request->rawRequest->response(self::render($exception, null));
+                } else if ($controller) {
+                    self::renderController($controller, $exception, $isHttp);
+                } else {
+                    $request->rawRequest->status($exception->getCode(), $exception->getMessage());
+                    $request->rawRequest->response(self::render($exception, $isHttp || ! Dce::isDevEnv(), true));
                 }
+            } else if ($request->rawRequest instanceof RawRequestConnection && $request->rawRequest->isResponseMode()) {
+                $controller ? self::renderController($controller, $exception, false) : $request->rawRequest->response(self::render($exception, null), $request->rawRequest->path);
             }
+        }
+    }
+
+    private static function renderController(Controller $controller, Throwable $throwable, bool $isHttp): void {
+        $controller->assignStatus('message', $throwable->getMessage());
+        if ($throwable instanceof ResponseException) {
+            $controller->assignStatus('status', false);
+            $controller->assignStatus('code', $throwable->getCode());
+            $controller->assignMapping($throwable->data);
+            $isHttp ? $controller->httpException($throwable->getCode()) : $controller->render();
+        } else {
+            $isHttp ? $controller->httpException($throwable->getCode()) : $controller->exception($throwable);
         }
     }
 
@@ -197,7 +201,7 @@ class Exception extends \Exception implements Decorator {
     }
 
     public static function render(Throwable $throwable, bool|null $simple = false, bool $html = false): string {
-        return LogManager::exceptionRender($throwable, $simple, $html);
+        return MatrixLogger::applyTime(LogManager::exceptionRender($throwable, $simple, $html), time());
     }
 
     public static function init() {

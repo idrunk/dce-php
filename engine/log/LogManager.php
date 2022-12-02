@@ -77,7 +77,7 @@ final class LogManager {
         $isConnecting = $rawRequest->isConnecting ?? false;
         $topic = sprintf("\n[#T;] (%s %s) %s/%s%s", $isConnecting ? '连' : '求',
             $rawRequest->getClientInfo()['request'], $rawRequest->getClientInfo()['ip'], $request->session->getId() ?? '', $isConnecting ? '/' . $request->fd : '');
-        self::push(LoggerType::Request, $topic, is_string($rawRequest->getRawData()) ? $rawRequest->getRawData() : json_encode($rawRequest->getRawData(), JSON_UNESCAPED_UNICODE));
+        self::push(LoggerType::Request, $topic, is_string($data = $rawRequest->getRawData()) ? (($request->files ?? false) ? '(upload content)' : $data) : json_encode($data, JSON_UNESCAPED_UNICODE));
     }
 
     /**
@@ -102,9 +102,9 @@ final class LogManager {
     public static function connect(Connection $conn, bool $isConnect = true): void {
         if (! Dce::$config->log['access']['connect'] && ! Dce::$config->log['access']['logfile_power']) return;
 
-        $topic = sprintf("\n[#T;] (%s %s) %s/%s/%s", $isConnect ? '连' : '断',
-            $conn->server instanceof WebsocketServer ? 'websocket' : 'tcp',
-            $conn->server->getServer()->getClientInfo($conn->fd)['remote_ip'] ?? '', $conn->session->getId(), $conn->fd);
+        $clientInfo = $conn->server->getServer()->getClientInfo($conn->fd);
+        $topic = sprintf("\n[#T;] (%s %s :%s) %s/%s/%s", $isConnect ? '连' : '断', $conn->server instanceof WebsocketServer ? 'websocket' : 'tcp',
+            $clientInfo['server_port'] ?? '', $clientInfo['remote_ip'] ?? '', $conn->session->getId(), $conn->fd);
         self::push(LoggerType::Connect, $topic);
     }
 
@@ -195,7 +195,9 @@ final class LogManager {
     }
 
     private static function push(LoggerType $type, string $topic, string $content = null): void {
-        SwooleUtility::inCoroutine() && self::$isServerStart ? self::$tableLogger->push($type, $topic, $content) : self::$simpleLogger->push($type, $topic, $content);
+        $content !== null && ! mb_detect_encoding(mb_substr($content, -32), null, true) && $content = '(binary stream)';
+        // SwooleUtility::inCoroutine() && self::$isServerStart ? self::$tableLogger->push($type, $topic, $content) : self::$simpleLogger->push($type, $topic, $content);
+        self::$simpleLogger->push($type, $topic, $content);
     }
 
     public static function standardConfigLogfile(array $config, string $replacement = null): string {

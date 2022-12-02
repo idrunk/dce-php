@@ -16,4 +16,7 @@ class NodeException extends Exception {
 
     #[Language(['Methods必须为字符串数组, 如["get", "post"]'])]
     public const NODE_METHODS_NEED_ARRAY = 1211;
+
+    #[Language(['[%s]:routeTo 属性非有效节点全路径地址'])]
+    public const ROUTE_TO_IS_INVALID_PATH = 1212;
 }

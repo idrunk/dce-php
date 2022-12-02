@@ -23,7 +23,6 @@ class Config implements ArrayAccess {
      * ConfigMatrix constructor.
      * @param array|ArrayAccess $config
      * @throws ConfigException
-     * @throws ReflectionException
      */
     function __construct(array|ArrayAccess $config = []) {
         $this->extend($config);
@@ -184,7 +183,6 @@ class Config implements ArrayAccess {
      * @param string $key
      * @param mixed $value
      * @throws ConfigException
-     * @throws ReflectionException
      */
     public function __set(string $key, mixed $value) {
         $this->set($key, $value);

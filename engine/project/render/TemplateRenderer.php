@@ -8,11 +8,14 @@ namespace dce\project\render;
 
 use dce\Dce;
 use dce\project\Controller;
+use dce\project\node\Node;
 use dce\project\request\RawRequest;
-use dce\project\request\RawRequestHttp;
 use dce\project\request\Request;
 
 class TemplateRenderer extends Renderer {
+    /** @var string $request 当前请求 */
+    protected Request $request;
+
     /** @var string $templatePath 模板文件路径 */
     protected string $templatePath;
 
@@ -27,7 +30,8 @@ class TemplateRenderer extends Renderer {
         // 需先预热, 因为父构造函数可能会直接从缓存渲染, 渲染时需要模板文件
         $this->warmUp($controller->request);
         parent::prepare($controller, $isResponseMode);
-        $controller->assign('request', $controller->request);
+        $controller->assign('ctrl', $controller);
+        $controller->assign('req', $controller->request);
     }
 
     /**
@@ -36,15 +40,14 @@ class TemplateRenderer extends Renderer {
      * @throws RenderException
      */
     protected function warmUp(Request $request): void {
+        $this->request = $request;
         $templateRoot = "{$request->project->path}template/";
         $this->templatePath = $templateRoot . self::getRender($request);
-        if (! is_file($this->templatePath) ) {
+        if (! is_file($this->templatePath) )
             throw (new RenderException(RenderException::TEMPLATE_NOTFOUND))->format($this->templatePath);
-        }
         $this->layoutPath = ($request->node->templateLayout ?? '') ? $templateRoot . $request->node->templateLayout : '';
-        if ($this->layoutPath && ! is_file($this->layoutPath)) {
+        if ($this->layoutPath && ! is_file($this->layoutPath))
             throw (new RenderException(RenderException::LAYOUT_NOTFOUND))->format($this->layoutPath);
-        }
         $this->templateCacheDir = $request->config->cache['file']['template_dir'] ?: APP_RUNTIME . 'tpl/';
     }
 
@@ -78,16 +81,16 @@ class TemplateRenderer extends Renderer {
      * @return string
      */
     protected function template(Controller $controller): string {
-        $cacheTemplatePath = $this->templateCacheDir . hash('md5', $this->templatePath) . '.php';
+        $cacheTemplatePath = $this->templateCacheDir . preg_replace('/[\\/\\\:]/', '-',
+                str_replace($this->request->project->path, $this->request->project->name . '/', $this->templatePath));
         // 如果缓存模板不存在, 或者未开启模板缓存, 且模板文件有变化了, 则进入编译缓存流程
         if (
             ! is_file($cacheTemplatePath)
-            || ! ($controller->request->node->renderCache & 2)
+            || ! ($controller->request->node->renderCache & Node::CACHE_TEMPLATE)
             && Dce::$cache::fileIsModified([$this->templatePath, $this->layoutPath])
         ) {
-            if (! is_dir($this->templateCacheDir)) {
+            if (! is_dir($this->templateCacheDir))
                 mkdir($this->templateCacheDir, 0755, true);
-            }
             // 如果模板文件改变了, 或者未找到缓存文件, 则重建缓存
             $fullCode = $this->compile();
             file_put_contents($cacheTemplatePath, $fullCode, LOCK_EX);
@@ -142,6 +145,8 @@ class TemplateRenderer extends Renderer {
                         ! file_exists($childPath) && $childPath = "$rootDir/$childPath";
                         $subContent = file_get_contents($childPath);
                         $rootContent .= self::loadAllContent($subContent, dirname($childPath));
+                    } else if ($type === T_CLOSE_TAG) {
+                        $isInInclude = false;
                     }
                 } else if (in_array($type, [T_INCLUDE, T_INCLUDE_ONCE, T_REQUIRE, T_REQUIRE_ONCE])) {
                     // 如果进到引用语句, 则关掉前面的PHP语句, 如果前面部分是赋值等运算符, 则会报错fatal_error, 因此禁止在模板中将引用参与计算

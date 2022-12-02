@@ -8,6 +8,7 @@ namespace dce\project\render;
 
 use dce\Dce;
 use dce\project\Controller;
+use dce\project\node\Node;
 use dce\project\request\RawRequest;
 use dce\project\request\Request;
 
@@ -74,10 +75,10 @@ abstract class Renderer {
      * @param bool $isResponseMode
      */
     private function renderCache(Controller $controller, bool $isResponseMode): void {
-        if ($isResponseMode && $controller->request->node->renderCache & 1) {
+        if ($isResponseMode && $controller->request->node->renderCache & Node::CACHE_API) {
             $cacheData = Dce::$cache->shmDefault->get(['api_data', $controller->request->node->pathFormat]);
             if (is_array($cacheData)) {
-                if ($controller->request->node->renderCache & 4) {
+                if ($controller->request->node->renderCache & Node::CACHE_PAGE) {
                     // 如果缓存了数据又缓存了页面, 则表示页面肯定没变化, 则可以直接渲染缓存页
                     $content = Dce::$cache->shmDefault->get(['page_data', $controller->request->node->pathFormat]);
                 } else {
@@ -121,7 +122,7 @@ abstract class Renderer {
      */
     private function beforeRender(Controller $controller): string {
         $dataId = '';
-        if ($controller->request->node->renderCache & 4) {
+        if ($controller->request->node->renderCache & Node::CACHE_PAGE) {
             $dataId = md5(serialize($controller->getAllAssignedStatus()));
             $cachedDataId = Dce::$cache->shmDefault->get(['api_data_id', $controller->request->node->pathFormat]);
             if ($dataId === $cachedDataId && $cachedPage = Dce::$cache->shmDefault->get(['page_data', $controller->request->node->pathFormat]))
@@ -137,9 +138,9 @@ abstract class Renderer {
      * @param string $content
      */
     private function afterRender(Controller $controller, string $dataId, string $content): void {
-        if ($controller->request->node->renderCache & 1)
+        if ($controller->request->node->renderCache & Node::CACHE_API)
             Dce::$cache->shmDefault->set(['api_data', $controller->request->node->pathFormat], $controller->getAllAssignedStatus());
-        if ($controller->request->node->renderCache & 4) {
+        if ($controller->request->node->renderCache & Node::CACHE_PAGE) {
             Dce::$cache->shmDefault->set(['api_data_id', $controller->request->node->pathFormat], $dataId);
             Dce::$cache->shmDefault->set(['page_data', $controller->request->node->pathFormat], $content);
         }

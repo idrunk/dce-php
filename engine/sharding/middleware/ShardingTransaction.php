@@ -59,7 +59,7 @@ class ShardingTransaction extends Transaction {
     /** @inheritDoc */
     public function rollback(): bool {
         $result = parent::rollback();
-        $this->pool->put($this->connector);
+        isset($this->pool) && $this->pool->put($this->connector);
         return $result;
     }
 

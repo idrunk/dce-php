@@ -14,6 +14,7 @@ use dce\db\query\builder\RawBuilder;
 use dce\db\query\builder\schema\WhereSchema;
 use dce\db\query\builder\Statement\SelectStatement;
 use dce\db\query\QueryException;
+use dce\loader\DecoratorManager;
 use dce\model\Model;
 use dce\model\ModelException;
 use dce\model\validator\ValidatorException;
@@ -260,16 +261,24 @@ class DbActiveQuery extends ActiveQuery {
      * @param ActiveRecord|array $targetRecord
      * @param bool|null $allowEmptyConditionOrMustEqual
      * @param SaveMethod|array $method
+     * @param array $columns 仅更新指定字段
      * @return int
      * @throws ActiveException
      * @throws ModelException
      * @throws Throwable
      * @throws ValidatorException
      */
-    public function update(ActiveRecord|array $targetRecord, bool|null $allowEmptyConditionOrMustEqual = false, SaveMethod|array $method = SaveMethod::Main): int {
+    public function update(ActiveRecord|array $targetRecord, bool|null $allowEmptyConditionOrMustEqual = false, SaveMethod|array $method = SaveMethod::Main, array $columns = []): int {
         $affected = 0;
+        ($isArray = is_array($targetRecord)) && $targetRecord = $this->activeRecordClass::from($targetRecord);
+        if ($columns) {
+            array_push($columns, ... array_map(fn($pkp) => $pkp->name, $this->activeRecordClass::getPkProperties()));
+            $scenario = DecoratorManager::getRefPropertyValue(Model::class, 'scenario', $targetRecord);
+            [$targetRecord, $originRecord] = [new ($this->activeRecordClass)($scenario), $targetRecord];
+            foreach ($columns as $column) $targetRecord->setPropertyValue($column, $originRecord->{$column});
+        }
         // 只有传入的activeRecord才自动校验，因为自动生成的无法得知scenario
-        is_array($targetRecord) ? $targetRecord = $this->activeRecordClass::from($targetRecord) : $targetRecord->valid();
+        ! $isArray && $targetRecord->valid();
         ! in_array($method, [SaveMethod::Extend, SaveMethod::ExtendClean]) && $affected += $this->query->update($targetRecord->extract(ExtractType::DbSave), $allowEmptyConditionOrMustEqual);
         if (SaveMethod::Main !== $method) {
             $this->extendRequirementValid();

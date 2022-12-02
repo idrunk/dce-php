@@ -26,6 +26,8 @@ class DceConfig extends Config {
         'id' => 'int', // 应用ID, 用于多应用部署在同台机器时, 标识其依赖公共组件的用户身份
         'name' => 'Stringable', // 应用名
         'homepage' => 'string', // 主页
+        'appPage' => 'string', // 应用主页
+        'staticHost' => 'string', // 静态资源主机前缀
         'lang' => 'string', // 默认语言码
         'country' => 'string', // 默认国家码
         'lang_parse' => 'callable(Request):string', // 语言码解析器, 返回语言码
@@ -409,7 +411,7 @@ class DceConfig extends Config {
 
     /** @inheritDoc */
     public function __construct($config) {
-        $this->app['id'] = hash('crc32', APP_ROOT);
+        $this->app['id'] = hash('crc32', getHostByName(getHostName()) . APP_ROOT);
         parent::__construct($config);
     }
 }

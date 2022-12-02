@@ -48,6 +48,8 @@ final class Dce {
      * @throws null
      */
     private static function prepare(): void {
+        // 预加载公共类库
+        Loader::prepareCommon();
         // 加载公共配置
         self::$config = ConfigManager::getCommonConfig();
         // 缓存初始化
@@ -55,8 +57,6 @@ final class Dce {
         LogManager::dce(new Language(['正在加载Dce类库...', 'DCE library loading...']));
         // PHP初始化
         self::phpInit();
-        // 预加载公共类库
-        Loader::prepareCommon();
         // 拦截异常
         Exception::init();
         // 并发锁初始化

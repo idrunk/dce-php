@@ -9,6 +9,7 @@ namespace dce\config;
 use dce\loader\attr\Singleton;
 use dce\project\Project;
 use drunk\Structure;
+use ReflectionException;
 
 final class ConfigManager {
     private const EXTENDS_KEY = '#extends';
@@ -24,6 +25,8 @@ final class ConfigManager {
     /**
      * 实例化一个新的公共配置
      * @return DceConfig
+     * @throws ConfigException
+     * @throws ReflectionException
      */
     public static function newCommonConfig(): DceConfig {
         return new DceConfig(self::parseFile(APP_COMMON . 'config/config.php'));
@@ -33,6 +36,8 @@ final class ConfigManager {
      * 取项目配置
      * @param Project $project
      * @return DceConfig
+     * @throws ConfigException
+     * @throws ReflectionException
      */
     public static function getProjectConfig(Project $project): DceConfig {
         static $configs = [];
@@ -47,6 +52,8 @@ final class ConfigManager {
      * 取未与公共配置合并的项目配置
      * @param Project $project
      * @return DceConfig
+     * @throws ConfigException
+     * @throws ReflectionException
      */
     public static function getPureProjectConfig(Project $project): DceConfig {
         static $configs = [];

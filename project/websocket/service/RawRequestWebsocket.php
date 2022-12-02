@@ -66,6 +66,17 @@ class RawRequestWebsocket extends RawRequestConnection {
     }
 
     /** @inheritDoc */
+    public function getClientInfo(): array {
+        $tcpClientInfo = $this->getServer()->getServer()->getClientInfo($this->fd);
+        $clientInfo = $this->connection->swRequest->header;
+        $clientInfo['request'] = "$this->method {$clientInfo['host']}/$this->path#" . ($this->requestId ?? '');
+        $clientInfo['ip'] = $clientInfo['remote-addr'] ?? $clientInfo['x-real-ip'] ?? $tcpClientInfo['remote_ip'] ?? '-';
+        $clientInfo['port'] = $clientInfo['remote-port'] ?? $clientInfo['x-real-port'] ?? $tcpClientInfo['remote_port'] ?? 0;
+        $clientInfo['server_port'] = $tcpClientInfo['server_port'] ?? 0;
+        return $clientInfo;
+    }
+
+    /** @inheritDoc */
     public function response(mixed $data, string|false $path): bool {
         LogManager::response($this, $data);
         return $this->getServer()->push($this->fd, $data, $path . (isset($this->requestId) ? self::REQUEST_SEPARATOR . $this->requestId : ''));

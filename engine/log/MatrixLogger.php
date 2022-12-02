@@ -7,11 +7,10 @@
 namespace dce\log;
 
 use dce\base\LoggerType;
-use dce\base\SwooleUtility;
 use dce\loader\attr\Singleton;
 
 abstract class MatrixLogger {
-    protected static function applyTime(string $topic, int $time): string {
+    public static function applyTime(string $topic, int $time): string {
         return str_replace('[#T;]', '[' . date('d H:i:s', $time) . ']', $topic);
     }
 

@@ -19,15 +19,16 @@ abstract class ActiveQuery {
 
     /**
      * 设置即时加载关联数据
-     * @param string|array ...$relationNames <pre>若需递归，仅支持传递第一个参数，格式如:
+     * @param string|array ...$relationName <pre>若需递归，仅支持传递第一个参数，格式如:
      * [grass, appleTree => flower,
      *  tree => [appleTree => flower, orangeTree => [flower, fruit]]
      * ]</pre>
+     * @param string ...$relationNames
      * @return $this
      * @throws ActiveException
      */
-    public function with(string|array ... $relationNames): static {
-        $relationNames = is_array(current($relationNames)) ? $relationNames[0] : $relationNames;
+    public function with(string|array $relationName, string ... $relationNames): static {
+        $relationNames = is_array($relationName) ? $relationName : [$relationName, ... $relationNames];
         $this->withRelations = self::buildWithRelation($relationNames, $this->getActiveRecordClass());
         return $this;
     }

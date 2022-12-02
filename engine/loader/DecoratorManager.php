@@ -22,6 +22,18 @@ use ReflectionType;
 use ReflectionUnionType;
 
 class DecoratorManager {
+    private static array $refClasses = [];
+
+    public static function getRefClass(string $className): ReflectionClass {
+        return self::$refClasses[$className];
+    }
+
+    public static function getRefPropertyValue(string $className, string $propertyName, object $object = null): mixed {
+        $property = self::getRefClass($className)->getProperty($propertyName);
+        $property->setAccessible(true);
+        return $property->getValue($object);
+    }
+
     public static function bindDceClassLoad(): void {
         Event::on(Loader::EVENT_ON_CLASS_LOAD, [self::class, 'decorate']);
     }
@@ -33,7 +45,7 @@ class DecoratorManager {
      * @throws ReflectionException
      */
     public static function decorate(string $className): void {
-        $refClass = new ReflectionClass($className);
+        self::$refClasses[$className] = $refClass = new ReflectionClass($className);
         if ($refClass->implementsInterface(Decorator::class) || $refClass->getAttributes(Decorator::class)) {
             // 如果刚加载的类实现了装饰器接口, 或者标记了装饰器注解, 则尝试执行各种装饰动作
             self::initConstructor($refClass);

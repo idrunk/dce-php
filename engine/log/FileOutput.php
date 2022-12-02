@@ -10,8 +10,6 @@ use dce\base\LogMethod;
 
 /**
  * 文件版日志储存引擎
- * Class File
- * @package drunk\debug\storage\FileStorage
  */
 class FileOutput extends MatrixOutput {
     public function push(string $path, string $content, LogMethod $logMethod = LogMethod::Append): void {

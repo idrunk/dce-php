@@ -52,7 +52,7 @@ class RawRequestUdp extends RawRequestConnection {
 
     /** @inheritDoc */
     public function getClientInfo(): array {
-        $this->clientInfo['request'] = "$this->method {$this->clientInfo['ip']}/$this->path:" . ($this->requestId ?? '');
+        $this->clientInfo['request'] = "$this->method :{$this->clientInfo['server_port']}/$this->path#" . ($this->requestId ?? '');
         return $this->clientInfo;
     }
 }
