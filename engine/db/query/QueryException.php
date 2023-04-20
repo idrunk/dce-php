@@ -65,6 +65,9 @@ class QueryException extends Exception {
     #[Language(['查询条件无效, 非查询条件或逻辑运算符'])]
     public const WHERE_OR_LOGIC_CONDITION_INVALID = 1325;
 
+    #[Language(['无效的窗口函数滑块结构'])]
+    public const WINDOW_FRAME_INVALID = 1340;
+
     #[Language(['未配置删除表'])]
     public const DELETE_TABLE_NOT_SPECIFIED = 1350;
 
@@ -107,8 +110,8 @@ class QueryException extends Exception {
     #[Language(['当前设置不允许无等于条件更新数据'])]
     public const NO_EQUAL_UPDATE_NOT_ALLOW = 1363;
 
-    #[Language(['不支持批量INSERT UPDATE'])]
-    public const NOT_ALLOW_BATCH_INSERT_UPDATE = 1364;
+    #[Language(['冲突时更新字段不能为空'])]
+    public const CONFLICT_UPDATE_COLUMNS_CANNOT_BE_EMPTY = 1364;
 
     #[Language(['ID %s 无法匹配到对应的分库, 数据无法完成插入'])]
     public const ID_CANNOT_MATCH_DB = 1380;

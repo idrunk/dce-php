@@ -49,6 +49,6 @@ class TableSchema extends SchemaAbstract {
     }
 
     public function getName(): string {
-        return trim($this->getConditions()[0]['table'] ?? null, ' `');
+        return trim($this->getConditions()[0]['table'] ?? '', ' `');
     }
 }

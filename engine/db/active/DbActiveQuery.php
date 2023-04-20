@@ -92,8 +92,8 @@ class DbActiveQuery extends ActiveQuery {
         $data = $this->presetData ?? $this->query->select(self::getColumns(), $indexColumn, isAutoRaw: false);
         $data = array_map(fn($datum) => $this->getActiveRecordClass()::from($datum)->markQueriedProperties(), $data);
         if ($data) {
-            ($this->withExtends ?? 0) && $this->loadExtendsData($data);
-            ($this->withRelations ?? []) && $this->loadWithRelationData($data, $this->withRelations);
+            ($this->carryExtends ?? 0) && $this->loadExtendsData($data);
+            ($this->carryRelations ?? []) && $this->loadCarryRelationData($data, $this->carryRelations);
         }
         return $data;
     }
@@ -124,28 +124,28 @@ class DbActiveQuery extends ActiveQuery {
     }
 
     /**
-     * 批量查询 with 关系数据并按映射关系分配绑定到主体数据
+     * 批量查询 carry 关系数据并按映射关系分配绑定到主体数据
      * @param list<T|DbActiveRecord> $recordList
-     * @param array $withRelations
+     * @param array $carryRelations
      */
-    private function loadWithRelationData(array $recordList, array $withRelations): void {
-        /** @var array<string, list<ActiveRecord>> $withViaRelationDataMapping 关系数据映射缓存表，以便节省数据库IO及遍历赋值 */
-        $withViaRelationDataMapping = [];
+    private function loadCarryRelationData(array $recordList, array $carryRelations): void {
+        /** @var array<string, list<ActiveRecord>> $carryViaRelationDataMapping 关系数据映射缓存表，以便节省数据库IO及遍历赋值 */
+        $carryViaRelationDataMapping = [];
         // 遍历关系名, 批量查询出所有关联关系数据
-        foreach ($withRelations as ['relation' => $withRelation, 'children' => $childWithRelations]) {
+        foreach ($carryRelations as ['relation' => $carryRelation, 'children' => $childCarryRelations]) {
             // 关系数据若已查询加载过则无需继续处理
-            if (key_exists($withRelation->name, $withViaRelationDataMapping)) continue;
+            if (key_exists($carryRelation->name, $carryViaRelationDataMapping)) continue;
 
-            $withRelation->loadWithActiveRecordList($recordList, $withViaRelationDataMapping);
+            $carryRelation->loadCarryActiveRecordList($recordList, $carryViaRelationDataMapping);
 
             // 遍历主体对象, 将关系数据挂靠于对象getter属性上
             foreach ($recordList as $record) {
                 // 由于对应关系可能是一对多对多, 所以此处将主活动记录集成员转为矩阵, 可以通用化匹配处理多对多的关系数据
                 $primaryData = [ $record ];
-                foreach ($withRelation->getReversedVias() as $viaRelation) {
+                foreach ($carryRelation->getReversedVias() as $viaRelation) {
                     $viaRelationName = $viaRelation->name;
                     $viaRelationColumns = $viaRelation->getRelationColumns();
-                    $viaRelationRecordList = $withViaRelationDataMapping[$viaRelationName];
+                    $viaRelationRecordList = $carryViaRelationDataMapping[$viaRelationName];
 
                     // 筛选与主数据匹配的关联数据集，此数据集即关联关系数据，亦作为下级关联数据的映射依据数据
                     $viaRelationDataMatched = array_reduce($primaryData, function($carry, $primaryDatum) use(& $viaRelationRecordList, $viaRelationColumns) {
@@ -164,10 +164,10 @@ class DbActiveQuery extends ActiveQuery {
                 }
             }
 
-            $childWithRelations
+            $childCarryRelations
                 && ($childRecordList = array_reduce($recordList, fn($rs, $r) => array_merge($rs,
-                    $r->{$withRelation->name} ? (is_array($r->{$withRelation->name}) ? $r->{$withRelation->name} : [$r->{$withRelation->name}]) : []), []))
-                && $this->loadWithRelationData($childRecordList, $childWithRelations);
+                    $r->{$carryRelation->name} ? (is_array($r->{$carryRelation->name}) ? $r->{$carryRelation->name} : [$r->{$carryRelation->name}]) : []), []))
+                && $this->loadCarryRelationData($childRecordList, $childCarryRelations);
         }
     }
 
@@ -177,7 +177,7 @@ class DbActiveQuery extends ActiveQuery {
      * @throws ActiveException
      */
     public function each(): Iterator {
-        ($this->withRelations ?? 0) && throw new ActiveException(ActiveException::EACH_NO_SUPPORT_WITH);
+        ($this->carryRelations ?? 0) && throw new ActiveException(ActiveException::EACH_NO_SUPPORT_WITH);
         return $this->query->each(self::getColumns(), false,
             fn($datum) => $datum ? $this->getActiveRecordClass()::from($datum)->markQueriedProperties() : false, false);
     }
@@ -190,7 +190,7 @@ class DbActiveQuery extends ActiveQuery {
     public function find(): ActiveRecord|false {
         if (! $record = $this->presetData ?? $this->query->find(self::getColumns(), false)) return false;
         $record = $this->getActiveRecordClass()::from($record);
-        ($this->withExtends ?? 0) && $this->loadExtendsData([$record]);
+        ($this->carryExtends ?? 0) && $this->loadExtendsData([$record]);
         $record->markQueriedProperties();
         return $record;
     }
@@ -206,28 +206,28 @@ class DbActiveQuery extends ActiveQuery {
     /**
      * 向数据库插入数据
      * @param ActiveRecord|array|array<array>|array<ActiveRecord> $data
-     * @param bool|null $ignoreOrReplace
+     * @param bool|array|null $updateOrIgnore
      * @param SaveMethod|array $method
      * @return int|string
      * @throws ActiveException
      * @throws Throwable
      * @throws ValidatorException
      */
-    public function insert(ActiveRecord|array $data, bool|null $ignoreOrReplace = null, SaveMethod|array $method = SaveMethod::Main): int|string {
+    public function insert(ActiveRecord|array $data, bool|array|null $updateOrIgnore = null, SaveMethod|array $method = SaveMethod::Main): int|string {
         $isSingle = $isModelType = $data instanceof ActiveRecord;
         ! $isSingle && ! is_array($firstElem = current($data)) && $isSingle = (! $isModelType = $firstElem instanceof Model);
         $insertData = $isModelType ? array_map(function(Model $m) {
             $m->valid();
             return $m->extract(ExtractType::DbSave, false);
         }, $isSingle ? [$data] : $data) : ($isSingle ? [$data] : $data);
-        if ($method === SaveMethod::Main) return $this->query->insert($isSingle ? current($insertData) : $insertData, $ignoreOrReplace);
+        if ($method === SaveMethod::Main) return $this->query->insert($isSingle ? current($insertData) : $insertData, $updateOrIgnore);
         $affected = 0;
         $needInsert = in_array($method, [SaveMethod::Both, SaveMethod::BothClean]);
         $countPrimaryKeys = count(([$pkProps] = $this->extendRequirementValid())[0]);
         foreach ($isSingle ? [$data] : $data as $k => $item) {
             $record = $isModelType ? $item : $this->activeRecordClass::from($item);
             if ($needInsert) {
-                $insertId = $this->query->insert($insertData[$k], $ignoreOrReplace);
+                $insertId = $this->query->insert($insertData[$k], $updateOrIgnore);
                 $affected += $isSingle ? $insertId : 1;
                 $countPrimaryKeys === 1 && $pkProps[0]->setValue($record, $insertId, false);
             }
@@ -235,25 +235,6 @@ class DbActiveQuery extends ActiveQuery {
             $affected += $isSingle ? 0 : $extAffected;
         }
         return $affected;
-    }
-
-    /**
-     * 向数据库插入数据，若有唯一键冲突则更新
-     * @throws Throwable
-     * @throws ActiveException
-     * @throws ValidatorException
-     */
-    public function insertUpdate(ActiveRecord|array $record, SaveMethod|array $method = SaveMethod::Main): int {
-        is_array($record) ? $record = $this->activeRecordClass::from($record) : $record->valid();
-        if (! in_array($method, [SaveMethod::Extend, SaveMethod::ExtendClean])) {
-            $insertId = $this->query->insertUpdate($record->extract(ExtractType::DbSave));
-            if ($insertId) $this->activeRecordClass::getPkProperties()[0]->setValue($record, $insertId, false);
-        }
-        if (SaveMethod::Main !== $method) {
-            $this->extendRequirementValid();
-            $this->saveExtends($record, is_array($method) ? $method : (in_array($method, [SaveMethod::Extend, SaveMethod::Both]) ? null : []));
-        }
-        return current($record->getPkValues());
     }
 
     /**

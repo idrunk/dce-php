@@ -13,9 +13,9 @@ use drunk\Structure;
  */
 abstract class ActiveQuery {
     /** @var array<array{relation: ActiveRelation, children?: array<>}> */
-    readonly protected array $withRelations;
+    readonly protected array $carryRelations;
 
-    readonly protected bool $withExtends;
+    readonly protected bool $carryExtends;
 
     /**
      * 设置即时加载关联数据
@@ -27,20 +27,20 @@ abstract class ActiveQuery {
      * @return $this
      * @throws ActiveException
      */
-    public function with(string|array $relationName, string ... $relationNames): static {
+    public function carry(string|array $relationName, string ... $relationNames): static {
         $relationNames = is_array($relationName) ? $relationName : [$relationName, ... $relationNames];
-        $this->withRelations = self::buildWithRelation($relationNames, $this->getActiveRecordClass());
+        $this->carryRelations = self::buildCarryRelation($relationNames, $this->getActiveRecordClass());
         return $this;
     }
 
     /**
-     * 构建树形with关系
+     * 构建树形carry关系
      * @param array $relationNames
      * @param class-string<ActiveRecord> $activeRecordClass
      * @return array
      * @throws ActiveException
      */
-    private static function buildWithRelation(array $relationNames, string $activeRecordClass): array {
+    private static function buildCarryRelation(array $relationNames, string $activeRecordClass): array {
         $relations = [];
         foreach ($relationNames as $name => $children) {
             if (is_int($name)) {
@@ -52,14 +52,14 @@ abstract class ActiveQuery {
             }
             $pack['relation'] = $activeRecordClass::getActiveRelation($activeRecordClass::toModelKey($name));
             ! $pack['relation'] && throw (new ActiveException(ActiveException::RELATION_NAME_INVALID))->format($name);
-            $pack['children'] = $children ? self::buildWithRelation($children, $pack['relation']->foreignActiveRecordClass) : [];
+            $pack['children'] = $children ? self::buildCarryRelation($children, $pack['relation']->foreignActiveRecordClass) : [];
             array_push($relations, $pack);
         }
         return $relations;
     }
 
-    public function withExtends(bool $with = true): static {
-        $this->withExtends = $with;
+    public function carryExtends(bool $carry = true): static {
+        $this->carryExtends = $carry;
         return $this;
     }
 

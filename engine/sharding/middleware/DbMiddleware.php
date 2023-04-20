@@ -13,7 +13,7 @@ use dce\db\connector\DbPool;
 use dce\db\connector\PdoDbConnector;
 use dce\db\proxy\TransactionException;
 use dce\db\Query;
-use dce\db\query\builder\StatementInterface;
+use dce\db\query\builder\StatementAbstract;
 use dce\db\query\QueryException;
 use dce\db\query\builder\schema\WhereConditionSchema;
 use dce\Dce;
@@ -69,12 +69,12 @@ class DbMiddleware extends Middleware {
 
     /**
      * SQL指令分发器
-     * @param StatementInterface $statement
+     * @param StatementAbstract $statement
      * @param string $dbAlias
      * @param DbPool $connectorPool
      * @throws TransactionException
      */
-    private function directDistribute(StatementInterface $statement, string $dbAlias, DbPool $connectorPool): void {
+    private function directDistribute(StatementAbstract $statement, string $dbAlias, DbPool $connectorPool): void {
         // 若打开了事务开关, 则尝试开启事务
         $transaction = ShardingTransaction::tryBegin($this->config->alias, $dbAlias, $connectorPool);
         $inTransaction = $transaction instanceof ShardingTransaction;
@@ -143,7 +143,7 @@ class DbMiddleware extends Middleware {
     /**
      * 组装跨分库更新迁移sql组件 (分库更新数据时, 可能会更新分库依据字段, 这种字段值改变时可能需要迁库, 此方法即处理这种情况)
      * @param array $upData
-     * @return StatementInterface[][]
+     * @return StatementAbstract[][]
      * @throws MiddlewareException
      * @throws IdgException
      */

@@ -8,7 +8,7 @@ namespace dce\db\query\builder;
 
 use dce\db\query\QueryException;
 
-abstract class SchemaAbstract implements SchemaInterface {
+abstract class SchemaAbstract {
     private array $conditions = [];
 
     protected array $sqlPackage = [];
@@ -80,7 +80,7 @@ abstract class SchemaAbstract implements SchemaInterface {
         if (is_numeric($string)) {
             $table = $string;
         } else {
-            ! $table = self::tableWrap($string, $isAllowAlias) && throw (new QueryException(QueryException::TABLE_OR_COLUMN_INVALID))->format($string);
+            (! $table = self::tableWrap($string, $isAllowAlias)) && throw (new QueryException(QueryException::TABLE_OR_COLUMN_INVALID))->format($string);
         }
         return $table;
     }
@@ -98,4 +98,6 @@ abstract class SchemaAbstract implements SchemaInterface {
         }
         return $value;
     }
+
+    abstract public function __toString(): string;
 }

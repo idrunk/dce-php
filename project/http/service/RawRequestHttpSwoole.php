@@ -43,6 +43,7 @@ class RawRequestHttpSwoole extends RawRequestHttp {
         $this->queryString = urldecode($this->requestSwoole->server['query_string'] ?? '');
         $this->httpOrigin = $header['origin'] ?? '';
         $this->userAgent = $header['user-agent'];
+        $this->referer = $header['referer'] ?? '';
         $this->remoteAddr = $header['remote-addr'] ?? $header['x-real-ip'] ?? $this->getServer()->getServer()->getClientInfo($this->requestSwoole->fd)['remote_ip'] ?? '-';
         $this->serverPort = $this->requestSwoole->server['server_port'];
     }

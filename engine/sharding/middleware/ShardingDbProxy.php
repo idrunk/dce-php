@@ -11,7 +11,7 @@ use dce\db\connector\DbConfig;
 use dce\db\proxy\DbProxy;
 use dce\db\proxy\Transaction;
 use dce\db\Query;
-use dce\db\query\builder\StatementInterface;
+use dce\db\query\builder\StatementAbstract;
 use dce\Dce;
 use Iterator;
 
@@ -34,44 +34,44 @@ final class ShardingDbProxy extends DbProxy {
 
     /**
      * 取一个新的分库中间件实例
-     * @param StatementInterface|string $statement
+     * @param StatementAbstract|string $statement
      * @param array $params
      * @return DbMiddleware
      * @throws MiddlewareException
      */
-    private function getMiddleware(StatementInterface|string $statement, array $params): DbMiddleware {
+    private function getMiddleware(StatementAbstract|string $statement, array $params): DbMiddleware {
         $this->logStatement($statement, $params);
         $directiveParser = new DbDirectiveParser($statement, $params);
         return new DbMiddleware($directiveParser, $this);
     }
 
     /** @inheritDoc */
-    public function queryAll(StatementInterface $statement, string|null $indexColumn = null, string|null $extractColumn = null): array {
+    public function queryAll(StatementAbstract $statement, string|null $indexColumn = null, string|null $extractColumn = null): array {
         return $this->getMiddleware($statement, $statement->getParams())->queryAll($indexColumn, $extractColumn);
     }
 
     /** @inheritDoc */
-    public function queryEach(StatementInterface $statement, Closure|null $decorator = null): Iterator {
+    public function queryEach(StatementAbstract $statement, Closure|null $decorator = null): Iterator {
         return $this->getMiddleware($statement, $statement->getParams())->queryEach($decorator);
     }
 
     /** @inheritDoc */
-    public function queryOne(StatementInterface $statement): array|false {
+    public function queryOne(StatementAbstract $statement): array|false {
         return $this->getMiddleware($statement, $statement->getParams())->queryOne();
     }
 
     /** @inheritDoc */
-    public function queryColumn(StatementInterface $statement): string|int|float|null|false {
+    public function queryColumn(StatementAbstract $statement): string|int|float|null|false {
         return $this->getMiddleware($statement, $statement->getParams())->queryColumn();
     }
 
     /** @inheritDoc */
-    public function queryGetAffectedCount(StatementInterface $statement): int {
+    public function queryGetAffectedCount(StatementAbstract $statement): int {
         return $this->getMiddleware($statement, $statement->getParams())->queryGetAffectedCount();
     }
 
     /** @inheritDoc */
-    public function queryGetInsertId(StatementInterface $statement): int|string {
+    public function queryGetInsertId(StatementAbstract $statement): int|string {
         return $this->getMiddleware($statement, $statement->getParams())->queryGetInsertId();
     }
 

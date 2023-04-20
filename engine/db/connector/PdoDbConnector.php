@@ -8,7 +8,7 @@ namespace dce\db\connector;
 
 use Closure;
 use dce\base\SwooleUtility;
-use dce\db\query\builder\StatementInterface;
+use dce\db\query\builder\StatementAbstract;
 use dce\db\query\QueryException;
 use PDO;
 use PDOStatement;
@@ -32,7 +32,7 @@ class PdoDbConnector extends DbConnector {
         return $this->connection;
     }
 
-    protected function prepareStatement(StatementInterface $statement, array $attrs = [], PDO|null &$conn = null): PDOStatement {
+    protected function prepareStatement(StatementAbstract $statement, array $attrs = [], PDO|null &$conn = null): PDOStatement {
         $conn = $this->getConnection();
 //        testPoint($conn->errorInfo());
         $stmt = $conn->prepare($statement, $attrs);
@@ -46,7 +46,7 @@ class PdoDbConnector extends DbConnector {
         return $this->connection;
     }
 
-    public function queryAll(StatementInterface $statement, string|null $indexColumn = null, string|null $extractColumn = null): array {
+    public function queryAll(StatementAbstract $statement, string|null $indexColumn = null, string|null $extractColumn = null): array {
         $logId = $this->logStatement($statement, $statement->getParams());
         $data = $this->prepareStatement($statement)->fetchAll(PDO::FETCH_ASSOC);
         $this->logStatementUpdate($logId, count($data));
@@ -63,14 +63,14 @@ class PdoDbConnector extends DbConnector {
         return $newData ?: $data;
     }
 
-    public function queryEach(StatementInterface $statement, Closure|null $decorator = null): DbEachIterator {
+    public function queryEach(StatementAbstract $statement, Closure|null $decorator = null): DbEachIterator {
         $logId = $this->logStatement($statement, $statement->getParams());
         $statement = $this->prepareStatement($statement, [PDO::ATTR_CURSOR => PDO::CURSOR_SCROLL]);
         $this->logStatementUpdate($logId, -1);
         return new DbEachIterator($statement, $decorator);
     }
 
-    public function queryOne(StatementInterface $statement): array|false {
+    public function queryOne(StatementAbstract $statement): array|false {
         $logId = $this->logStatement($statement, $statement->getParams());
         $stmt = $this->prepareStatement($statement);
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -79,7 +79,7 @@ class PdoDbConnector extends DbConnector {
         return $data;
     }
 
-    public function queryColumn(StatementInterface $statement, int $column = 0): string|float|null|false {
+    public function queryColumn(StatementAbstract $statement, int $column = 0): string|float|null|false {
         $logId = $this->logStatement($statement, $statement->getParams());
         $stmt = $this->prepareStatement($statement);
         $data = $stmt->fetchColumn($column);
@@ -88,14 +88,14 @@ class PdoDbConnector extends DbConnector {
         return $data;
     }
 
-    public function queryGetAffectedCount(StatementInterface $statement): int {
+    public function queryGetAffectedCount(StatementAbstract $statement): int {
         $logId = $this->logStatement($statement, $statement->getParams());
         $result = $this->prepareStatement($statement)->rowCount();
         $this->logStatementUpdate($logId, $result);
         return $result;
     }
 
-    public function queryGetInsertId(StatementInterface $statement): int|string {
+    public function queryGetInsertId(StatementAbstract $statement): int|string {
         $logId = $this->logStatement($statement, $statement->getParams());
         $this->prepareStatement($statement, [], $conn);
         $result = $conn->lastInsertId();

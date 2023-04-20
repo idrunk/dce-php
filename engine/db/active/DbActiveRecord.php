@@ -60,7 +60,7 @@ abstract class DbActiveRecord extends ActiveRecord {
             }
             return $record;
         }
-        return self::query($method !== FindMethod::Extend ? null : $mapping)->where(ActiveQuery::mappingToWhere($mapping))->withExtends($method !== FindMethod::Main)->find();
+        return self::query($method !== FindMethod::Extend ? null : $mapping)->where(ActiveQuery::mappingToWhere($mapping))->carryExtends($method !== FindMethod::Main)->find();
     }
 
     /**
@@ -78,34 +78,21 @@ abstract class DbActiveRecord extends ActiveRecord {
     /**
      * 活动记录持久化
      * @param bool $needLoadNew
-     * @param bool|null $ignoreOrReplace {true: insert ignore into, false: replace into , null: insert into}
+     * @param bool|array|null $updateOrIgnore {true|array: insert into on duplicate key update, false: insert ignore into, null: insert into}
      * @param SaveMethod|array<string> $method
      * @return int|string
      * @throws ActiveException
      * @throws Throwable
      * @throws ValidatorException
      */
-    public function insert(bool $needLoadNew = false, bool|null $ignoreOrReplace = null, SaveMethod|array $method = SaveMethod::Main): int|string {
+    public function insert(bool $needLoadNew = false, bool|array|null $updateOrIgnore = null, SaveMethod|array $method = SaveMethod::Main): int|string {
         $this->valid();
-        $insertId = self::query()->insert($this, $ignoreOrReplace, $method);
+        $insertId = self::query()->insert($this, $updateOrIgnore, $method);
         $needLoadNew ? $this->apply(static::find($insertId)->extract(ExtractType::KeepKey, false))
             : $insertId > 0 && self::getPkProperties()[0]->setValue($this, $insertId, false);
         $this->markQueriedProperties();
         $this->saveCache();
         return $insertId;
-    }
-
-    /**
-     * 插入数据，若已存在则更新
-     * @param SaveMethod|array $method
-     * @return int
-     * @throws ActiveException
-     * @throws Throwable
-     */
-    public function insertUpdate(SaveMethod|array $method = SaveMethod::Main): int {
-        $affected = self::query()->insertUpdate($this, $method);
-        $this->saveCache();
-        return $affected;
     }
 
     /**
@@ -189,7 +176,7 @@ abstract class DbActiveRecord extends ActiveRecord {
             return $this;
         }
         ! static::getExtProperties() && throw new ActiveException(ActiveException::NO_EXT_PROPERTY_DEFINED);
-        return self::query(ActiveQuery::mappingToWhere($this->genExternalMapping(static::getExtendClass())))->withExtends()->find();
+        return self::query(ActiveQuery::mappingToWhere($this->genExternalMapping(static::getExtendClass())))->carryExtends()->find();
     }
 
     /**

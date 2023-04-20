@@ -12,7 +12,6 @@ use dce\db\query\builder\schema\GroupSchema;
 use dce\db\query\builder\schema\HavingSchema;
 use dce\db\query\builder\schema\InsertSchema;
 use dce\db\query\builder\schema\InsertSelectSchema;
-use dce\db\query\builder\schema\InsertUpdateSchema;
 use dce\db\query\builder\schema\JoinSchema;
 use dce\db\query\builder\schema\LimitSchema;
 use dce\db\query\builder\schema\OrderSchema;
@@ -22,6 +21,8 @@ use dce\db\query\builder\schema\TableSchema;
 use dce\db\query\builder\schema\UnionSchema;
 use dce\db\query\builder\schema\UpdateSchema;
 use dce\db\query\builder\schema\WhereSchema;
+use dce\db\query\builder\schema\WindowSchema;
+use dce\db\query\builder\schema\WithSchema;
 use dce\db\query\builder\statement\DeleteStatement;
 use dce\db\query\builder\statement\InsertSelectStatement;
 use dce\db\query\builder\statement\InsertStatement;
@@ -39,11 +40,15 @@ class QueryBuilder {
 
     private HavingSchema $havingSchema;
 
+    private WindowSchema $windowSchema;
+
     private OrderSchema $orderSchema;
 
     private LimitSchema $limitSchema;
 
     private UnionSchema $unionSchema;
+
+    private WithSchema $withSchema;
 
     public function getTableSchema(): TableSchema {
         return $this->tableSchema ??= new TableSchema();
@@ -65,6 +70,10 @@ class QueryBuilder {
         return $this->havingSchema ??= new HavingSchema();
     }
 
+    public function getWindowSchema(): WindowSchema {
+        return $this->windowSchema ??= new WindowSchema();
+    }
+
     public function getOrderSchema(): OrderSchema {
         return $this->orderSchema ??= new OrderSchema();
     }
@@ -75,6 +84,10 @@ class QueryBuilder {
 
     public function getUnionSchema(): UnionSchema {
         return $this->unionSchema ??= new UnionSchema();
+    }
+
+    public function getWithSchema(): WithSchema {
+        return $this->withSchema ??= new WithSchema();
     }
 
     public function addTable(string|RawBuilder|SelectStatement $tableName, string|null $alias): self {
@@ -106,6 +119,11 @@ class QueryBuilder {
         return $this;
     }
 
+    public function addWindow(string $name, string|array|RawBuilder|null $partition = null, string|array|RawBuilder|null $order = null, string|RawBuilder|null $frame = null, string $reference = null): self {
+        $this->getWindowSchema()->addWindow($name, $partition, $order, $frame, $reference);
+        return $this;
+    }
+
     public function addOrder(string|array|RawBuilder $column, string|bool|null $order, bool $isAutoRaw): self {
         $this->getOrderSchema()->addOrder($column, $order, $isAutoRaw);
         return $this;
@@ -121,67 +139,59 @@ class QueryBuilder {
         return $this;
     }
 
+    public function addWith(string $name, SelectStatement $select, array $columns = [], bool $recursive = null): self {
+        $this->getWithSchema()->addWith($name, $select, $columns, $recursive);
+        return $this;
+    }
+
     public function buildSelect(string|array|RawBuilder|null $columns, bool $isDistinct, bool $isAutoRaw): SelectStatement {
-        $selectSchema = new SelectSchema($columns, $isAutoRaw);
-        $selectModifierSchema = new SelectModifierSchema($isDistinct ? 'DISTINCT' : '');
-        $selectStatement = new SelectStatement(
-            $selectSchema,
-            $selectModifierSchema,
+        return new SelectStatement(
+            new SelectSchema($columns, $isAutoRaw),
+            new SelectModifierSchema($isDistinct ? 'DISTINCT' : ''),
             $this->getTableSchema(),
             $this->getJoinSchema(),
             $this->getWhereSchema(),
             $this->getGroupSchema(),
             $this->getHavingSchema(),
+            $this->getWindowSchema(),
             $this->getOrderSchema(),
             $this->getLimitSchema(),
-            $this->getUnionSchema()
+            $this->getUnionSchema(),
+            $this->getWithSchema(),
         );
-        return $selectStatement;
     }
 
-    public function buildInsert(array $data, bool|null $ignoreOrReplace): InsertStatement {
-        $insertSchema = new InsertSchema($data);
-        $insertStatement = new InsertStatement($this->getTableSchema(), $insertSchema, $ignoreOrReplace);
-        return $insertStatement;
-    }
-
-    public function buildInsertUpdate(array $data): InsertStatement {
-        $insertUpdateSchema = new InsertUpdateSchema($data);
-        $insertStatement = new InsertStatement($this->getTableSchema(), $insertUpdateSchema, null);
-        return $insertStatement;
+    public function buildInsert(array $data, bool|array|null $updateOrIgnore): InsertStatement {
+        return new InsertStatement($this->getTableSchema(), new InsertSchema($data), $updateOrIgnore);
     }
 
     public function buildInsertSelect(SelectStatement|RawBuilder $selectStatement, string|array $columns, bool|null $ignoreOrReplace): InsertSelectStatement {
-        $insertSelectSchema = new InsertSelectSchema($selectStatement, $columns);
-        $insertStatement = new InsertSelectStatement($this->getTableSchema(), $insertSelectSchema, $ignoreOrReplace);
-        return $insertStatement;
+        return new InsertSelectStatement($this->getTableSchema(), new InsertSelectSchema($selectStatement, $columns), $ignoreOrReplace);
     }
 
     public function buildUpdate(array $data, bool|null $allowEmptyConditionOrMustEqual): UpdateStatement {
-        $updateSchema = new UpdateSchema($data);
-        $updateStatement = new UpdateStatement(
+        return new UpdateStatement(
             $this->getTableSchema(),
             $this->getJoinSchema(),
-            $updateSchema,
+            new UpdateSchema($data),
             $this->getWhereSchema(),
             $this->getOrderSchema(),
             $this->getLimitSchema(),
-            $allowEmptyConditionOrMustEqual
+            $this->getWithSchema(),
+            $allowEmptyConditionOrMustEqual,
         );
-        return $updateStatement;
     }
 
     public function buildDelete(string|array|null $tableNames, bool|null $allowEmptyConditionOrMustEqual): DeleteStatement {
-        $deleteSchema = new DeleteSchema($tableNames);
-        $deleteStatement = new DeleteStatement(
-            $deleteSchema,
+        return new DeleteStatement(
+            new DeleteSchema($tableNames),
             $this->getTableSchema(),
             $this->getJoinSchema(),
             $this->getWhereSchema(),
             $this->getOrderSchema(),
             $this->getLimitSchema(),
-            $allowEmptyConditionOrMustEqual
+            $this->getWithSchema(),
+            $allowEmptyConditionOrMustEqual,
         );
-        return $deleteStatement;
     }
 }

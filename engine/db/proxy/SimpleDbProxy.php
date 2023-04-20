@@ -11,7 +11,7 @@ use dce\db\connector\DbConfig;
 use dce\db\connector\DbConnector;
 use dce\db\connector\PdoDbConnector;
 use dce\db\Query;
-use dce\db\query\builder\StatementInterface;
+use dce\db\query\builder\StatementAbstract;
 use dce\Dce;
 use drunk\Utility;
 use Iterator;
@@ -61,11 +61,11 @@ final class SimpleDbProxy extends DbProxy {
 
     /**
      * 取可复用的连接器
-     * @param StatementInterface|string|null $statement
+     * @param StatementAbstract|string|null $statement
      * @param array|null $params
      * @return DbConnector
      */
-    private function getConnector(StatementInterface|string $statement = null, array|null $params = null): DbConnector {
+    private function getConnector(StatementAbstract|string $statement = null, array|null $params = null): DbConnector {
         static $connectorMapping = [];
         $hostKey = $this->config->host .':'. $this->config->dbPort;
         if (! key_exists($hostKey, $connectorMapping)) {
@@ -83,32 +83,32 @@ final class SimpleDbProxy extends DbProxy {
     }
 
     /** @inheritDoc */
-    public function queryAll(StatementInterface $statement, string|null $indexColumn = null, string|null $extractColumn = null): array {
+    public function queryAll(StatementAbstract $statement, string|null $indexColumn = null, string|null $extractColumn = null): array {
         return $this->getConnector($statement, $statement->getParams())->queryAll($statement, $indexColumn, $extractColumn);
     }
 
     /** @inheritDoc */
-    public function queryEach(StatementInterface $statement, Closure|null $callback = null): Iterator {
+    public function queryEach(StatementAbstract $statement, Closure|null $callback = null): Iterator {
         return $this->getConnector($statement, $statement->getParams())->queryEach($statement, $callback);
     }
 
     /** @inheritDoc */
-    public function queryOne(StatementInterface $statement): array|false {
+    public function queryOne(StatementAbstract $statement): array|false {
         return $this->getConnector($statement, $statement->getParams())->queryOne($statement);
     }
 
     /** @inheritDoc */
-    public function queryColumn(StatementInterface $statement, int $column = 0): string|int|float|null|false {
+    public function queryColumn(StatementAbstract $statement, int $column = 0): string|int|float|null|false {
         return $this->getConnector($statement, $statement->getParams())->queryColumn($statement, $column);
     }
 
     /** @inheritDoc */
-    public function queryGetAffectedCount(StatementInterface $statement): int {
+    public function queryGetAffectedCount(StatementAbstract $statement): int {
         return $this->getConnector($statement, $statement->getParams())->queryGetAffectedCount($statement);
     }
 
     /** @inheritDoc */
-    public function queryGetInsertId(StatementInterface $statement): int|string {
+    public function queryGetInsertId(StatementAbstract $statement): int|string {
         return $this->getConnector($statement, $statement->getParams())->queryGetInsertId($statement);
     }
 

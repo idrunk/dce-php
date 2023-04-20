@@ -11,6 +11,11 @@ use dce\db\query\builder\RawBuilder;
 use dce\db\query\builder\SchemaAbstract;
 
 class GroupSchema extends SchemaAbstract {
+    /**
+     * @param string|array|RawBuilder $columns
+     * @param bool $isAutoRaw
+     * @throws QueryException
+     */
     public function setGroup(string|array|RawBuilder $columns, bool $isAutoRaw) {
         if (is_string($columns)) {
             $columns = explode(',', $columns);

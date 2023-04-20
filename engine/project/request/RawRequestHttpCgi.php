@@ -23,6 +23,7 @@ class RawRequestHttpCgi extends RawRequestHttp {
         $this->queryString = $_SERVER['QUERY_STRING'];
         $this->httpOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
         $this->userAgent = $_SERVER['HTTP_USER_AGENT'];
+        $this->referer = $_SERVER['HTTP_REFERER'] ?? '';
         $this->remoteAddr = $_SERVER['REMOTE_ADDR'];
         $this->serverPort = $_SERVER['SERVER_PORT'];
     }

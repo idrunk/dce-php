@@ -6,7 +6,7 @@
 
 namespace dce\db\query\builder\Statement;
 
-use dce\db\query\QueryException;
+use dce\db\query\builder\schema\WithSchema;
 use dce\db\query\builder\schema\DeleteSchema;
 use dce\db\query\builder\schema\JoinSchema;
 use dce\db\query\builder\schema\LimitSchema;
@@ -14,6 +14,7 @@ use dce\db\query\builder\schema\OrderSchema;
 use dce\db\query\builder\schema\TableSchema;
 use dce\db\query\builder\schema\WhereSchema;
 use dce\db\query\builder\StatementAbstract;
+use dce\db\query\QueryException;
 
 class DeleteStatement extends StatementAbstract {
     private bool|null $allowEmptyConditionOrMustEqual;
@@ -25,8 +26,10 @@ class DeleteStatement extends StatementAbstract {
         WhereSchema $whereSchema,
         OrderSchema $orderSchema,
         LimitSchema $limitSchema,
+        WithSchema $withSchema,
         bool|null $allowEmptyConditionOrMustEqual
     ) {
+        $this->withSchema = $withSchema;
         $this->deleteSchema = $deleteSchema;
         $this->tableSchema = $tableSchema;
         $this->joinSchema = $joinSchema;
@@ -35,6 +38,7 @@ class DeleteStatement extends StatementAbstract {
         $this->limitSchema = $limitSchema;
         $this->allowEmptyConditionOrMustEqual = $allowEmptyConditionOrMustEqual;
         $this->valid();
+        $this->mergeParams($this->withSchema->getParams());
         $this->mergeParams($this->joinSchema->getParams());
         $this->mergeParams($this->whereSchema->getParams());
         $this->logHasSubQuery($this->joinSchema->hasSubQuery());
@@ -42,7 +46,8 @@ class DeleteStatement extends StatementAbstract {
     }
 
     public function __toString(): string {
-        $sql = "DELETE";
+        $sql = $this->withSchema->isEmpty() ? '' : "WITH $this->withSchema\n";
+        $sql .= "DELETE";
         if (! $this->deleteSchema->isEmpty()) {
             $sql .= " {$this->deleteSchema}";
         }

@@ -6,14 +6,15 @@
 
 namespace dce\db\query\builder\Statement;
 
-use dce\db\query\QueryException;
 use dce\db\query\builder\schema\JoinSchema;
 use dce\db\query\builder\schema\LimitSchema;
 use dce\db\query\builder\schema\OrderSchema;
 use dce\db\query\builder\schema\TableSchema;
 use dce\db\query\builder\schema\UpdateSchema;
 use dce\db\query\builder\schema\WhereSchema;
+use dce\db\query\builder\schema\WithSchema;
 use dce\db\query\builder\StatementAbstract;
+use dce\db\query\QueryException;
 
 class UpdateStatement extends StatementAbstract {
     private bool|null $allowEmptyConditionOrMustEqual;
@@ -25,8 +26,10 @@ class UpdateStatement extends StatementAbstract {
         WhereSchema $whereSchema,
         OrderSchema $orderSchema,
         LimitSchema $limitSchema,
-        bool|null $allowEmptyConditionOrMustEqual
+        WithSchema $withSchema,
+        bool|null $allowEmptyConditionOrMustEqual,
     ) {
+        $this->withSchema = $withSchema;
         $this->tableSchema = $tableSchema;
         $this->joinSchema = $joinSchema;
         $this->updateSchema = $updateSchema;
@@ -35,6 +38,7 @@ class UpdateStatement extends StatementAbstract {
         $this->limitSchema = $limitSchema;
         $this->allowEmptyConditionOrMustEqual = $allowEmptyConditionOrMustEqual;
         $this->valid();
+        $this->mergeParams($this->withSchema->getParams());
         $this->mergeParams($this->joinSchema->getParams());
         $this->mergeParams($this->updateSchema->getParams());
         $this->mergeParams($this->whereSchema->getParams());
@@ -44,7 +48,8 @@ class UpdateStatement extends StatementAbstract {
     }
 
     public function __toString(): string {
-        $sql = "UPDATE {$this->tableSchema}";
+        $sql = $this->withSchema->isEmpty() ? '' : "WITH $this->withSchema\n";
+        $sql .= "UPDATE {$this->tableSchema}";
         if (! $this->joinSchema->isEmpty()) {
             $sql .= " {$this->joinSchema}";
         }

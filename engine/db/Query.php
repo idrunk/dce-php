@@ -213,6 +213,20 @@ class Query {
     }
 
     /**
+     * 定义窗口
+     * @param string $name 窗口名
+     * @param string|array|RawBuilder|null $partition 格式同\dce\db\Query::group(columns)
+     * @param string|array|RawBuilder|null $order 格式同\dce\db\Query::order(column)，仅支持其中的array及raw形式
+     * @param string|RawBuilder|null $frame 参考\dce\db\query\builder\schema\FrameSchema::setFrame; https://dev.mysql.com/doc/refman/8.0/en/window-functions-frames.html
+     * @param string|null $reference 引用窗口名
+     * @return $this
+     */
+    public function window(string $name, string|array|RawBuilder|null $partition = null, string|array|RawBuilder|null $order = null, string|RawBuilder|null $frame = null, string $reference = null): self {
+        $this->queryBuilder->addWindow($name, $partition, $order, $frame, $reference);
+        return $this;
+    }
+
+    /**
      * 设置排序条件
      * @param string|RawBuilder|array $column 排序列
      * <pre>
@@ -261,6 +275,19 @@ class Query {
         return $this;
     }
 
+    /**
+     * 定义公共表表达式
+     * @param string $name 表别名
+     * @param SelectStatement $select 查询语句对象，通过\dce\db\Query::buildSelect获取
+     * @param array $columns 字段别名序列
+     * @param bool|null $recursive 是否递归查询
+     * @return $this
+     */
+    public function with(string $name, SelectStatement $select, array $columns = [], bool $recursive = null): self {
+        $this->queryBuilder->addWith($name, $select, $columns, $recursive);
+        return $this;
+    }
+
 
     /**
      * 构建查询语句实例, 入参同select, 详情参见"多记录查询"
@@ -297,11 +324,12 @@ class Query {
      *  false, 不包裹, 自动对所传字段做合法性校验
      * </pre>
      * @return array
+     * @throws query\QueryException
      */
     public function select(string|array|RawBuilder|null $columns = null, string|RawBuilder|null $indexColumn = null, bool $isDistinct = false, bool $isAutoRaw = true): array {
         $statement = $this->queryBuilder->buildSelect($columns, $isDistinct, $isAutoRaw);
         if ($indexColumn) {
-            $statement->getSelectSchema()->extendColumn($indexColumn);
+            $statement->getSelectSchema()->addColumn($indexColumn);
             $indexColumn = $statement->getSelectSchema()->columnToKey($indexColumn);
         }
         return $this->proxy->queryAll($statement, $indexColumn);
@@ -377,7 +405,7 @@ class Query {
         $statement = $this->queryBuilder->buildSelect($column, $isDistinct, $isAutoRaw);
         $column = $statement->getSelectSchema()->columnToKey($column);
         if ($indexColumn) {
-            $statement->getSelectSchema()->extendColumn($indexColumn);
+            $statement->getSelectSchema()->addColumn($indexColumn);
             $indexColumn = $statement->getSelectSchema()->columnToKey($indexColumn);
         }
         return $this->proxy->queryAll($statement, $indexColumn, $column);
@@ -476,31 +504,21 @@ class Query {
      * Map型数据, 单条插入, 如, ['field1' => 1, 'f2' => 2], 此时函数返回所插入数据的id
      * Map为元素的数组, 批量插入, 如, [['field1' => 1, 'f2' => 2]], 此时函数将返回被插入的条数
      * </pre>
-     * @param bool|null $ignoreOrReplace 三相类型, 指定重复数据处理规则, 默认, null
+     * @param bool|null $updateOrIgnore 三相类型, 指定重复数据处理规则, 默认, null
      * <pre>
      *  null, 普通插入
-     *  true, 忽略重复插入, 若插入数据重复, 则不会插入该数据
-     *  false, 替换插入, 若插入主键重复, 则将删除老数据, 插入新数据
+     *  true|array, 插入冲突时更新，即insert into on duplicate key update，若为数组，则这些字段不更新
+     *  false, 忽略重复插入, 若插入数据重复, 则不会插入该数据
      * </pre>
      * @return int|string
      */
-    public function insert(array $data, bool|null $ignoreOrReplace = null): int|string {
-        $statement = $this->queryBuilder->buildInsert($data, $ignoreOrReplace);
+    public function insert(array $data, bool|array|null $updateOrIgnore = null): int|string {
+        $statement = $this->queryBuilder->buildInsert($data, $updateOrIgnore);
         if ($statement->isBatch()) {
             return $this->proxy->queryGetAffectedCount($statement);
         } else {
             return $this->proxy->queryGetInsertId($statement);
         }
-    }
-
-    /**
-     * 插入单条数据，当唯一约束数据存在时，更新这条数据
-     * @param array $data
-     * @return int|string
-     */
-    public function insertUpdate(array $data): int|string {
-        $statement = $this->queryBuilder->buildInsertUpdate($data);
-        return $this->proxy->queryGetInsertId($statement);
     }
 
     /**

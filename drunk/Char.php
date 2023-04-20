@@ -48,19 +48,27 @@ class Char {
      * 对字符串脱敏
      * @param string $target
      * @param string $coverWith 用以替换的字符
-     * @param int $leftKeeps 左保留字符数（0表示不保留）
-     * @param int $rightKeeps 右保留字符数
-     * @param int $middleKeeps 中间保留字符数
+     * @param int $left 左保留字符数（0表示不保留, 负数表示替换数）
+     * @param int $right 右保留字符数（0表示不保留, 负数表示替换数）
+     * @param int $middle 中间保留字符数（0表示不保留, 负数表示替换数）
      * @return string
      */
-    public static function desensitise(string $target, string $coverWith = '*', int $leftKeeps = 0, int $rightKeeps = 3, int $middleKeeps = 0): string {
+    public static function desensitise(string $target, string $coverWith = '*', int $left = 0, int $right = 3, int $middle = 0): string {
         $len = mb_strlen($target);
-        if ($middleKeeps > 0) {
-            $halfCover = ($len - $leftKeeps - $rightKeeps - $middleKeeps) / 2;
-            $target = mb_substr($target, 0, $leftKeeps) . str_repeat($coverWith, floor($halfCover)) . mb_substr($target, $leftKeeps + floor($halfCover), $middleKeeps) . str_repeat($coverWith, ceil($halfCover)) . mb_substr($target, - $rightKeeps);
-        } else {
-            $coverLen = $len - $leftKeeps - $rightKeeps;
-            $target = mb_substr($target, 0, $leftKeeps) . str_repeat($coverWith, $coverLen) . mb_substr($target, - $rightKeeps);
+        $absLeft = abs($left);
+        $absMiddle = abs($middle);
+        $absRight = abs($right);
+        $left < 0 && $target = substr_replace($target, str_repeat($coverWith, $absLeft), 0, $absLeft);
+        $right < 0 && $target = substr_replace($target, str_repeat($coverWith, $absRight), $right);
+        if ($middle) {
+            $halfCover = ($len - $absLeft - $absRight - $absMiddle) / 2;
+            $ceilHalfCover = ceil($halfCover);
+            if ($middle > 0) {
+                $target = substr_replace($target, str_repeat($coverWith, $ceilHalfCover), $absLeft, $ceilHalfCover);
+                $target = substr_replace($target, str_repeat($coverWith, $ceilHalfCover), $absLeft + $ceilHalfCover + $absMiddle, $ceilHalfCover);
+            } else {
+                $target = substr_replace($target, str_repeat($coverWith, $absMiddle), $absLeft + $ceilHalfCover, $absMiddle);
+            }
         }
         return $target;
     }

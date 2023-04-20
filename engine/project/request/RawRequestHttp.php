@@ -28,6 +28,8 @@ abstract class RawRequestHttp extends RawRequest {
 
     public string $userAgent;
 
+    public string $referer;
+
     public string $remoteAddr;
 
     public int $serverPort;

@@ -21,17 +21,16 @@ class SelectSchema extends SchemaAbstract {
         }
         foreach ($columns as $alias => $column) {
             $isAutoRaw && is_string($column) && $column = new RawBuilder($column, false);
-            $this->extendColumn($column, is_int($alias) ? null : $alias);
+            $this->addColumn($column, is_int($alias) ? null : $alias);
         }
     }
 
-    public function extendColumn(string|RawBuilder $column, string|null $alias = null) {
-        if (($isRaw = $column instanceof RawBuilder) || is_numeric($column)) {
-            $columnName = $column;
-        } else if (! (is_string($column) && $columnName = self::tableWrap($column, true))) {
-            throw (new QueryException(QueryException::SELECT_COLUMN_INVALID))->format(self::printable($column));
-        }
-        $columnName .= $alias ? " {$alias}" : '';
+    public function addColumn(string|RawBuilder $column, string|null $alias = null) {
+        $columnName = $column;
+        if (! ($isRaw = $column instanceof RawBuilder) && ! is_numeric($column))
+            if (! $columnName = self::tableWrap($column, true))
+                throw (new QueryException(QueryException::SELECT_COLUMN_INVALID))->format(self::printable($column));
+        $columnName .= $alias ? " $alias" : '';
         if (! in_array($columnName, $this->getConditions())) {
             $this->pushCondition($columnName);
             $isRaw && $this->mergeParams($column->getParams());

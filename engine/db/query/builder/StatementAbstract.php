@@ -21,11 +21,15 @@ use dce\db\query\builder\schema\TableSchema;
 use dce\db\query\builder\schema\UnionSchema;
 use dce\db\query\builder\schema\UpdateSchema;
 use dce\db\query\builder\schema\WhereSchema;
+use dce\db\query\builder\schema\WindowSchema;
+use dce\db\query\builder\schema\WithSchema;
 
-abstract class StatementAbstract implements StatementInterface {
+abstract class StatementAbstract {
     private array $params = [];
 
     private bool $subQueryBool = false;
+
+    protected WithSchema|null $withSchema = null;
 
     protected InsertSchema|null $insertSchema = null;
 
@@ -48,6 +52,8 @@ abstract class StatementAbstract implements StatementInterface {
     protected GroupSchema|null $groupSchema = null;
 
     protected HavingSchema|null $havingSchema = null;
+
+    protected WindowSchema|null $windowSchema = null;
 
     protected OrderSchema|null $orderSchema = null;
 
@@ -78,6 +84,10 @@ abstract class StatementAbstract implements StatementInterface {
             && $this->getTableSchema() && 1 === count($this->getTableSchema()->getConditions())
             && (! $this->getJoinSchema() || $this->getJoinSchema()->isEmpty())
             && (! $this->getHavingSchema() || $this->getHavingSchema()->isEmpty());
+    }
+
+    public function getWithSchema(): WithSchema|null {
+        return $this->withSchema;
     }
 
     public function getInsertSchema(): InsertSchema|null {
@@ -165,4 +175,6 @@ abstract class StatementAbstract implements StatementInterface {
     }
 
     abstract protected function valid(): void;
+
+    abstract public function __toString(): string;
 }

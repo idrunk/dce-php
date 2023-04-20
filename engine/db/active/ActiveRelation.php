@@ -75,7 +75,7 @@ class ActiveRelation {
      * @throws ActiveException|ModelException
      */
     public function screen(ActiveRecord $primaryActiveRecord): ActiveRecord|array|false {
-        $activeQuery = $this->loadWithActiveRecord($primaryActiveRecord);
+        $activeQuery = $this->loadCarryActiveRecord($primaryActiveRecord);
         return $this->hasOneBool
             ? ($activeQuery?->find() ?: false)
             : ($activeQuery?->select() ?: []);
@@ -97,7 +97,7 @@ class ActiveRelation {
      * @return ActiveQuery|null
      * @throws ActiveException
      */
-    private function loadWithActiveRecord(ActiveRecord $primaryRecord): ActiveQuery|null {
+    private function loadCarryActiveRecord(ActiveRecord $primaryRecord): ActiveQuery|null {
         /*
          * 1. 反向的via关系集，保证当前关系对象必然在关系集尾部
          * 2. 遍历前面的via关系时，若取到了关系数据（已在别处或自加载），则直接跳过循环，未取到则跳出循环（无法取到关系数据导致下游关系数据也无法查取）
@@ -122,11 +122,11 @@ class ActiveRelation {
         return array_pop($where) ? $this->newForeignActiveQuery()->where($where) : null;
     }
 
-    public function loadWithActiveRecordList(array $primaryConditionData, array & $relationDataMapping): array {
+    public function loadCarryActiveRecordList(array $primaryConditionData, array & $relationDataMapping): array {
         // 如果需从关联关系筛选数据, 则递归载入关联关系数据, 否则以主体数据作为关联关系数据
         // 需加载的数据可能已在之前作为中间数据加载过, 所以若已加载过则直接取出即可
         $this->via && $primaryConditionData = key_exists($this->via->name, $relationDataMapping)
-            ? $relationDataMapping[$this->via->name] : $this->via->loadWithActiveRecordList($primaryConditionData, $relationDataMapping);
+            ? $relationDataMapping[$this->via->name] : $this->via->loadCarryActiveRecordList($primaryConditionData, $relationDataMapping);
 
         // 当ID可能与多个表关联时，需根据类型筛选出正确的关联表
         $this->primaryQualifiers && $primaryConditionData = array_filter($primaryConditionData, function($record) {
@@ -135,11 +135,11 @@ class ActiveRelation {
             return true;
         });
 
-        // 有via数据时才能查with数据，否则设为空数组即可，即主数据没有关联的with数据
+        // 有via数据时才能查carry数据，否则设为空数组即可，即主数据没有关联的carry数据
         $relationData = [];
         if ($primaryConditionData) {
             // 这里在为单一条件时没问题, 在为多条件时会多查出单条件匹配但可能多条件不匹配的数据, 但对于最终正确结果的匹配无影响
-            // 根据依赖关系批量查出所有关联数据, 此处虽然新建了ActiveQuery对象, 但因为主ActiveQuery对象缓存了数据，且非with查询，所以不会重复发送相同查询请求
+            // 根据依赖关系批量查出所有关联数据, 此处虽然新建了ActiveQuery对象, 但因为主ActiveQuery对象缓存了数据，且非carry查询，所以不会重复发送相同查询请求
             $where = array_reduce($this->getRelationColumns(), function ($cm, $c) use ($primaryConditionData) {
                 $relationWhereParams = array_map(fn($conditionDatum) => $conditionDatum->{$c['modelPrimary']}, $primaryConditionData);
                 ! $relationWhereParams && throw (new ActiveException(ActiveException::PRIMARY_RECORD_NO_FOREIGN_COLUMN))->format($this->name, $c['modelPrimary']);

@@ -8,7 +8,7 @@ namespace dce\db\proxy;
 
 use Closure;
 use dce\db\Query;
-use dce\db\query\builder\StatementInterface;
+use dce\db\query\builder\StatementAbstract;
 use Iterator;
 
 abstract class DbProxy {
@@ -19,10 +19,10 @@ abstract class DbProxy {
     private static array $statementLogs = [];
 
     /**
-     * @param StatementInterface|string $statement
+     * @param StatementAbstract|string $statement
      * @param array|null $params
      */
-    protected function logStatement(StatementInterface|string $statement, array|null $params = null): void {
+    protected function logStatement(StatementAbstract|string $statement, array|null $params = null): void {
         if (null !== $statement) {
             self::$logCounter ++;
             self::$statementLogs[] = [$statement, $params];
@@ -51,48 +51,48 @@ abstract class DbProxy {
 
     /**
      * 筛选取出全部数据
-     * @param StatementInterface $statement
+     * @param StatementAbstract $statement
      * @param string|null $indexColumn
      * @param string|null $extractColumn
      * @return array
      */
-    abstract public function queryAll(StatementInterface $statement, string|null $indexColumn = null, string|null $extractColumn = null): array;
+    abstract public function queryAll(StatementAbstract $statement, string|null $indexColumn = null, string|null $extractColumn = null): array;
 
     /**
      * 迭代式取筛选数据
-     * @param StatementInterface $statement
+     * @param StatementAbstract $statement
      * @param Closure|null $decorator
      * @return Iterator
      */
-    abstract public function queryEach(StatementInterface $statement, Closure|null $decorator = null): Iterator;
+    abstract public function queryEach(StatementAbstract $statement, Closure|null $decorator = null): Iterator;
 
     /**
      * 取第一条筛选结果
-     * @param StatementInterface $statement
+     * @param StatementAbstract $statement
      * @return array|false
      */
-    abstract public function queryOne(StatementInterface $statement): array|false;
+    abstract public function queryOne(StatementAbstract $statement): array|false;
 
     /**
      * 取第一条筛选结果的第一个字段标量值
-     * @param StatementInterface $statement
+     * @param StatementAbstract $statement
      * @return string|int|float|false|null
      */
-    abstract public function queryColumn(StatementInterface $statement): string|int|float|null|false;
+    abstract public function queryColumn(StatementAbstract $statement): string|int|float|null|false;
 
     /**
      * 取执行SQL所改变的记录数
-     * @param StatementInterface $statement
+     * @param StatementAbstract $statement
      * @return int
      */
-    abstract public function queryGetAffectedCount(StatementInterface $statement): int;
+    abstract public function queryGetAffectedCount(StatementAbstract $statement): int;
 
     /**
      * 取插入语句的最后插入的记录ID
-     * @param StatementInterface $statement
+     * @param StatementAbstract $statement
      * @return int|string
      */
-    abstract public function queryGetInsertId(StatementInterface $statement): int|string;
+    abstract public function queryGetInsertId(StatementAbstract $statement): int|string;
 
     /**
      * 字符串式PDO查询取查询结果

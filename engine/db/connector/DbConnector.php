@@ -8,7 +8,6 @@ namespace dce\db\connector;
 
 use Closure;
 use dce\db\query\builder\StatementAbstract;
-use dce\db\query\builder\StatementInterface;
 use dce\log\LogManager;
 
 abstract class DbConnector {
@@ -54,17 +53,17 @@ abstract class DbConnector {
 
     abstract public function getConnection(): object;
 
-    abstract public function queryAll(StatementInterface $statement, string|null $indexColumn = null, string|null $extractColumn = null): array;
+    abstract public function queryAll(StatementAbstract $statement, string|null $indexColumn = null, string|null $extractColumn = null): array;
 
-    abstract public function queryEach(StatementInterface $statement, Closure|null $decorator = null): DbEachIterator;
+    abstract public function queryEach(StatementAbstract $statement, Closure|null $decorator = null): DbEachIterator;
 
-    abstract public function queryOne(StatementInterface $statement): array|false;
+    abstract public function queryOne(StatementAbstract $statement): array|false;
 
-    abstract public function queryColumn(StatementInterface $statement, int $column = 0): string|float|null|false;
+    abstract public function queryColumn(StatementAbstract $statement, int $column = 0): string|float|null|false;
 
-    abstract public function queryGetAffectedCount(StatementInterface $statement): int;
+    abstract public function queryGetAffectedCount(StatementAbstract $statement): int;
 
-    abstract public function queryGetInsertId(StatementInterface $statement): int|string;
+    abstract public function queryGetInsertId(StatementAbstract $statement): int|string;
 
     abstract public function query(string $statement, array $params, array $fetchArgs): array;
 

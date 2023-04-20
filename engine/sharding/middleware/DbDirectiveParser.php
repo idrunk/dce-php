@@ -21,7 +21,6 @@ use dce\db\query\builder\Statement\InsertStatement;
 use dce\db\query\builder\Statement\SelectStatement;
 use dce\db\query\builder\Statement\UpdateStatement;
 use dce\db\query\builder\StatementAbstract;
-use dce\db\query\builder\StatementInterface;
 use dce\Dce;
 use dce\sharding\parser\mysql\list\MysqlColumnParser;
 use dce\sharding\parser\mysql\list\MysqlGroupByParser;
@@ -60,7 +59,7 @@ class DbDirectiveParser extends DirectiveParser {
     public array|null $selectModifiers = null;
 
     public function __construct(
-        private StatementInterface|string $statement,
+        private StatementAbstract|string $statement,
         private array|null $params,
     ) {
         if ($statement instanceof StatementAbstract) {
@@ -102,7 +101,7 @@ class DbDirectiveParser extends DirectiveParser {
         $statement = $this->getStatement();
         $insertSchema = new InsertSchema($data);
         $tableSchema = $statement->getTableSchema();
-        $ignoreOrReplace = $this->insertBool ? $statement->getIgnoreOrReplace(): null;
+        $ignoreOrReplace = $this->insertBool ? $statement->getUpdateOrIgnore(): null;
         return new InsertStatement($tableSchema, $insertSchema, $ignoreOrReplace);
     }
 
