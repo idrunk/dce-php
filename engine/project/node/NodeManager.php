@@ -35,7 +35,7 @@ final class NodeManager {
         self::$idTreeMapping = Dce::$cache->get('dce_id_tree_mapping') ?: [];
 
         // 如果缓存有效且开启了节点缓存, 则直接返回
-        if (self::$idTreeMapping && Dce::$config->node['cache']) return;
+        if (self::$idTreeMapping && Dce::$config->node['cache'] > 0) return;
         $nodesFiles = $nodesFileList = [];
         foreach (ProjectManager::getAll() as $project) {
             if (is_file($nodesFile = "{$project->path}config/nodes.php")) {
@@ -49,7 +49,7 @@ final class NodeManager {
         if (self::$idTreeMapping && ! Dce::$cache::fileIsModified($nodesFileList)) return;
 
         $rootTree = new NodeTree([
-            'node_name' => 'root',
+            'path_name' => 'root',
             'path_format' => '',
         ]);
         // 从全部项目加载节点配置
@@ -62,9 +62,9 @@ final class NodeManager {
         self::$nodeTree = $rootTree;
 
         // 缓存节点配置
-        Dce::$cache->set('dce_node_tree', self::$nodeTree); // cache the nodes config
-        Dce::$cache->set('dce_path_tree_mapping', self::$pathTreeMapping);
-        Dce::$cache->set('dce_id_tree_mapping', self::$idTreeMapping);
+        Dce::$cache->set('dce_node_tree', self::$nodeTree, Dce::$config->node['cache']); // cache the nodes config
+        Dce::$cache->set('dce_path_tree_mapping', self::$pathTreeMapping, Dce::$config->node['cache']);
+        Dce::$cache->set('dce_id_tree_mapping', self::$idTreeMapping, Dce::$config->node['cache']);
     }
 
     /**

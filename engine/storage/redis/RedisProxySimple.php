@@ -10,8 +10,13 @@ use dce\Dce;
 
 class RedisProxySimple extends RedisProxy {
     protected function __construct(int $index, bool $noSerialize) {
-        static $redis;
-        $this->redis = $redis ??= (new RedisConnector(Dce::$config->redis))->getRedis();
+        static $pool = [];
+        $key = sprintf("%s-%s", $index, $noSerialize);
+        if (key_exists($key, $pool)) {
+            $this->redis = $pool[$key];
+        } else {
+            $pool[$key] = $this->redis = (new RedisConnector(Dce::$config->redis))->getRedis();
+        }
         parent::__construct($index, $noSerialize);
     }
 }

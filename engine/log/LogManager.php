@@ -37,9 +37,7 @@ final class LogManager {
      */
     public static function exception(Throwable $throwable, bool $isSimple, bool $isWarn = false): void {
         $pureContent = self::exceptionRender($throwable, $isSimple, warn: $isWarn);
-
-        // 打印异常
-        self::push(LoggerType::Exception, "\n" . $pureContent);
+        self::push(LoggerType::Exception, "\n" . $pureContent); // 控制台打印异常
     }
 
     /**
@@ -185,7 +183,7 @@ final class LogManager {
     public static function dce(Stringable|string $text): void {
         if (! isset(self::$isServerStart)) {
             global $argv;
-            self::$isServerStart = in_array('start', $argv);
+            self::$isServerStart = in_array('start', $argv ?? []);
             self::$simpleLogger = SimpleLogger::inst();
             SwooleUtility::inSwoole() && self::$tableLogger = TableLogger::inst();
         }

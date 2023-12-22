@@ -25,13 +25,15 @@ abstract class RedisProxy {
         $noSerialize && $this->redis->setOption(Redis::OPT_SERIALIZER, Redis::SERIALIZER_NONE);
     }
 
-    public function __destruct() {
-        // 如果修改了默认库, 则还原选库
-        Dce::$config->redis['index'] !== $this->index && $this->redis->select(Dce::$config->redis['index']);
-        // 如果设置为了不编码, 则重置为自动编码
-        $this->noSerialize && $this->redis->setOption(Redis::OPT_SERIALIZER, Redis::SERIALIZER_PHP);
-        unset($this->redis);
-    }
+//    // 这里无需还原redis配置，因为在simpleProxy下，不同proxy实例会使用相同redis，导致本应以相同redis配置执行的操作，
+//    // 因为中间proxy destruct改变了redis配置，而写入了错误数据
+//    public function __destruct() {
+//        // 如果修改了默认库, 则还原选库
+//        Dce::$config->redis['index'] !== $this->index && $this->redis->select(Dce::$config->redis['index']);
+//        // 如果设置为了不编码, 则重置为自动编码
+//        $this->noSerialize && $this->redis->setOption(Redis::OPT_SERIALIZER, Redis::SERIALIZER_PHP);
+//        unset($this->redis);
+//    }
 
     public static function new(int $index = -1, bool $noSerialize = false): static {
         static $class;

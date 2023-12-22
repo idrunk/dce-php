@@ -51,7 +51,7 @@ class DbPool extends Pool {
                 return $transaction->uses ?? 0 > 1;
             }, array_unique(array_column(isset(Dce::$config->sharding)
                 ? Dce::$config->sharding->filter(fn($c) => key_exists($this->dbAlias, $c->mapping)) : [], 'alias')))
-        ) $result = new PoolException(PoolException::DISCONNECTED_TRANSACTION_ACTIVATED);
+        ) $result = new PoolException(PoolException::DISCONNECTED_TRANSACTION_ACTIVATED, previous: $throwable);
 
         return $result;
     }

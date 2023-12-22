@@ -10,6 +10,7 @@ use dce\base\QuietException;
 use dce\project\node\Node;
 use dce\project\node\NodeManager;
 use drunk\Network;
+use drunk\Structure;
 use Throwable;
 
 abstract class RawRequestHttp extends RawRequest {
@@ -207,7 +208,8 @@ abstract class RawRequestHttp extends RawRequest {
         if ($corsOrigins = $request->node->corsOrigins ?? []) {
             // 若配置了跨域白名单，则允许所有本地地址跨域
             if (Network::isLocalIp($this->getClientInfo()['ip'])) $corsOrigins = ['*'];
-            $this->header('Access-Control-Allow-Origin', implode(',', $corsOrigins));
+            if (false === $origin = Structure::arraySearchItem(fn($o) => $o === '*' || str_contains($o, $this->httpOrigin), $corsOrigins)) return;
+            $this->header('Access-Control-Allow-Origin', $origin);
             $this->header('Access-Control-Allow-Credentials', 'true');
             $this->header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS');
             $this->header('Access-Control-Allow-Headers', 'X-Requested-With, X-Session-Id, Content-Type, Authorization, Accept, Cookie, Origin, Referer, UserToken, ReferToken');

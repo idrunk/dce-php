@@ -17,7 +17,7 @@ class RawRequestHttpCgi extends RawRequestHttp {
     /** @inheritDoc */
     protected function initProperties(): void {
         $this->method = strtolower($_SERVER['REQUEST_METHOD']);
-        $this->isHttps = strtolower($_SERVER["HTTPS"]) === "on";
+        $this->isHttps = strtolower($_SERVER["HTTPS"] ?? "") === "on";
         $this->host = $_SERVER['HTTP_HOST'];
         $this->requestUri = $_SERVER['REQUEST_URI'];
         $this->queryString = $_SERVER['QUERY_STRING'];
@@ -54,7 +54,7 @@ class RawRequestHttpCgi extends RawRequestHttp {
     /** @inheritDoc */
     public function getHeader(string|null $key = null): string|array|null {
         $this->headers ??= array_reduce(array_filter(Structure::arrayEntries($_SERVER), fn($kv) => preg_match('/^http_/ui', $kv[0])),
-            fn($carry, $kv) => $carry + [strtolower(str_ireplace('HTTP_', '', $kv[0])) => $kv[1]], []);
+            fn($carry, $kv) => $carry + [strtolower(str_ireplace(['HTTP_', '_'], ['', '-'], $kv[0])) => $kv[1]], []);
         return ! $key ? $this->headers : $this->headers[$key] ?? null;
     }
 

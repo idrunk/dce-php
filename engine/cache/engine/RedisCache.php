@@ -26,7 +26,7 @@ final class RedisCache extends Cache {
     }
 
     /** @inheritDoc */
-    public function set(array|string $key, mixed $value, int $expiry = 0): bool {
+    public function set(array|string $key, mixed $value, int $expiry = null): bool {
         return RedisProxy::new($this->config['index'])->set(self::genKey($key), $value, $expiry);
     }
 

@@ -60,7 +60,7 @@ class DceConfig extends Config {
         'deep' => 'int',
     ])]
     public array $node = [
-        'cache' => false, // 是否开启节点缓存
+        'cache' => 0, // 节点缓存时长，0为不缓存
         'deep' => 4, // 默认最深扫描4层控制器注解式节点
     ];
 

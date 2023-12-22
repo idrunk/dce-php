@@ -160,7 +160,7 @@ class PdoDbConnector extends DbConnector {
                     Coroutine::cancel($coroutineId);
                 else // 如果不存在了，则表示可能抛出了异常，被捕获后退出了协程，此时需解除映射
                     unset($coroutineMapping[$type][$coroutineId]);
-                testPoint("超时了！！！", $before, Coroutine::exists($coroutineId));
+//                testPoint("超时了！！！", $before, Coroutine::exists($coroutineId));
             });
         } else if ($timerId = $coroutineMapping[$type][$coroutineId] ?? 0) {  // 以非注册逻辑进入时，映射必未解除，此处必为类真值，表达式仅为取timerId
             unset($coroutineMapping[$type][$coroutineId]);

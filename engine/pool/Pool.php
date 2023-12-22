@@ -257,12 +257,14 @@ abstract class Pool {
             $retryable = $this->retryable($throwable);
             // 若可重试却已超限，则抛出超限异常
             true === $retryable && $this->maxRetries > 0 && $this->retries >= $this->maxRetries
-                && $retryable = (new PoolException(PoolException::DISCONNECTED_RETRIES_OVERFLOWED))->format($this->maxRetries);
+                && $retryable = (new PoolException(PoolException::DISCONNECTED_RETRIES_OVERFLOWED, previous: array_pop($exceptions)))->format($this->maxRetries);
 
             // 若可重试未超限，则重试，否则若未标记过异常，则标记异常以便外面抛出
             if (true === $retryable) {
-                // 首次重试前弹警告
-                ! $this->retries && LogManager::warning((new PoolException(PoolException::WARNING_RETRY_CONNECT))->format(static::class));
+                if (! $this->retries) {
+                    array_push($exceptions, $throwable); // 记录原始异常，以便后续跟踪解决
+                    LogManager::warning((new PoolException(PoolException::WARNING_RETRY_CONNECT))->format(static::class)); // 首次重试前弹警告
+                }
                 $this->retry($callback, $exceptions);
             } else {
                 array_push($exceptions, $retryable ?: $throwable);

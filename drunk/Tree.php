@@ -97,15 +97,15 @@ abstract class Tree {
     public function traversal(callable $callback): void {
         $parents = [$this];
         while ($parent = array_pop($parents)) {
-            $children = $parent->children;
-            foreach ($children as $child) {
+            $count = count($parents);
+            foreach ($parent->children as $child) {
                 $result = call_user_func_array($callback, [$child]);
                 if (TreeTraverResult::StopAll === $result) {
                     break 2;
                 } else if (TreeTraverResult::StopSibling === $result) {
                     break;
                 } else if (TreeTraverResult::StopChild !== $result) {
-                    $parents[] = $child;
+                    array_splice($parents, $count, 0, [$child]);
                 }
             }
         }
